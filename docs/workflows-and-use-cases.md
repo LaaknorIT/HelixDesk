@@ -1,0 +1,373 @@
+## HelixDesk Workflows and Key Use Cases
+
+This document describes the main business workflows (incident lifecycle, monitoring events, documentation, change approval, password access, billing metering), and how they map to application components.
+
+---
+
+## 1. Incident lifecycle
+
+### 1.1 Default incident workflow
+
+Default states:
+
+- `New`
+- `Assigned`
+- `In Progress`
+- `Waiting for User`
+- `Resolved`
+- `Closed`
+
+Allowed default transitions (simplified):
+
+- `New` → `Assigned`
+- `Assigned` → `In Progress`
+- `In Progress` → `Waiting for User`
+- `In Progress` → `Resolved`
+- `Waiting for User` → `In Progress`
+- `Resolved` → `Closed`
+- `Resolved` → `In Progress` (reopened)
+
+Implementation:
+
+- Represented by a `WorkflowDefinition` for `entity_type = incident`.
+- Each transition can have optional guards:
+  - role/permission checks (e.g. only agents can resolve).
+  - field requirements (e.g. resolution summary before `Resolved`).
+
+SLA integration:
+
+- When an incident is created:
+  - Determine SLA policy from queue, priority, and/or customer.
+  - Set target response and resolution times.
+- Background jobs:
+  - Monitor SLA timers (queue jobs) and mark incidents as breached when thresholds are crossed.
+  - Trigger notifications/escalations if configured.
+
+---
+
+## 2. Monitoring events and auto-incidents
+
+### 2.1 Event ingestion
+
+Sources:
+
+- Zabbix (initial)
+- Other monitoring tools via HTTP/webhooks
+
+Steps:
+
+1. Monitoring system sends event to `/api/events` or dedicated webhook.
+2. `ProcessMonitoringEventJob` is queued with:
+   - `tenant_id`
+   - event payload
+3. Job performs:
+   - Normalization into `Event` entity.
+   - Calculation of `deduplication_key` from relevant fields (e.g. host, service, problem ID).
+   - Deduplication:
+     - If an open event exists with same `deduplication_key` in a recent time window, update existing event instead of creating a new one.
+
+### 2.2 Incident creation and linking
+
+- For a new or re-opened event:
+  - Apply **event rules** to determine whether to:
+    - create a new incident, or
+    - link to an existing incident.
+  - Use asset mapping to link event to `Asset` and route to appropriate `Queue` (e.g. NOC queue).
+- For a resolved event:
+  - Mark `Event.status` as `resolved` or `closed`.
+  - Optionally:
+    - auto-transition associated incident to `Resolved` if:
+      - no recent agent activity contradicts that state, and
+      - auto-resolution is enabled in tenant configuration.
+
+### 2.3 Separation of queues
+
+- Event-driven incidents are typically routed to:
+  - special **monitoring/operations queues**, not standard service desk queues.
+- This separation is configured per tenant and queue, allowing:
+  - Dedicated NOC teams to work from their own dashboards.
+
+---
+
+## 3. Documentation workflows
+
+### 3.1 States and transitions
+
+Default documentation states:
+
+- `draft`
+- `in_review`
+- `published`
+
+Default transitions:
+
+- `draft` → `in_review`
+- `in_review` → `published`
+- `in_review` → `draft` (changes requested)
+- `published` → `draft` (major revision)
+
+Implementation:
+
+- `WorkflowDefinition` with `entity_type = document`, used by:
+  - `KnowledgeArticle`
+  - `HelpdeskGuide`
+  - `ITDoc`
+- Optional per-type overrides:
+  - Tenants can enable workflow only for IT operations docs, for example.
+
+### 3.2 Approval behavior
+
+- By default, workflows are **disabled**:
+  - Documents can be edited and published directly by authorized users.
+- When enabled:
+  - Only users with specific permissions (e.g. `approve_docs`) can move documents from `in_review` to `published`.
+  - Audit logs record:
+    - who approved
+    - previous and new version
+    - who wrote the change
+
+### 3.3 Linking documents to other entities
+
+Use cases:
+
+- Link KB articles to:
+  - incidents (for resolution references),
+  - problems (for root cause knowledge),
+  - services/assets (for service catalogs).
+- Link helpdesk guides and IT docs to:
+  - processes, risks, non-conformances (for ISO).
+
+Implementation:
+
+- Polymorphic `document_links` table:
+  - `tenant_id`
+  - `document_id`
+  - `linkable_type`
+  - `linkable_id`
+
+---
+
+## 4. Change management and risk assessment
+
+### 4.1 Change request workflow
+
+States:
+
+- `Draft`
+- `Review`
+- `Approved`
+- `Scheduled`
+- `Implemented`
+- `Closed`
+
+Transitions (simplified):
+
+- `Draft` → `Review`
+- `Review` → `Approved`
+- `Approved` → `Scheduled`
+- `Scheduled` → `Implemented`
+- `Implemented` → `Closed`
+
+Approval model:
+
+- Single-step approval in v1:
+  - A user with appropriate permission (`approve_changes`) can move change from `Review` to `Approved`.
+- Future extension:
+  - Additional `ChangeApproval` records with role and sequence fields.
+
+### 4.1.1 Change Calendar
+
+Purpose:
+
+- Give operations and change managers a **time-based overview** of all upcoming and past changes.
+
+Behavior:
+
+- Calendar can be viewed by:
+  - day / week / month
+  - filters (queue, team, organization, asset/service, status)
+- Each change uses:
+  - `scheduled_start_at` and `scheduled_end_at` for its calendar slot.
+- Clicking a calendar entry opens:
+  - change details
+  - linked assets/services
+  - risk assessment
+  - related incidents/problems.
+
+### 4.1.2 Change Kanban board
+
+Purpose:
+
+- Provide a **visual workflow board** for managing changes by status and work-in-progress.
+
+Behavior:
+
+- Columns correspond to change states:
+  - `Draft`, `Review`, `Approved`, `Scheduled`, `Implemented`, `Closed` (or tenant-customized equivalents).
+- Cards:
+  - one card per `Change`, showing key fields (title, requester, risk, window, affected services).
+- Interactions:
+  - Drag-and-drop between columns where transitions are allowed by the workflow definition.
+  - Permissions and workflow rules determine which moves are valid (e.g. only approvers can move into `Approved`).
+- Filters:
+  - by queue, team, organization, risk level, and schedule window (e.g. only show changes in the next 7 days).
+
+### 4.2 Risk linkage
+
+Steps for a risk-aware change:
+
+1. During change creation or review:
+   - Risk is assessed using probability and consequence (1–5).
+2. A `Risk` entity can be:
+   - created specifically for the change, or
+   - selected from existing risks.
+3. The change stores `risk_id` and displays:
+   - risk score (probability × consequence),
+   - risk matrix position (color-coded).
+
+Visualization:
+
+- A heatmap view shows all risks for the tenant with:
+  - axes: `probability` and `consequence`
+  - color: severity (low/medium/high).
+
+---
+
+## 5. Password access and MFA enforcement
+
+### 5.1 Access flow
+
+Scenario: Agent accesses a password entry.
+
+1. Agent opens an asset/customer/team or password list.
+2. Agent selects a password entry to view/copy.
+3. System checks:
+   - agent’s permissions (scoped to password’s tenant and scope).
+   - tenant’s MFA policy for password access.
+   - `last_mfa_at` on user.
+4. If MFA is required and `last_mfa_at` is older than 30 minutes:
+   - System triggers a new MFA challenge (e.g. TOTP, push).
+   - On success, update `last_mfa_at`.
+5. Decrypt password using tenant-unique salt.
+6. Log an entry in `PasswordAccessLog` with:
+   - `user_id`, `password_entry_id`, `access_type`, `reason`, `accessed_at`.
+
+### 5.2 Encryption model
+
+- Per-tenant key hierarchy:
+  - Tenant-specific salt (stored securely, e.g. in encrypted config or KMS).
+  - Passwords encrypted server-side using tenant key material.
+- Future extension:
+  - Support for client-side encryption if stricter compliance is needed.
+
+---
+
+## 6. AI-assisted workflows
+
+### 6.1 Incident triage and suggestions
+
+When an agent opens an incident:
+
+1. UI calls backend endpoint to fetch AI suggestions.
+2. Backend enqueues `RunAIInferenceJob` with:
+   - incident context (sanitized)
+   - request type (`incident_suggestion`).
+3. Job:
+   - selects appropriate AI provider based on:
+     - tenant’s configuration (BYO key vs. HelixDesk AI).
+     - provider availability and priority order.
+   - calls provider via Laravel AI SDK.
+4. On response:
+   - store `AIUsageRecord` (tokens, credits, provider).
+   - store `AIInferenceLog` with summarized suggestion.
+5. Agent UI shows:
+   - proposed solution,
+   - similar incidents/problems,
+   - suggested KB articles.
+6. If agent accepts:
+   - apply changes (e.g. add work log, link problem),
+   - record in `AIInferenceLog` as “applied”, with `approved_by_user_id`.
+
+### 6.2 Batch analysis and clustering
+
+Scheduled job:
+
+1. Picks incidents/problems that match criteria (e.g. last N days, unresolved).
+2. Groups them for clustering or trend analysis.
+3. Enqueues low-priority `RunAIInferenceJob` tasks.
+4. Uses results to:
+   - propose new problems (root causes),
+   - propose improvement actions,
+   - enrich risk and ISO modules.
+
+All such jobs:
+
+- Run on low priority.
+- Are fully logged via `AIUsageRecord` and `AIInferenceLog`.
+
+---
+
+## 7. Billing metering and Stripe integration
+
+### 7.1 Concurrent user sampling
+
+Every hour:
+
+1. A scheduled command runs `RecordConcurrentUsageSampleJob`.
+2. For each tenant:
+   - Count currently active agents/end users (e.g. based on sessions or last activity within a window).
+   - Persist a `ConcurrentUsageSample`:
+     - `tenant_id`, `sampled_at`, `active_user_count`.
+
+### 7.2 Daily peak and export
+
+Daily (e.g. just after midnight in a reference timezone):
+
+1. `ExportDailyMeteredUsageToStripeJob` runs.
+2. For each tenant:
+   - Compute the maximum `active_user_count` for the previous day.
+   - Create or update a `MeteredUsageExport` with:
+     - `tenant_id`, `date`, `peak_active_users`.
+   - Call Stripe metered billing API:
+     - record usage for the tenant’s subscription.
+   - Store Stripe usage record ID.
+
+### 7.3 Per-seat licensing
+
+- License assignments (`LicenseAssignment`) updated when:
+  - new agents are added.
+  - seats are transferred.
+- Business rules:
+  - Yearly licenses can be reused (transferred) if not active concurrently.
+  - If both old and new agent are active:
+    - temporary extra license is needed (e.g. monthly until the first is removed).
+
+---
+
+## 8. Dashboards and widgets
+
+### 8.1 Agent dashboard
+
+Widgets:
+
+- My incidents
+- Incidents in my queues
+- Major incidents
+- Monitoring alerts/events
+- SLA breaches
+- KPIs (e.g. MTTR, open problems, open changes, risk distribution)
+
+Configuration:
+
+- Tenant admin can:
+  - define default widget sets per role/team.
+  - lock specific widgets:
+    - widget locked → cannot be removed or significantly reconfigured by individual agents.
+
+Implementation:
+
+- Store dashboard layouts as JSON per:
+  - `tenant_id`
+  - `role_id` / `team_id`
+  - `user_id` (for personal overrides).
+

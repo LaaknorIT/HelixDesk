@@ -1,0 +1,34 @@
+---
+description: Workflow for handling change requests - summarize, confirm, design first, then implement
+alwaysApply: true
+---
+
+# Change Request Workflow
+
+When the user requests changes through chat, follow this sequence:
+
+## 1. Summarize
+
+Write a brief summary of the requested changes. Include:
+- What is being added, removed, or modified
+- Key constraints or requirements
+- Affected areas (e.g. routes, controllers, models)
+
+## 2. Confirm
+
+Ask the user: **"Does this summary accurately capture what you want?"** or similar. Wait for explicit confirmation before proceeding.
+
+## 3. Update docs/ documentation First
+
+Once confirmed, update `docs`-files:
+- Add or revise relevant sections
+- Document decisions, architecture, and rationale
+- Ensure the design doc reflects the planned implementation
+
+## 4. Implement
+
+Only after docs/ is updated, proceed with implementation in the codebase.
+
+---
+
+**Exception:** Skip this workflow for trivial fixes (typos, minor formatting), clarifications, or questions that do not involve code changes.

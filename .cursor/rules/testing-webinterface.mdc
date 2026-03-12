@@ -1,0 +1,40 @@
+---
+description: Always verify changes through the web interface and log files after making code changes.
+alwaysApply: true
+---
+
+# Web Interface & Log Verification Rule
+
+After the AI assistant makes any non-trivial code change (backend, frontend, or configuration), **it must** guide and, where possible, perform verification of the change end‑to‑end via the web interface and log files before considering the work complete.
+
+## 1. Log in to the Web Interface
+
+- **AI responsibilities**:
+  - Remind the user to ensure the app server is running (e.g. `php artisan serve` / Sail).
+  - Describe exactly which URL to open and which credentials (from seeders or config) to use.
+  - Keep track of which flows need to be exercised in the browser based on the code changes made.
+
+## 2. Exercise the Relevant UI Flow
+
+- **AI responsibilities**:
+  - Tell the user exactly which pages and actions to run (e.g. “go to Billing, click ‘Upgrade Plan’, upload a file in Media Library”).
+  - Explain what successful behavior should look like so the user can confirm or report back problems.
+
+## 3. Check Application Logs for Errors
+
+- **AI responsibilities**:
+  - Use read-only file access to inspect:
+    - `storage/logs/browser.log`
+    - `storage/logs/laravel.log`
+  - Look for new errors/exceptions related to the flows just exercised.
+  - If errors are present, treat them as part of the current task: investigate and propose fixes, or clearly call them out for follow‑up.
+
+## 4. When This Rule Applies
+
+- Applies to **all non-trivial code changes performed by the AI assistant**, including:
+  - Controllers, routes, middleware, jobs, services, models, views, Livewire components, and config changes that affect runtime behavior.
+- The AI may skip full UI + log verification **only** for:
+  - Pure documentation edits.
+  - Comment-only or formatting-only changes.
+  - Extremely isolated refactors where it can reasonably argue behavior is unchanged and the affected code is thoroughly covered by automated tests (and those tests are run).
+
