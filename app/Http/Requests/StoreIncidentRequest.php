@@ -1,0 +1,52 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Foundation\Http\FormRequest;
+
+class StoreIncidentRequest extends FormRequest
+{
+    /**
+     * Determine if the user is authorized to make this request.
+     */
+    public function authorize(): bool
+    {
+        $user = $this->user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->type === 'end_user' || $user->hasPermissionTo('manage_incidents');
+    }
+
+    /**
+     * Get the validation rules that apply to the request.
+     *
+     * @return array<string, ValidationRule|array<mixed>|string>
+     */
+    public function rules(): array
+    {
+        return [
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:65535'],
+            // Priority is SLA-driven later; default to "normal" when omitted.
+            'priority' => ['nullable', 'string', 'max:50'],
+            'queue_id' => ['nullable', 'integer'],
+            'category_id' => ['nullable', 'integer'],
+            'department_id' => ['nullable', 'integer'],
+            'organization_id' => ['nullable', 'integer'],
+            'reported_by_user_id' => ['nullable', 'integer'],
+            'assigned_agent_id' => ['nullable', 'integer'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [];
+    }
+}

@@ -15,8 +15,13 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        if (app()->environment('local')) {
+            $this->call(DemoContentSeeder::class);
 
+            return;
+        }
+
+        // Minimal default seed for non-local environments.
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',

@@ -85,10 +85,19 @@ Foreign key behavior:
 
 - **Tenant isolation at application layer** via:
   - Tenant global scopes on Eloquent queries.
-  - Authorization policies checking `tenant_id` and RBAC.
+  - Authorization policies checking `tenant_id` and RBAC, with RBAC implemented via `spatie/laravel-permission` (teams/multi-tenancy mode) and wired to `tenant_id`.
 - **Administrative separation**:
-  - **Global admins** live in a separate guard/role system and are hidden from tenant UIs.
-  - Global admin access to a tenant is recorded in a dedicated table (e.g. `tenant_impersonations` or similar).
+- **Global admins** live in a separate guard/role system and are hidden from tenant UIs.
+- Tenant-facing UIs are separated by persona:
+  - an **Agent panel** where tenant agents/tenant admins manage incidents,
+  - an **End-user panel** where end users can only manage their own incidents (create, reply, close).
+- Tenant scoping inside tenant-facing Filament panels is handled via Filament's built-in `tenant()` feature (panel tenancy), not by exposing tenant identifiers in UI forms/tables.
+- Incident handling in tenant-facing panels uses a dedicated **record view/edit page** (instead of list-row quick actions), so new workflows can be added without overloading list tables.
+- Incident conversation data supports:
+  - threaded external replies (`incident_messages.parent_message_id`),
+  - agent-only internal notes (`incident_messages.is_internal = true`),
+  - status and priority updates in the record page workflow.
+- Global admin access to a tenant is recorded in a dedicated table (e.g. `tenant_impersonations` or similar).
 - **Data residency**:
   - All databases and object storage located in EU regions.
   - Backups also stored in EU regions.
@@ -107,6 +116,11 @@ Recommended structure (following Laravel 12 streamlined conventions and existing
   - Controllers (web + API), HTTP middleware, request validation classes.
 - `app/Filament/*` (or convention chosen in this project)
   - Filament resources, pages, and widgets for the admin/agent UI.
+  - Panel-specific code is organized by panel folder:
+    - `app/Filament/GlobalAdmin/*`
+    - `app/Filament/Agent/*`
+    - `app/Filament/EndUser/*`
+  - Each panel provider discovers resources/pages/widgets only inside its own folder.
 - `app/Actions/*`
   - Application-level actions (e.g. `CreateIncident`, `ResolveIncident`, `RecordAIUsage`).
 - `app/Jobs/*`
@@ -278,7 +292,8 @@ Patterns:
 
 ### 7.2 Audit logging
 
-- **AuditLogEntry** entity in DB:
+- Prefer `spatie/laravel-activitylog` for an append-only activity/audit trail (immutable by convention; no in-place updates).
+- Where domain requirements demand stricter, queryable audit semantics (e.g. before/after snapshots or a specific schema), persist an `AuditLogEntry` entity in DB:
   - `tenant_id` (nullable for global events)
   - actor (user/global admin/service)
   - action type
