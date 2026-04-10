@@ -44,6 +44,27 @@ class Document extends TenantModel
             ->withTimestamps();
     }
 
+    public function serviceOfferings(): MorphToMany
+    {
+        return $this->morphedByMany(ServiceOffering::class, 'linkable', 'document_links')
+            ->using(DocumentLink::class)
+            ->withTimestamps();
+    }
+
+    public function suppliers(): MorphToMany
+    {
+        return $this->morphedByMany(Supplier::class, 'linkable', 'document_links')
+            ->using(DocumentLink::class)
+            ->withTimestamps();
+    }
+
+    public function assets(): MorphToMany
+    {
+        return $this->morphedByMany(Asset::class, 'linkable', 'document_links')
+            ->using(DocumentLink::class)
+            ->withTimestamps();
+    }
+
     public static function uniqueSlugForTenant(int|string $tenantId, string $title, ?int $ignoreId = null): string
     {
         $base = Str::slug($title);

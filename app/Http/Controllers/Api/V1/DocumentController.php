@@ -65,7 +65,13 @@ class DocumentController extends Controller
         }
 
         return response()->json([
-            'data' => $document->load(['owner', 'incidents']),
+            'data' => $document->load([
+                'owner',
+                'incidents',
+                'serviceOfferings',
+                'suppliers',
+                'assets',
+            ]),
         ]);
     }
 }

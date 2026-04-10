@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\Assets\Pages\EditAsset;
 use App\Filament\Agent\Resources\Assets\Pages\ListAssets;
 use App\Filament\Agent\Resources\Assets\RelationManagers\ChildAssetRelationshipsRelationManager;
 use App\Filament\Agent\Resources\Assets\RelationManagers\ParentAssetRelationshipsRelationManager;
+use App\Filament\Agent\Resources\Assets\RelationManagers\ServiceOfferingsRelationManager;
 use App\Filament\Agent\Resources\Assets\Schemas\AssetForm;
 use App\Filament\Agent\Resources\Assets\Tables\AssetsTable;
 use App\Models\Asset;
@@ -75,6 +76,7 @@ class AssetResource extends Resource
     public static function getRelations(): array
     {
         return [
+            ServiceOfferingsRelationManager::class,
             ChildAssetRelationshipsRelationManager::class,
             ParentAssetRelationshipsRelationManager::class,
         ];

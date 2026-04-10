@@ -2,9 +2,13 @@
 
 namespace Database\Seeders;
 
+use App\Models\Asset;
+use App\Models\AssetType;
 use App\Models\Incident;
 use App\Models\IncidentMessage;
 use App\Models\Organization;
+use App\Models\ServiceOffering;
+use App\Models\Supplier;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Observers\TenantObserver;
@@ -41,6 +45,62 @@ class DemoContentSeeder extends Seeder
                 'external_reference' => null,
             ],
         );
+
+        $demoSupplier = Supplier::query()->withoutGlobalScopes()->firstOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'name' => 'Demo Carrier',
+            ],
+            [
+                'notes' => 'Sample supplier for the service catalog.',
+            ],
+        );
+
+        $demoOffering = ServiceOffering::query()->withoutGlobalScopes()->firstOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'organization_id' => $organization->getKey(),
+                'name' => 'Demo Internet connectivity',
+            ],
+            [
+                'description' => 'Illustrative managed connectivity offering.',
+                'code' => 'DEMO-INET',
+                'kind' => 'internet_connectivity',
+                'attributes_json' => ['line_number' => 'LN-DEMO-001'],
+            ],
+        );
+
+        if (! $demoOffering->suppliers()->whereKey($demoSupplier->getKey())->exists()) {
+            $demoOffering->suppliers()->attach($demoSupplier->getKey(), [
+                'role' => 'primary',
+                'notes' => null,
+            ]);
+        }
+
+        $networkEquipmentType = AssetType::query()->withoutGlobalScopes()
+            ->where('tenant_id', $tenant->getKey())
+            ->where('name', 'Network equipment')
+            ->first();
+
+        if ($networkEquipmentType !== null) {
+            $demoCpe = Asset::query()->withoutGlobalScopes()->firstOrCreate(
+                [
+                    'tenant_id' => $tenant->getKey(),
+                    'organization_id' => $organization->getKey(),
+                    'asset_type_id' => $networkEquipmentType->getKey(),
+                    'name' => 'Demo primary CPE',
+                ],
+                [
+                    'lifecycle_status' => 'in_use',
+                ],
+            );
+
+            if (! $demoOffering->realizationAssets()->whereKey($demoCpe->getKey())->exists()) {
+                $demoOffering->realizationAssets()->attach($demoCpe->getKey(), [
+                    'role' => 'primary_access',
+                ]);
+            }
+        }
 
         $generalQueue = $tenant->generalQueue();
 

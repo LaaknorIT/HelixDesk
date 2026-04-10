@@ -46,4 +46,9 @@ class Organization extends TenantModel
     {
         return $this->hasMany(Asset::class);
     }
+
+    public function serviceOfferings(): HasMany
+    {
+        return $this->hasMany(ServiceOffering::class);
+    }
 }

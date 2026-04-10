@@ -291,7 +291,9 @@ Relationships:
 - belongs to `Organization` (optional)
 - belongs to `User` as owner (optional)
 - belongs to many `Incident`, `Change`, `Event`
+- belongs to many `ServiceOffering` (technical realization pivot **`service_offering_asset`**)
 - has many `AssetRelationship` as parent/child
+- documents via **`document_links`** (morph)
 
 ### 4.3 AssetRelationship
 
@@ -308,6 +310,43 @@ Key fields:
 Invariants:
 
 - `parent_asset.tenant_id` must equal `child_asset.tenant_id`.
+
+### 4.4 Supplier
+
+Commercial vendor (e.g. carrier, software vendor) scoped to a tenant.
+
+Key fields:
+
+- `id`, `tenant_id`, `name`, `notes` (nullable)
+
+Relationships:
+
+- belongs to `Tenant`
+- belongs to many `ServiceOffering` via **`service_offering_supplier`** (`role`: `primary`, `backup`, `support`; optional `notes`)
+- documents via **`document_links`** (morph)
+
+### 4.5 Service offering (service catalog)
+
+A **business service** consumed by a customer organization: what the company needs (e.g. “Internet connectivity”, “Financial and HR systems”), distinct from CIs (`Asset`).
+
+Key fields:
+
+- `id`, `tenant_id`, `organization_id` (customer org; required for MSP clarity)
+- `name`, `description` (nullable), `code` (nullable, internal reference)
+- `kind` (`internet_connectivity`, `business_application_suite`, `custom`, …) — drives suggested asset/supplier roles and optional required attributes
+- `attributes_json` (nullable) — service-specific facts (e.g. `line_number` for connectivity); validated per `kind` where configured
+
+Relationships:
+
+- belongs to `Tenant`, `Organization`
+- belongs to many `Supplier` via **`service_offering_supplier`**
+- belongs to many `Asset` via **`service_offering_asset`** with pivot **`role`** (e.g. `primary_access`, `backup_access`, `financial_application`, `payroll_application`, `circuit`) — **technical realization** of the service
+- documents via **`document_links`** (morph)
+
+Invariants:
+
+- All linked `Supplier` and `Asset` rows must belong to the same `tenant_id` as the offering.
+- `organization_id` identifies **who** consumes the service; CIs may belong to the same or a related org per tenant practice.
 
 ---
 

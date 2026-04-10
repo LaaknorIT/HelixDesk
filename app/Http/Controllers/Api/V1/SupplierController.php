@@ -1,0 +1,70 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreSupplierRequest;
+use App\Models\Supplier;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
+
+class SupplierController extends Controller
+{
+    public function index(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
+
+        setPermissionsTeamId($user->tenant_id);
+
+        try {
+            abort_unless($user->hasPermissionTo('supplier.read'), SymfonyResponse::HTTP_FORBIDDEN);
+        } finally {
+            setPermissionsTeamId(null);
+        }
+
+        $suppliers = Supplier::query()
+            ->orderBy('name')
+            ->get();
+
+        return response()->json([
+            'data' => $suppliers,
+        ]);
+    }
+
+    public function store(StoreSupplierRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $data = $request->validated();
+        $data['tenant_id'] = $user->tenant_id;
+
+        $supplier = Supplier::query()->create($data);
+
+        return response()->json([
+            'data' => $supplier,
+        ], 201);
+    }
+
+    public function show(Request $request, Supplier $supplier): JsonResponse
+    {
+        $user = $request->user();
+
+        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless((int) $supplier->tenant_id === (int) $user->tenant_id, SymfonyResponse::HTTP_FORBIDDEN);
+
+        setPermissionsTeamId($user->tenant_id);
+
+        try {
+            abort_unless($user->hasPermissionTo('supplier.read'), SymfonyResponse::HTTP_FORBIDDEN);
+        } finally {
+            setPermissionsTeamId(null);
+        }
+
+        return response()->json([
+            'data' => $supplier->load(['serviceOfferings']),
+        ]);
+    }
+}

@@ -43,7 +43,8 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 ## Phase C — CMDB & documentation
 
 - [~] **Assets** / CMDB: models, relationships, Filament, API v1
-- [~] **Documents**: Filament, API v1, links to incidents
+- [x] **Service catalog**: `Supplier`, `ServiceOffering`, pivots to assets/suppliers, config-driven kinds/roles ([`docs/service-catalog.md`](service-catalog.md))
+- [~] **Documents**: Filament, API v1, links to incidents, **assets, suppliers, service offerings**
 - [ ] **Deeper CMDB**: discovery feeds, lifecycle policies, compliance views
 - [ ] **Documentation approval workflows** (draft → review → publish) per product spec
 

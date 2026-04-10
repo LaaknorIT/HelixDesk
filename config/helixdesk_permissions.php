@@ -34,6 +34,14 @@ return [
             'label' => 'Assets',
             'actions' => ['read', 'create', 'update', 'delete', 'admin'],
         ],
+        'supplier' => [
+            'label' => 'Suppliers',
+            'actions' => ['read', 'create', 'update', 'delete', 'admin'],
+        ],
+        'service_offering' => [
+            'label' => 'Service offerings',
+            'actions' => ['read', 'create', 'update', 'delete', 'admin'],
+        ],
         'document' => [
             'label' => 'Documentation',
             'actions' => ['read', 'create', 'update', 'delete', 'admin'],
@@ -72,6 +80,12 @@ return [
                 'asset.read',
                 'asset.create',
                 'asset.update',
+                'supplier.read',
+                'supplier.create',
+                'supplier.update',
+                'service_offering.read',
+                'service_offering.create',
+                'service_offering.update',
                 'document.read',
                 'document.create',
                 'document.update',

@@ -6,6 +6,9 @@ use App\Filament\Agent\Resources\Documents\Pages\CreateDocument;
 use App\Filament\Agent\Resources\Documents\Pages\EditDocument;
 use App\Filament\Agent\Resources\Documents\Pages\ListDocuments;
 use App\Filament\Agent\Resources\Documents\RelationManagers\IncidentsRelationManager;
+use App\Filament\Agent\Resources\Documents\RelationManagers\LinkedAssetsRelationManager;
+use App\Filament\Agent\Resources\Documents\RelationManagers\ServiceOfferingsRelationManager;
+use App\Filament\Agent\Resources\Documents\RelationManagers\SuppliersRelationManager;
 use App\Filament\Agent\Resources\Documents\Schemas\DocumentForm;
 use App\Filament\Agent\Resources\Documents\Tables\DocumentsTable;
 use App\Models\Document;
@@ -77,6 +80,9 @@ class DocumentResource extends Resource
     {
         return [
             IncidentsRelationManager::class,
+            ServiceOfferingsRelationManager::class,
+            SuppliersRelationManager::class,
+            LinkedAssetsRelationManager::class,
         ];
     }
 

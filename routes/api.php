@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\V1\AssetController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\IncidentController;
 use App\Http\Controllers\Api\V1\MonitoringEventController;
+use App\Http\Controllers\Api\V1\ServiceOfferingController;
+use App\Http\Controllers\Api\V1\SupplierController;
 use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Middleware\EnsureGlobalAdmin;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +26,14 @@ Route::prefix('v1')->middleware('auth')->group(function (): void {
     Route::get('assets', [AssetController::class, 'index']);
     Route::post('assets', [AssetController::class, 'store']);
     Route::get('assets/{asset}', [AssetController::class, 'show']);
+
+    Route::get('suppliers', [SupplierController::class, 'index']);
+    Route::post('suppliers', [SupplierController::class, 'store']);
+    Route::get('suppliers/{supplier}', [SupplierController::class, 'show']);
+
+    Route::get('service-offerings', [ServiceOfferingController::class, 'index']);
+    Route::post('service-offerings', [ServiceOfferingController::class, 'store']);
+    Route::get('service-offerings/{service_offering}', [ServiceOfferingController::class, 'show']);
 
     Route::get('monitoring-events', [MonitoringEventController::class, 'index']);
     Route::post('monitoring-events', [MonitoringEventController::class, 'store']);
