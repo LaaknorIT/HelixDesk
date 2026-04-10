@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->unsignedBigInteger('tenant_id')->nullable()->index();
             $table->foreign('tenant_id')->references('id')->on('tenants')->nullOnDelete();
-            $table->string('type')->nullable(); // agent, end_user, tenant_admin, global_admin
+            $table->string('type')->nullable(); // agent (all back-office), end_user, global_admin, etc.
             $table->timestamp('last_mfa_at')->nullable();
         });
     }

@@ -1,8 +1,8 @@
 <?php
 
 use App\Auth\TenantTeamResolver;
+use App\Models\TenantRole;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 
 return [
 
@@ -28,7 +28,7 @@ return [
          * `Spatie\Permission\Contracts\Role` contract.
          */
 
-        'role' => Role::class,
+        'role' => TenantRole::class,
 
     ],
 
@@ -43,9 +43,8 @@ return [
         'roles' => 'roles',
 
         /*
-         * When using the "HasPermissions" trait from this package, we need to know which
-         * table should be used to retrieve your permissions. We have chosen a basic
-         * default value but you may easily change it to any table you like.
+         * The application stores permission names on `role_permissions` instead of this table.
+         * The key remains for Spatie package compatibility; the physical `permissions` table is removed by migration.
          */
 
         'permissions' => 'permissions',

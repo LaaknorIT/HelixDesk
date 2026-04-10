@@ -26,7 +26,6 @@ class StoreTenantRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['nullable', 'string', 'max:255', 'alpha_dash', 'unique:tenants,slug'],
             'status' => ['nullable', 'string', 'in:active,readonly,disabled'],
-            'billing_mode' => ['nullable', 'string', 'max:50'],
             'region' => ['nullable', 'string', 'max:50'],
         ];
     }

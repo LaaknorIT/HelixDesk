@@ -28,9 +28,6 @@ class TenantForm
                         'readonly' => 'Read only',
                         'disabled' => 'Disabled',
                     ]),
-                TextInput::make('billing_mode')
-                    ->required()
-                    ->maxLength(50),
                 TextInput::make('region')
                     ->required()
                     ->maxLength(50),

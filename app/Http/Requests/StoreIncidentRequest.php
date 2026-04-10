@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Tenant;
+use App\Support\HelixdeskIncidentAuthorization;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -18,7 +20,21 @@ class StoreIncidentRequest extends FormRequest
             return false;
         }
 
-        return $user->type === 'end_user' || $user->hasPermissionTo('manage_incidents');
+        if ($user->type === 'end_user') {
+            return true;
+        }
+
+        $queueId = $this->input('queue_id');
+
+        if ($queueId === null) {
+            $queueId = Tenant::query()->find($user->tenant_id)?->generalQueue()?->getKey();
+        }
+
+        if ($queueId === null) {
+            return false;
+        }
+
+        return HelixdeskIncidentAuthorization::hasIncidentPermission($user, 'create', (int) $queueId);
     }
 
     /**

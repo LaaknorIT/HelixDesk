@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Incident;
 use App\Models\Tenant;
+use App\Models\TenantRole;
 use App\Models\User;
+use App\Services\RolePermissionMatrixSync;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Symfony\Component\HttpFoundation\Response;
 use Tests\TestCase;
@@ -38,6 +40,9 @@ class IncidentWorkflowApiTest extends TestCase
             ->assertJsonPath('data.status', 'New');
 
         $incidentId = $createResponse->json('data.id');
+        $generalQueueId = $tenant->fresh()->generalQueue()?->id;
+        $this->assertNotNull($generalQueueId);
+        $this->assertSame($generalQueueId, $createResponse->json('data.queue_id'));
 
         $this->patchJson("/api/v1/incidents/{$incidentId}/status", [
             'to_status' => 'Assigned',
@@ -51,7 +56,7 @@ class IncidentWorkflowApiTest extends TestCase
         ])->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 
-    public function test_transition_requires_manage_incidents_permission(): void
+    public function test_transition_requires_incident_update_permission(): void
     {
         $tenant = Tenant::factory()->create();
 
@@ -73,6 +78,7 @@ class IncidentWorkflowApiTest extends TestCase
 
         $incident = Incident::query()->create([
             'tenant_id' => $tenant->id,
+            'queue_id' => $tenant->fresh()->generalQueue()?->id,
             'title' => 'Server down',
             'description' => 'Core app server is down.',
             'priority' => 'Critical',
@@ -85,6 +91,169 @@ class IncidentWorkflowApiTest extends TestCase
         $this->patchJson("/api/v1/incidents/{$incident->id}/status", [
             'to_status' => 'Resolved',
         ])->assertStatus(Response::HTTP_FORBIDDEN);
+    }
+
+    public function test_agent_cannot_read_incidents_outside_assigned_queues(): void
+    {
+        $tenant = Tenant::factory()->create();
+
+        $supportQueue = $tenant->queues()->create([
+            'name' => 'Support',
+            'description' => null,
+        ]);
+
+        $salesQueue = $tenant->queues()->create([
+            'name' => 'Sales',
+            'description' => null,
+        ]);
+
+        $agent = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'type' => 'agent',
+        ]);
+
+        setPermissionsTeamId($tenant->id);
+        $agent->assignRole('Agent');
+        $agentRole = TenantRole::query()
+            ->where('team_id', $tenant->id)
+            ->where('name', 'Agent')
+            ->firstOrFail();
+        $agentRole->queues()->sync([
+            $supportQueue->getKey() => [
+                'incident_permissions' => json_encode(RolePermissionMatrixSync::normalizeIncidentActions([
+                    'read' => true,
+                    'create' => true,
+                    'update' => true,
+                ])),
+            ],
+        ]);
+        setPermissionsTeamId(null);
+
+        $supportIncident = Incident::query()->create([
+            'tenant_id' => $tenant->id,
+            'queue_id' => $supportQueue->getKey(),
+            'title' => 'Support queue incident',
+            'description' => 'Visible to support agent.',
+            'priority' => 'High',
+            'status' => 'New',
+            'opened_at' => now(),
+        ]);
+
+        $salesIncident = Incident::query()->create([
+            'tenant_id' => $tenant->id,
+            'queue_id' => $salesQueue->getKey(),
+            'title' => 'Sales queue incident',
+            'description' => 'Should be hidden from support agent.',
+            'priority' => 'High',
+            'status' => 'New',
+            'opened_at' => now(),
+        ]);
+
+        $this->actingAs($agent);
+
+        $indexResponse = $this->getJson('/api/v1/incidents');
+        $indexResponse->assertOk();
+        $this->assertCount(1, $indexResponse->json('data'));
+        $this->assertSame($supportIncident->id, $indexResponse->json('data.0.id'));
+
+        $this->getJson("/api/v1/incidents/{$supportIncident->id}")
+            ->assertOk();
+
+        $this->getJson("/api/v1/incidents/{$salesIncident->id}")
+            ->assertStatus(Response::HTTP_FORBIDDEN);
+    }
+
+    public function test_agent_gets_queue_access_via_role_queues(): void
+    {
+        $tenant = Tenant::factory()->create();
+
+        $supportQueue = $tenant->queues()->create([
+            'name' => 'Support',
+            'description' => null,
+        ]);
+
+        $agent = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'type' => 'agent',
+        ]);
+
+        setPermissionsTeamId($tenant->id);
+        $agent->assignRole('Agent');
+        $agentRole = TenantRole::query()
+            ->where('team_id', $tenant->id)
+            ->where('name', 'Agent')
+            ->firstOrFail();
+        $agentRole->queues()->sync([
+            $supportQueue->getKey() => [
+                'incident_permissions' => json_encode(RolePermissionMatrixSync::normalizeIncidentActions([
+                    'read' => true,
+                    'create' => true,
+                    'update' => true,
+                ])),
+            ],
+        ]);
+        setPermissionsTeamId(null);
+
+        $supportIncident = Incident::query()->create([
+            'tenant_id' => $tenant->id,
+            'queue_id' => $supportQueue->getKey(),
+            'title' => 'Via group',
+            'description' => 'Queue from group only.',
+            'priority' => 'High',
+            'status' => 'New',
+            'opened_at' => now(),
+        ]);
+
+        $this->actingAs($agent);
+
+        $this->getJson("/api/v1/incidents/{$supportIncident->id}")
+            ->assertOk();
+    }
+
+    public function test_agent_without_incident_read_on_queue_cannot_access_incident_workspace(): void
+    {
+        $tenant = Tenant::factory()->create();
+
+        $queue = $tenant->queues()->create([
+            'name' => 'Locked read',
+            'description' => null,
+        ]);
+
+        $agent = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'type' => 'agent',
+        ]);
+
+        setPermissionsTeamId($tenant->id);
+        $agent->assignRole('Agent');
+        $agentRole = TenantRole::query()
+            ->where('team_id', $tenant->id)
+            ->where('name', 'Agent')
+            ->firstOrFail();
+        $agentRole->queues()->sync([
+            $queue->getKey() => [
+                'incident_permissions' => json_encode(RolePermissionMatrixSync::normalizeIncidentActions([
+                    'read' => false,
+                    'create' => true,
+                    'update' => true,
+                ])),
+            ],
+        ]);
+        setPermissionsTeamId(null);
+
+        Incident::query()->create([
+            'tenant_id' => $tenant->id,
+            'queue_id' => $queue->getKey(),
+            'title' => 'No read',
+            'description' => 'Agent lacks read on this queue.',
+            'priority' => 'High',
+            'status' => 'New',
+            'opened_at' => now(),
+        ]);
+
+        $this->actingAs($agent);
+
+        $this->getJson('/api/v1/incidents')->assertStatus(Response::HTTP_FORBIDDEN);
     }
 
     public function test_end_user_can_create_and_only_see_own_incidents(): void

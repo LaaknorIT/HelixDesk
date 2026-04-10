@@ -30,7 +30,7 @@ class TenantApiTest extends TestCase
 
         $this->assertDatabaseHas('roles', [
             'team_id' => $tenantId,
-            'name' => 'Admin',
+            'name' => 'Tenant Admin',
         ]);
 
         $this->assertDatabaseHas('roles', [

@@ -25,9 +25,6 @@ class TenantsTable
                 TextColumn::make('status')
                     ->label('Status')
                     ->sortable(),
-                TextColumn::make('billing_mode')
-                    ->label('Billing')
-                    ->sortable(),
                 TextColumn::make('region')
                     ->label('Region')
                     ->sortable(),

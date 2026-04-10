@@ -17,7 +17,7 @@ class TenantController extends Controller
     {
         $tenants = Tenant::query()
             ->orderBy('id')
-            ->get(['id', 'name', 'slug', 'status', 'billing_mode', 'region', 'created_at']);
+            ->get(['id', 'name', 'slug', 'status', 'region', 'created_at']);
 
         return response()->json([
             'data' => $tenants,
@@ -35,12 +35,11 @@ class TenantController extends Controller
             'name' => $validated['name'],
             'slug' => $validated['slug'] ?? Str::slug($validated['name']),
             'status' => $validated['status'] ?? 'active',
-            'billing_mode' => $validated['billing_mode'] ?? 'Stripe',
             'region' => $validated['region'] ?? 'eu',
         ]);
 
         return response()->json([
-            'data' => $tenant->only(['id', 'name', 'slug', 'status', 'billing_mode', 'region', 'created_at']),
+            'data' => $tenant->only(['id', 'name', 'slug', 'status', 'region', 'created_at']),
         ], 201);
     }
 
@@ -52,7 +51,7 @@ class TenantController extends Controller
         $tenant = Tenant::query()->findOrFail($id);
 
         return response()->json([
-            'data' => $tenant->only(['id', 'name', 'slug', 'status', 'billing_mode', 'region', 'created_at']),
+            'data' => $tenant->only(['id', 'name', 'slug', 'status', 'region', 'created_at']),
         ]);
     }
 

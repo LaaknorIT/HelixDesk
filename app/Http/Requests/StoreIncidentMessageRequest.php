@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Support\HelixdeskIncidentAuthorization;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -18,7 +19,17 @@ class StoreIncidentMessageRequest extends FormRequest
             return false;
         }
 
-        return $user->type === 'end_user' || $user->hasPermissionTo('manage_incidents');
+        if ($user->type === 'end_user') {
+            return true;
+        }
+
+        $incident = $this->route('incident');
+
+        if ($incident === null || $incident->queue_id === null) {
+            return false;
+        }
+
+        return HelixdeskIncidentAuthorization::hasIncidentPermission($user, 'update', (int) $incident->queue_id);
     }
 
     /**

@@ -8,6 +8,8 @@ use App\Http\Requests\StoreIncidentRequest;
 use App\Http\Requests\UpdateIncidentStatusRequest;
 use App\Models\Incident;
 use App\Services\IncidentWorkflowService;
+use App\Support\HelixdeskIncidentAuthorization;
+use App\Support\IncidentQueueScope;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -22,11 +24,11 @@ class IncidentController extends Controller
 
         $query = Incident::query()->orderByDesc('opened_at');
 
-        if ($user->type === 'end_user') {
-            $query->where('reported_by_user_id', $user->id);
-        } else {
-            abort_unless($user?->hasPermissionTo('view_incidents'), SymfonyResponse::HTTP_FORBIDDEN);
+        if ($user->type !== 'end_user') {
+            abort_unless(HelixdeskIncidentAuthorization::canAccessIncidentWorkspace($user), SymfonyResponse::HTTP_FORBIDDEN);
         }
+
+        IncidentQueueScope::applyToIncidentQuery($query, $user);
 
         $incidents = $query->get();
 
@@ -57,7 +59,7 @@ class IncidentController extends Controller
         if ($user->type === 'end_user') {
             abort_unless((int) $incident->reported_by_user_id === (int) $user->id, SymfonyResponse::HTTP_FORBIDDEN);
         } else {
-            abort_unless($user?->hasPermissionTo('view_incidents'), SymfonyResponse::HTTP_FORBIDDEN);
+            abort_unless(IncidentQueueScope::canAccess($user, $incident), SymfonyResponse::HTTP_FORBIDDEN);
         }
 
         return response()->json([

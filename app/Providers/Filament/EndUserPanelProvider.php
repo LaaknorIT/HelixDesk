@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Http\Middleware\SyncFilamentTenantContext;
 use App\Models\Tenant;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -29,6 +30,9 @@ class EndUserPanelProvider extends PanelProvider
             ->id('end-user')
             ->path('end-user')
             ->tenant(Tenant::class, 'slug', 'tenant')
+            ->tenantMiddleware([
+                SyncFilamentTenantContext::class,
+            ], isPersistent: true)
             ->tenantMenu(false)
             ->tenantSwitcher(false)
             ->login()

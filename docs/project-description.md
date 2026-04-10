@@ -1,8 +1,10 @@
-# **Requirements Specification – HelixDesk SaaS ServiceDesk**
+# **Requirements Specification – HelixDesk**
+
+> **Distribution:** HelixDesk is **open source** under the **GNU Affero General Public License v3 or later (AGPL-3.0-or-later)**. This repository does **not** include subscription billing, payment processing, or Stripe/Cashier integration; see **§16**.
 
 ## **1. Product overview**
 
-**HelixDesk** is a multi-tenant SaaS ServiceDesk platform designed for:
+**HelixDesk** is a multi-tenant ServiceDesk platform designed for:
 
 - IT departments  
 - Managed Service Providers (MSP)
@@ -31,8 +33,7 @@ Main purposes:
 
 - Laravel v12+  
 - Laravel Horizon  
-- Laravel Cashier  
-- Laravel AI SDK
+- Laravel AI SDK (optional integrations)
 
 **Frontend:**
 
@@ -42,8 +43,7 @@ Main purposes:
 
 **Infrastructure:**
 
-- Object storage: DigitalOcean S3 bucket (EU-only)  
-- Payment: Stripe  
+- Object storage: S3-compatible bucket (e.g. EU region)
 
 ---
 
@@ -77,7 +77,7 @@ Each tenant has:
 - its own assets and CMDB relationships  
 - its own documentation  
 - its own configurations  
-- its own billing and subscription configuration  
+- its own operational and integration configuration  
 
 **Identity providers (IdP):**
 
@@ -107,16 +107,18 @@ Each tenant has:
 A tenant admin can:
 
 - manage users within the tenant  
-- set roles and groups  
+- set roles (including which incident queues each role may access)  
 - configure dashboards (defaults per role/team)  
-- handle license levels and billing-related configuration exposed to the tenant  
+- configure tenant-level feature access and limits where the product supports them  
 - manage documentation access and workflows  
-- configure queues, teams, groups, and workflows (including incident/change workflows and documentation approval workflows)  
+- configure queues, teams, and workflows (including incident/change workflows and documentation approval workflows)  
 
 When a tenant is created, it must be pre-populated with:
 
-- a default `Admin` role  
-- a default `Agent` role  
+- a default **Tenant Admin** role (Spatie role name; seeded with `*` → all `{module}.{action}` permissions from `config/helixdesk_permissions.php`)  
+- a default **Agent** role (subset of explicit `{module}.{action}` permissions from the same config)  
+
+People who administer the tenant are **users with `type = agent`** who are assigned the **Tenant Admin** role (or another role granted `tenant.admin` for role/permission management). There is no separate `tenant_admin` user type.
 
 Tenant admins can create, update, and delete additional custom roles within their tenant.
 
@@ -160,26 +162,24 @@ Agents can:
 
 Agents can belong to:
 
-- **groups** (primarily for permission/RBAC grouping)  
-- **queues** (for routing and assignment of work)  
+- **roles** (RBAC capabilities **and** incident queue scope via `role_queue`)  
 - **teams** (for organizational and reporting structure)  
 
 These distinctions must be documented in the design document:
 
-- **Queues**: primary routing units for incidents/events/requests.  
+- **Queues**: primary routing units for incidents/events/requests; tenant admins attach queues to **roles** so agents inherit queue visibility from their assigned roles.  
 - **Teams**: logical organizational units (e.g. “Network team”, “Desktop team”).  
-- **Groups**: reusable access-control groupings to which roles/permissions can be applied.  
 
 ---
 
 ### **4.3 Global Admin**
 
-The global admin role administers the overall SaaS platform (not just a single tenant).
+The global admin role administers the overall platform deployment (not just a single tenant).
 
 Global admins can:
 
 - create, deactivate, and set tenants to read-only mode  
-- manage subscriptions and billing configuration at a global level  
+- manage tenant lifecycle and platform-wide defaults  
 - monitor system usage and performance  
 - configure default AI access and global AI providers  
 - manage global integrations (e.g. global monitoring integrations, SMS/email providers, status page providers)  
@@ -191,24 +191,30 @@ Global admins can:
 
 The system uses **RBAC (Role-Based Access Control)**.
 
-Access can be granted to:
+Users receive capabilities by **assigning roles**. Each role carries `{module}.{action}` permissions and the **incident queues** that role may work in; there is no separate access-control group entity.
 
-- users  
-- groups  
-- roles  
+Permissions are named **`{module}.{action}`** (for example `problem.read`, `change.approve`, `tenant.admin`). Modules and their actions are declared in `config/helixdesk_permissions.php`. Tenant admins manage **roles** under **Settings → Roles**: each role has a **global permission matrix** for non-incident modules, and a separate **per-queue incident matrix** (add a queue, then set read/create/update/delete/admin for incidents in that queue only). **`incident.admin`** remains a global capability for full incident access.
 
-Examples of permissions:
+For incident access, **queue-scoped incident rights** on each role determine what agents can do:
 
-| Permission         | Description             |
-| ------------------ | ----------------------- |
-| `view_incidents`   | read incidents          |
-| `manage_incidents` | create / edit incidents |
-| `manage_problems`  | problem management      |
-| `manage_changes`   | change management       |
-| `view_assets`      | view inventory/CMDB     |
-| `manage_assets`    | edit assets/CMDB        |
-| `view_docs`        | read documentation      |
-| `edit_docs`        | edit documentation      |
+- Each **queue** attached to a role carries a small matrix of incident actions (read, create, update, …).
+- **Which incidents** a user sees is the union of queues where they have **read** (or they hold **`incident.admin`**).
+
+Example: a role may have read/update in `Support` but only read in `Sales`; agents with that role see both queues in the index, but can only update incidents in `Support`.
+
+Tenant admins manage **queues** in the Agent panel (Settings) and configure **roles** (including queue attachments and matrices) under **Settings → Roles**. Effective incident access is the union of queue-specific rights from all roles assigned to the user.
+
+Role capabilities remain **`{module}.{action}`** strings stored on the **`role_permissions`** pivot (no separate global `permissions` catalog table).
+
+Examples:
+
+| Permission        | Description |
+| ----------------- | ------------------------ |
+| `incident.read`   | read incidents           |
+| `incident.update` | update incidents         |
+| `change.approve`  | approve changes          |
+| `document.update` | edit documentation       |
+| `tenant.admin`    | manage roles & access    |
 
 Access can also be controlled per:
 
@@ -221,7 +227,7 @@ Each tenant defines its own mapping of roles → permissions, starting from the 
 Default role behavior:
 
 - The default `Admin` role in a new tenant is seeded with **all available permissions** to simplify initial setup.  
-- Permissions are still **individually assignable**; having permission to manage roles/permissions (e.g. `manage_permissions`) **does not implicitly grant all other permissions**.  
+- Permissions are still **individually assignable**; having `tenant.admin` (manage roles/permissions) **does not implicitly grant all other module permissions** unless those cells are also checked (or the role uses `*`).  
 - Tenant admins can:
   - remove specific permissions from the `Admin` role, and/or
   - create custom admin-like roles with more restricted access, even if they retain the ability to change permissions.
@@ -568,7 +574,7 @@ Processes can be linked with:
 Functions:
 
 - encrypted storage of passwords and secrets  
-- access control based on roles/groups/asset/customer/team scope  
+- access control based on roles/asset/customer/team scope  
 - audit logging  
 
 Scoping:
@@ -716,81 +722,22 @@ Authentication:
 
 ---
 
-## **16. Billing and subscription**
+## **16. Distribution, licensing, and optional modules**
 
-Billing is **per tenant**.
+**Licensing:** The HelixDesk **codebase** is distributed under **AGPL-3.0-or-later**. Network use of modified versions must comply with Affero obligations (see the license text).
 
-Pricing structure:
+**Payments:** In-repo **payment processing, subscriptions, Stripe, and Laravel Cashier are explicitly out of scope**. Operators may run the stack for internal use, offer separate commercial support or hosting, or maintain a compliant fork—without merging proprietary payment logic into the AGPL-covered core unless that code is also AGPL-compatible.
 
-- base price per agent  
-- extra storage  
-- possibility to activate extra modules (add-ons)  
+### **16.1 Extra modules (product scope, not payment-gated)**
 
-Billing periods:
+The following remain **product goals** where implemented; they are **not** tied to in-app billing in this repository:
 
-- monthly  
-- yearly  
-- mixed (some users/modules monthly, some yearly)  
+- **Project module** — portfolio and follow-up  
+- **Requirements / tender / evaluation** — structured vendor comparison  
+- **Sales module** — quotes, lifecycle budgets (especially for MSPs)  
+- **Password administration** — extended vault features on top of core password management  
 
-License models within a tenant:
-
-- Some users can be **yearly licensed**, others **monthly**.  
-- If a yearly-licensed user quits, the license can be **transferred to another agent**.  
-- If the new agent starts before the previous agent has fully left, the tenant may temporarily require an **extra license** (e.g. for one or two months).  
-
-Concurrent user billing:
-
-- The system must support billing based on **concurrent users**.  
-- The number of **active users** must be logged **every hour of the day** for each tenant.  
-- Daily, the system must send to Stripe the **highest number of active users** for that day for metered billing.  
-
-Tenant admin can:
-
-- increase/decrease the number of licenses  
-- turn extra modules on and off (subject to billing)  
-
----
-
-### **16.1 Extra modules (add-ons)**
-
-Possible extra modules include:
-
-- **Project module**
-  - Project portfolio management  
-  - Follow-up of individual projects  
-- **Requirements specification, tender, and evaluation**
-  - Enter different requirements and have different vendors fill them out (via email invitation or by an agent in the system)  
-  - Compare vendors across all requirements  
-- **Sales module**
-  - Especially targeted at MSPs, but also useful for internal departments  
-  - Create offers/quotes for customers or departments  
-  - Plan replacement of equipment nearing end-of-life  
-  - Provide budget input to customers/companies  
-  - Integrated with the project module  
-- **Password administration**
-  - Enhanced password management features, building on the core password manager  
-
-The tight coupling between core functionality and add-ons (e.g. password management) must be clearly defined in the technical design and billing rules.
-
----
-
-### **16.2 Stripe integration**
-
-Payment is handled via:
-
-- Stripe  
-- Laravel Cashier  
-
-Each tenant can be set to **manual handling**, where Stripe is disabled and invoicing is done via an external system.
-
----
-
-### **16.3 External invoicing**
-
-Global admin can:
-
-- deactivate Stripe for specific tenants  
-- export billing data for invoicing in external invoicing systems  
+The boundary between **core** and **add-on** features should stay clear in technical design; enforcement via payment is **not** required here.
 
 ---
 

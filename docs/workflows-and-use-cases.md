@@ -1,6 +1,6 @@
 ## HelixDesk Workflows and Key Use Cases
 
-This document describes the main business workflows (incident lifecycle, monitoring events, documentation, change approval, password access, billing metering), and how they map to application components.
+This document describes the main business workflows (incident lifecycle, monitoring events, documentation, change approval, password access), and they map to application components.
 
 ---
 
@@ -33,6 +33,11 @@ Implementation:
 - Each transition can have optional guards:
   - role/permission checks (e.g. only agents can resolve).
   - field requirements (e.g. resolution summary before `Resolved`).
+
+Queue visibility guard:
+
+- Agent access to incident lists/details is restricted to incidents in queues assigned to that agent.
+- Queue assignment is therefore part of effective authorization, alongside `incident.read` / `incident.update`.
 
 SLA integration:
 
@@ -171,7 +176,7 @@ Transitions (simplified):
 Approval model:
 
 - Single-step approval in v1:
-  - A user with appropriate permission (`approve_changes`) can move change from `Review` to `Approved`.
+  - A user with `change.approve` (or broader change permissions) can move change from `Review` to `Approved`.
 - Future extension:
   - Additional `ChangeApproval` records with role and sequence fields.
 
@@ -307,46 +312,9 @@ All such jobs:
 
 ---
 
-## 7. Billing metering and Stripe integration
+## 7. Dashboards and widgets
 
-### 7.1 Concurrent user sampling
-
-Every hour:
-
-1. A scheduled command runs `RecordConcurrentUsageSampleJob`.
-2. For each tenant:
-   - Count currently active agents/end users (e.g. based on sessions or last activity within a window).
-   - Persist a `ConcurrentUsageSample`:
-     - `tenant_id`, `sampled_at`, `active_user_count`.
-
-### 7.2 Daily peak and export
-
-Daily (e.g. just after midnight in a reference timezone):
-
-1. `ExportDailyMeteredUsageToStripeJob` runs.
-2. For each tenant:
-   - Compute the maximum `active_user_count` for the previous day.
-   - Create or update a `MeteredUsageExport` with:
-     - `tenant_id`, `date`, `peak_active_users`.
-   - Call Stripe metered billing API:
-     - record usage for the tenant’s subscription.
-   - Store Stripe usage record ID.
-
-### 7.3 Per-seat licensing
-
-- License assignments (`LicenseAssignment`) updated when:
-  - new agents are added.
-  - seats are transferred.
-- Business rules:
-  - Yearly licenses can be reused (transferred) if not active concurrently.
-  - If both old and new agent are active:
-    - temporary extra license is needed (e.g. monthly until the first is removed).
-
----
-
-## 8. Dashboards and widgets
-
-### 8.1 Agent dashboard
+### 7.1 Agent dashboard
 
 Widgets:
 
@@ -360,7 +328,7 @@ Widgets:
 Configuration:
 
 - Tenant admin can:
-  - define default widget sets per role/team.
+  - define default widget sets per role.
   - lock specific widgets:
     - widget locked → cannot be removed or significantly reconfigured by individual agents.
 
@@ -368,6 +336,12 @@ Implementation:
 
 - Store dashboard layouts as JSON per:
   - `tenant_id`
-  - `role_id` / `team_id`
+  - `role_name` (Spatie role name, e.g. defaults from `config/helixdesk_permissions.php`)
   - `user_id` (for personal overrides).
+
+Resolution order at runtime:
+
+1. Active `user_override` for the current user.
+2. Active `role_default` for one of the user's tenant roles (e.g. `Admin`, `Agent`).
+3. Application fallback widget set.
 

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Incident;
 use App\Models\IncidentMessage;
+use App\Models\Organization;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Observers\TenantObserver;
@@ -22,14 +23,26 @@ class DemoContentSeeder extends Seeder
             [
                 'name' => 'Demo Tenant',
                 'status' => 'active',
-                'billing_mode' => 'Stripe',
                 'region' => 'eu',
             ],
         );
 
-        // Ensure tenant roles, permissions, and the default incident workflow are present
+        // Ensure tenant roles, permissions, default queues/workflows are present
         // and up-to-date (idempotent).
         app(TenantObserver::class)->created($tenant);
+
+        $organization = Organization::query()->firstOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'name' => 'Demo Customer',
+            ],
+            [
+                'parent_organization_id' => null,
+                'external_reference' => null,
+            ],
+        );
+
+        $generalQueue = $tenant->generalQueue();
 
         $password = Hash::make('password');
 
@@ -44,7 +57,7 @@ class DemoContentSeeder extends Seeder
             ],
         );
 
-        // Create a tenant agent user and assign the tenant-scoped Agent role.
+        // Line agent: Agent role only (no Settings / tenant.admin in navigation).
         $agent = User::query()->updateOrCreate(
             ['email' => 'demo-agent@helixdesk.local'],
             [
@@ -56,8 +69,21 @@ class DemoContentSeeder extends Seeder
             ],
         );
 
+        // Tenant admin: full catalog including tenant.admin and dashboard.admin (Settings navigation).
+        $tenantAdminUser = User::query()->updateOrCreate(
+            ['email' => 'demo-tenantadmin@helixdesk.local'],
+            [
+                'name' => 'Demo Tenant Admin',
+                'password' => $password,
+                'is_admin' => false,
+                'tenant_id' => $tenant->getKey(),
+                'type' => 'agent',
+            ],
+        );
+
         setPermissionsTeamId($tenant->getKey());
-        $agent->assignRole('Agent');
+        $agent->syncRoles(['Agent']);
+        $tenantAdminUser->syncRoles(['Tenant Admin']);
         setPermissionsTeamId(null);
 
         // Two end users to demonstrate "only see your own incidents".
@@ -68,6 +94,7 @@ class DemoContentSeeder extends Seeder
                 'password' => $password,
                 'is_admin' => false,
                 'tenant_id' => $tenant->getKey(),
+                'organization_id' => $organization->getKey(),
                 'type' => 'end_user',
             ],
         );
@@ -79,6 +106,7 @@ class DemoContentSeeder extends Seeder
                 'password' => $password,
                 'is_admin' => false,
                 'tenant_id' => $tenant->getKey(),
+                'organization_id' => $organization->getKey(),
                 'type' => 'end_user',
             ],
         );
@@ -119,11 +147,11 @@ class DemoContentSeeder extends Seeder
         // End-user 2: create a Resolved incident (end-user should be able to close it).
         Incident::query()->create([
             'tenant_id' => $tenant->getKey(),
-            'organization_id' => null,
+            'organization_id' => $organization->getKey(),
             'department_id' => null,
             'reported_by_user_id' => $endUser2->getKey(),
             'assigned_agent_id' => null,
-            'queue_id' => null,
+            'queue_id' => $generalQueue?->getKey(),
             'title' => 'Demo (End User 2) - Resolved incident',
             'description' => 'Demo incident already resolved; End User 2 can close it.',
             'priority' => 'Medium',

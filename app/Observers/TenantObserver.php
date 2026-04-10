@@ -2,88 +2,87 @@
 
 namespace App\Observers;
 
+use App\Models\AssetType;
+use App\Models\DashboardLayout;
+use App\Models\MonitoringEventSource;
+use App\Models\Queue;
 use App\Models\Tenant;
+use App\Models\TenantRole;
 use App\Models\WorkflowDefinition;
 use App\Models\WorkflowTransition;
+use App\Services\RolePermissionSync;
+use App\Support\HelixdeskPermissionCatalog;
 use Illuminate\Support\Facades\Config;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 class TenantObserver
 {
     public function created(Tenant $tenant): void
     {
+        $this->seedTenantPermissionsAndRoles($tenant);
+
+        $this->seedDefaultIncidentWorkflow($tenant);
+        $this->seedDefaultQueue($tenant);
+        $this->seedDefaultChangeWorkflow($tenant);
+        $this->seedDefaultAssetTypes($tenant);
+        $this->seedDefaultMonitoringQueue($tenant);
+        $this->seedDefaultRoleQueues($tenant);
+        $this->seedDefaultMonitoringEventSource($tenant);
+        $this->seedDefaultDashboardLayouts($tenant);
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    private function seedTenantPermissionsAndRoles(Tenant $tenant): void
+    {
         $roleModelClass = Config::get('permission.models.role');
-        $permissionModelClass = Config::get('permission.models.permission');
         $teamForeignKey = Config::get('permission.column_names.team_foreign_key', 'team_id');
         $guard = Config::get('auth.defaults.guard', 'web');
 
-        $permissions = collect($this->defaultPermissions())
-            ->map(fn (string $permissionName) => $permissionModelClass::query()->firstOrCreate([
-                'name' => $permissionName,
-                'guard_name' => $guard,
-            ]));
+        foreach (config('helixdesk_permissions.tenant_roles', []) as $roleConfig) {
+            $roleName = $roleConfig['name'];
 
-        foreach (['Admin', 'Agent'] as $roleName) {
             $roleModelClass::query()->firstOrCreate([
                 $teamForeignKey => $tenant->getKey(),
                 'name' => $roleName,
                 'guard_name' => $guard,
             ]);
+
+            /** @var TenantRole $role */
+            $role = $roleModelClass::query()
+                ->where($teamForeignKey, $tenant->getKey())
+                ->where('name', $roleName)
+                ->where('guard_name', $guard)
+                ->firstOrFail();
+
+            $assignment = $roleConfig['permissions'] ?? [];
+            $expanded = HelixdeskPermissionCatalog::expandRoleAssignment($assignment);
+            $forRolePermissionsTable = array_values(array_filter(
+                $expanded,
+                static function (string $permission): bool {
+                    if (! str_starts_with($permission, 'incident.')) {
+                        return true;
+                    }
+
+                    return $permission === 'incident.admin';
+                }
+            ));
+
+            RolePermissionSync::sync($role, $forRolePermissionsTable, $guard);
         }
-
-        /** @var Role $adminRole */
-        $adminRole = $roleModelClass::query()
-            ->where($teamForeignKey, $tenant->getKey())
-            ->where('name', 'Admin')
-            ->where('guard_name', $guard)
-            ->firstOrFail();
-
-        $adminRole->syncPermissions($permissions);
-
-        $agentRole = $roleModelClass::query()
-            ->where($teamForeignKey, $tenant->getKey())
-            ->where('name', 'Agent')
-            ->where('guard_name', $guard)
-            ->firstOrFail();
-
-        $agentRole->syncPermissions($this->defaultAgentPermissions());
-
-        $this->seedDefaultIncidentWorkflow($tenant);
-
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
-    /**
-     * @return list<string>
-     */
-    private function defaultPermissions(): array
+    private function seedDefaultQueue(Tenant $tenant): void
     {
-        return [
-            'view_incidents',
-            'manage_incidents',
-            'manage_problems',
-            'manage_changes',
-            'view_assets',
-            'manage_assets',
-            'view_docs',
-            'edit_docs',
-            'manage_permissions',
-            'approve_changes',
-        ];
-    }
-
-    /**
-     * Permissions required for v1 incident management actions.
-     *
-     * @return array<string>
-     */
-    private function defaultAgentPermissions(): array
-    {
-        return [
-            'view_incidents',
-            'manage_incidents',
-        ];
+        Queue::query()->firstOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'name' => 'General',
+            ],
+            [
+                'description' => 'Default service desk queue',
+            ]
+        );
     }
 
     private function seedDefaultIncidentWorkflow(Tenant $tenant): void
@@ -114,7 +113,7 @@ class TenantObserver
      */
     private function defaultIncidentTransitions(): array
     {
-        $permission = 'manage_incidents';
+        $permission = 'incident.update';
 
         return [
             [
@@ -154,5 +153,205 @@ class TenantObserver
                 'required_permission' => $permission,
             ],
         ];
+    }
+
+    private function seedDefaultChangeWorkflow(Tenant $tenant): void
+    {
+        $workflowDefinition = WorkflowDefinition::query()->firstOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'entity_type' => 'change',
+                'is_default' => true,
+            ],
+            ['name' => 'Default Change Workflow']
+        );
+
+        $manage = 'change.update';
+        $approve = 'change.approve';
+
+        foreach ([
+            ['from_status' => 'Draft', 'to_status' => 'Review', 'required_permission' => $manage],
+            ['from_status' => 'Review', 'to_status' => 'Approved', 'required_permission' => $approve],
+            ['from_status' => 'Approved', 'to_status' => 'Scheduled', 'required_permission' => $manage],
+            ['from_status' => 'Scheduled', 'to_status' => 'Implemented', 'required_permission' => $manage],
+            ['from_status' => 'Implemented', 'to_status' => 'Closed', 'required_permission' => $manage],
+        ] as $transition) {
+            WorkflowTransition::query()->updateOrCreate([
+                'tenant_id' => $tenant->getKey(),
+                'workflow_definition_id' => $workflowDefinition->getKey(),
+                'from_status' => $transition['from_status'],
+                'to_status' => $transition['to_status'],
+            ], [
+                'required_permission' => $transition['required_permission'],
+            ]);
+        }
+    }
+
+    private function seedDefaultAssetTypes(Tenant $tenant): void
+    {
+        foreach (['PC', 'Server', 'Network equipment', 'Application', 'License'] as $name) {
+            AssetType::query()->firstOrCreate(
+                [
+                    'tenant_id' => $tenant->getKey(),
+                    'name' => $name,
+                ],
+            );
+        }
+    }
+
+    private function seedDefaultMonitoringQueue(Tenant $tenant): void
+    {
+        Queue::query()->firstOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'name' => 'Monitoring',
+            ],
+            [
+                'description' => 'Monitoring and NOC alert routing',
+            ]
+        );
+    }
+
+    private function seedDefaultRoleQueues(Tenant $tenant): void
+    {
+        $guard = Config::get('auth.defaults.guard', 'web');
+        $tenantAdminName = config('helixdesk_permissions.tenant_roles.tenant_admin.name');
+        $agentName = config('helixdesk_permissions.tenant_roles.agent.name');
+
+        $allQueueIds = Queue::query()->where('tenant_id', $tenant->getKey())->pluck('id')->all();
+
+        $tenantAdmin = TenantRole::query()
+            ->where('team_id', $tenant->getKey())
+            ->where('name', $tenantAdminName)
+            ->where('guard_name', $guard)
+            ->first();
+
+        if ($tenantAdmin !== null && $allQueueIds !== []) {
+            $tenantAdminConfig = config('helixdesk_permissions.tenant_roles.tenant_admin', []);
+            $expanded = HelixdeskPermissionCatalog::expandRoleAssignment($tenantAdminConfig['permissions'] ?? []);
+            $incidentPayload = $this->incidentPermissionBoolMapFromExpanded($expanded);
+            $sync = [];
+
+            foreach ($allQueueIds as $queueId) {
+                $sync[(int) $queueId] = ['incident_permissions' => json_encode($incidentPayload)];
+            }
+
+            $tenantAdmin->queues()->sync($sync);
+        }
+
+        $agentRole = TenantRole::query()
+            ->where('team_id', $tenant->getKey())
+            ->where('name', $agentName)
+            ->where('guard_name', $guard)
+            ->first();
+
+        if ($agentRole === null) {
+            return;
+        }
+
+        $ids = array_values(array_filter([
+            $tenant->generalQueue()?->getKey(),
+            $tenant->monitoringQueue()?->getKey(),
+        ]));
+
+        if ($ids !== []) {
+            $agentConfig = config('helixdesk_permissions.tenant_roles.agent', []);
+            $expanded = HelixdeskPermissionCatalog::expandRoleAssignment($agentConfig['permissions'] ?? []);
+            $incidentPayload = $this->incidentPermissionBoolMapFromExpanded($expanded);
+            $sync = [];
+
+            foreach ($ids as $queueId) {
+                $sync[(int) $queueId] = ['incident_permissions' => json_encode($incidentPayload)];
+            }
+
+            $agentRole->queues()->sync($sync);
+        }
+    }
+
+    /**
+     * @param  list<string>  $expandedNames
+     * @return array<string, bool>
+     */
+    private function incidentPermissionBoolMapFromExpanded(array $expandedNames): array
+    {
+        $actions = config('helixdesk_permissions.modules.incident.actions', []);
+        $map = array_fill_keys($actions, false);
+
+        foreach ($expandedNames as $name) {
+            if ($name === 'incident.admin') {
+                foreach ($actions as $action) {
+                    $map[$action] = true;
+                }
+
+                break;
+            }
+
+            if (str_starts_with($name, 'incident.')) {
+                $action = substr($name, strlen('incident.'));
+
+                if (array_key_exists($action, $map)) {
+                    $map[$action] = true;
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    private function seedDefaultMonitoringEventSource(Tenant $tenant): void
+    {
+        MonitoringEventSource::query()->firstOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'slug' => 'api',
+            ],
+            [
+                'name' => 'API / Webhook',
+                'provider' => 'api',
+                'configuration_json' => null,
+            ]
+        );
+    }
+
+    private function seedDefaultDashboardLayouts(Tenant $tenant): void
+    {
+        $agentRoleName = config('helixdesk_permissions.tenant_roles.agent.name');
+        $tenantAdminRoleName = config('helixdesk_permissions.tenant_roles.tenant_admin.name');
+
+        DashboardLayout::query()->updateOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'scope' => DashboardLayout::SCOPE_ROLE_DEFAULT,
+                'role_name' => $agentRoleName,
+            ],
+            [
+                'user_id' => null,
+                'layout_json' => [
+                    ['widget' => 'my_incidents', 'x' => 0, 'y' => 0, 'w' => 6, 'h' => 3],
+                    ['widget' => 'incidents_in_queue', 'x' => 6, 'y' => 0, 'w' => 6, 'h' => 3],
+                    ['widget' => 'monitoring_events', 'x' => 0, 'y' => 3, 'w' => 12, 'h' => 3],
+                ],
+                'locked_widgets' => ['my_incidents'],
+                'is_active' => true,
+            ],
+        );
+
+        DashboardLayout::query()->updateOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'scope' => DashboardLayout::SCOPE_ROLE_DEFAULT,
+                'role_name' => $tenantAdminRoleName,
+            ],
+            [
+                'user_id' => null,
+                'layout_json' => [
+                    ['widget' => 'major_incidents', 'x' => 0, 'y' => 0, 'w' => 6, 'h' => 3],
+                    ['widget' => 'sla_breaches', 'x' => 6, 'y' => 0, 'w' => 6, 'h' => 3],
+                    ['widget' => 'kpis', 'x' => 0, 'y' => 3, 'w' => 12, 'h' => 3],
+                ],
+                'locked_widgets' => ['major_incidents'],
+                'is_active' => true,
+            ],
+        );
     }
 }

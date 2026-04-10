@@ -24,7 +24,6 @@ class TenantFactory extends Factory
             'name' => $name,
             'slug' => Str::slug($name).'-'.fake()->unique()->numberBetween(100, 999),
             'status' => 'active',
-            'billing_mode' => 'Stripe',
             'region' => 'eu',
         ];
     }

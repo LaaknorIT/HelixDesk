@@ -16,7 +16,6 @@ return new class extends Migration
             $table->string('name');
             $table->string('slug')->unique()->nullable();
             $table->string('status')->default('active'); // active, readonly, disabled
-            $table->string('billing_mode')->default('Stripe'); // Stripe or external/manual
             $table->string('region')->default('eu'); // EU-only for v1
             $table->timestamps();
         });

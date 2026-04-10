@@ -2,7 +2,8 @@
 
 This document describes the main domain entities, their relationships, and key invariants. It is a working model to guide migrations, Eloquent models, and API design.
 
-> Note: Field lists are indicative, not exhaustive. Types and naming must follow Laravel and project conventions.
+> Note: Field lists are indicative, not exhaustive. Types and naming must follow Laravel and project conventions.  
+> **AGPL core:** payment processors, Stripe, and subscription tables are **not** part of this codebase; some sections below are retained as **historic product sketches** only.
 
 ---
 
@@ -18,7 +19,6 @@ Key fields:
 - `name`
 - `slug` or `subdomain` (optional, for routing)
 - `status` (`active`, `readonly`, `disabled`)
-- `billing_mode` (Stripe, external/manual)
 - `region` (EU region identifier, if multi-region introduced later)
 
 Relationships:
@@ -26,13 +26,12 @@ Relationships:
 - has many `Organization`
 - has many `User`
 - has many `Role`, `Team`, `Queue`
-- has many `Subscription`, `LicenseAssignment`, `ConcurrentUsageSample`
 - has many `IntegrationConnection`, `IdpConnection`
 
 Invariants:
 
 - All tenant-owned entities reference `tenant_id`.
-- Tenant cannot be deleted if it has active billing records; must be archived/disabled.
+- Prefer **archiving/disabling** tenants instead of hard deletion when audit or compliance retention applies.
 
 ### 1.2 Organization
 
@@ -68,7 +67,7 @@ Key fields:
 - `id`
 - `tenant_id`
 - `organization_id` (nullable for agents)
-- `type` (`agent`, `end_user`, `tenant_admin`, etc.)
+- `type` (`agent` for all back-office staff including those who administer the tenant, `end_user`, `global_admin` for platform operators when stored on the same table, etc.)
 - `email`, `name`
 - `last_mfa_at` (for password vault access enforcement)
 
@@ -76,22 +75,23 @@ Relationships:
 
 - belongs to `Tenant`, `Organization` (optional)
 - belongs to many `Role`, `Team`
-- assigned to many `Queue` (via assignments)
 - has many `Incident` as `reported_by` and `assigned_agent`
 - has many `PasswordEntry` as last viewed by
 
 Invariants:
 
-- Agents must belong to a tenant and can optionally be linked to an organization.
+- Back-office staff (`type = agent`) must belong to a tenant; **tenant administration** is a **Spatie role** (default name `Tenant Admin`, configurable in `config/helixdesk_permissions.php`) with full permission assignment via `*` (or explicitly including `tenant.admin`), not a separate `users.type`.
 - End users must belong to an `Organization`.
 
 ### 1.4 Role, Team, Queue
 
 **Role**
 
-- `id`, `tenant_id`, `name`, `description`
-- has many `Permission` through pivot (e.g. `role_permissions`)
+- `id`, `tenant_id`, `name`, `description` (Spatie `roles` with `team_id` = tenant)
+- permission strings are attached via **`role_permissions`** (`role_id`, `permission`, `guard_name`, timestamps). There is **no** separate `permissions` lookup table; the string is the canonical permission name (e.g. `problem.read`, `tenant.admin`). **Incident** actions (`incident.read`, `incident.update`, …) are **not** stored here except **`incident.admin`** (full incident bypass); per-queue incident rights live on the **`role_queue`** pivot.
+- belongs to many `Queue` via **`role_queue`** (`role_id`, `queue_id`, `incident_permissions` JSON, timestamps). The JSON holds booleans per incident action (read, create, update, delete, admin) for that queue on that role.
 - users belong to many roles.
+- Default seeded roles and **`{module}.{action}`** permission names are defined in `config/helixdesk_permissions.php`. The **Tenant Admin** role receives all catalog permissions by default (`*` expansion) but can be edited like any other role.
 
 **Team**
 
@@ -104,7 +104,12 @@ Invariants:
 - `id`, `tenant_id`, `name`, `description`
 - routing unit for incidents/events/requests.
 - has many `Incident`
-- has many `User` (agents assigned to queue).
+- belongs to many `Role` via **`role_queue`**.
+
+Queue-scoped authorization invariant:
+
+- For agents, **incident** capabilities are evaluated per **`queue_id`** using **`role_queue.incident_permissions`** (and **`incident.admin`** on `role_permissions` if present). Legacy data may use global `incident.*` on `role_permissions` only when the pivot JSON is null.
+- An agent can read an incident only when they have **read** (or **admin**) for that incident’s queue on at least one assigned role; list/index scopes use the union of queue IDs where **read** is granted.
 
 ---
 
@@ -489,64 +494,9 @@ Key fields:
 
 ---
 
-## 9. Billing and subscriptions
+## 9. Billing and subscriptions (out of scope in AGPL core)
 
-### 9.1 Subscription
-
-Key fields:
-
-- `id`
-- `tenant_id`
-- `stripe_customer_id` (nullable if manual)
-- `stripe_subscription_id` (nullable)
-- `billing_mode` (`per_seat`, `concurrent`, or mixed)
-
-Relationships:
-
-- belongs to `Tenant`
-- has many `LicenseAssignment`
-- has many `ConcurrentUsageSample`
-
-### 9.2 LicenseAssignment
-
-Represents per-user licensing (monthly/yearly).
-
-Key fields:
-
-- `id`
-- `tenant_id`
-- `user_id`
-- `license_type` (`monthly`, `yearly`)
-- `starts_at`
-- `ends_at` (nullable)
-
-Invariants:
-
-- Transferring yearly license: link new assignment to same yearly license bundle if needed.
-
-### 9.3 ConcurrentUsageSample
-
-Hourly snapshot of concurrent active users.
-
-Key fields:
-
-- `id`
-- `tenant_id`
-- `sampled_at` (hour)
-- `active_user_count`
-
-Used to compute **daily peak active users** for metered billing to Stripe.
-
-### 9.4 MeteredUsageExport
-
-Key fields:
-
-- `id`
-- `tenant_id`
-- `date`
-- `peak_active_users`
-- `exported_at`
-- `stripe_metered_usage_id` (response from Stripe)
+**Not implemented** in this repository: Stripe, Cashier, `Subscription`, seat metering exports, or payment webhooks. Any future **optional** usage accounting (e.g. AI quotas) should be documented separately and remain AGPL-compatible.
 
 ---
 
@@ -579,8 +529,7 @@ Key fields:
 
 Used for:
 
-- internal monitoring
-- tenant billing when using HelixDesk-managed AI.
+- internal monitoring and optional usage limits
 
 ### 10.3 AIInferenceLog
 
@@ -622,4 +571,33 @@ Visibility rules:
 
 - Tenant admins see only entries with their `tenant_id`.
 - Global admins can see all entries.
+
+---
+
+## 12. Dashboards
+
+### 12.1 DashboardLayout
+
+Tenant-scoped persisted dashboard configuration for agent-facing dashboards.
+
+Key fields:
+
+- `id`
+- `tenant_id`
+- `scope` (`role_default`, `user_override`)
+- `role_name` (nullable; required for `role_default`)
+- `user_id` (nullable; required for `user_override`)
+- `layout_json` (JSON object/array with widget placement and settings)
+- `locked_widgets` (JSON array of widget identifiers that cannot be removed/reconfigured by personal overrides)
+- `is_active`
+- `created_at`, `updated_at`
+
+Invariants:
+
+- Exactly one active default per `(tenant_id, role_name)` pair.
+- At most one active override per `(tenant_id, user_id)`.
+- Effective layout precedence:
+  1. active user override (`user_override`)
+  2. active role default (`role_default`)
+  3. hardcoded application fallback.
 

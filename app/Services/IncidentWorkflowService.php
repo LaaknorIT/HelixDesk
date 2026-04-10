@@ -4,9 +4,12 @@ namespace App\Services;
 
 use App\Models\Incident;
 use App\Models\IncidentMessage;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Models\WorkflowDefinition;
 use App\Models\WorkflowTransition;
+use App\Support\HelixdeskIncidentAuthorization;
+use App\Support\IncidentQueueScope;
 use Illuminate\Support\Carbon;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -48,14 +51,18 @@ class IncidentWorkflowService
                 throw new AccessDeniedHttpException('Forbidden.');
             }
         } else {
+            if (! IncidentQueueScope::canAccess($user, $incident)) {
+                throw new AccessDeniedHttpException('Forbidden.');
+            }
+
             // Agents/tenant admins must have permission required by the workflow transition.
-            if ($transition->required_permission !== null && ! $user->hasPermissionTo($transition->required_permission)) {
+            if (! HelixdeskIncidentAuthorization::satisfiesWorkflowPermission($user, $transition->required_permission, $incident)) {
                 throw new AccessDeniedHttpException('Forbidden.');
             }
         }
 
         // End users can reach a transition only when the workflow allows it.
-        if ($transition->required_permission !== null && ! $user->hasPermissionTo($transition->required_permission)) {
+        if (! HelixdeskIncidentAuthorization::satisfiesWorkflowPermission($user, $transition->required_permission, $incident)) {
             throw new AccessDeniedHttpException('Forbidden.');
         }
 
@@ -113,13 +120,13 @@ class IncidentWorkflowService
                     continue;
                 }
             } else {
-                if ($transition->required_permission !== null && ! $user->hasPermissionTo($transition->required_permission)) {
+                if (! HelixdeskIncidentAuthorization::satisfiesWorkflowPermission($user, $transition->required_permission, $incident)) {
                     continue;
                 }
             }
 
             // End-user transitions are still subject to workflow required permissions (if any).
-            if ($transition->required_permission !== null && ! $user->hasPermissionTo($transition->required_permission)) {
+            if (! HelixdeskIncidentAuthorization::satisfiesWorkflowPermission($user, $transition->required_permission, $incident)) {
                 continue;
             }
 
@@ -138,17 +145,26 @@ class IncidentWorkflowService
             throw new AccessDeniedHttpException('Forbidden.');
         }
 
-        if ($user->type !== 'end_user' && ! $user->hasPermissionTo('manage_incidents')) {
-            throw new AccessDeniedHttpException('Forbidden.');
+        $queueId = $data['queue_id'] ?? null;
+
+        if ($queueId === null) {
+            $tenant = Tenant::query()->find($user->tenant_id);
+            $queueId = $tenant?->generalQueue()?->getKey();
+        }
+
+        if ($user->type !== 'end_user') {
+            if ($queueId === null || ! HelixdeskIncidentAuthorization::hasIncidentPermission($user, 'create', (int) $queueId)) {
+                throw new AccessDeniedHttpException('Forbidden.');
+            }
         }
 
         $incident = Incident::query()->create([
             'tenant_id' => $user->tenant_id,
-            'organization_id' => $data['organization_id'] ?? null,
+            'organization_id' => $data['organization_id'] ?? $user->organization_id,
             'department_id' => $data['department_id'] ?? null,
             'reported_by_user_id' => $user->id,
             'assigned_agent_id' => $data['assigned_agent_id'] ?? null,
-            'queue_id' => $data['queue_id'] ?? null,
+            'queue_id' => $queueId,
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
             // SLA-driven priority will be introduced later; default to "normal" for now.
@@ -175,7 +191,12 @@ class IncidentWorkflowService
         }
 
         if ($isInternal) {
-            if ($user->type === 'end_user' || ! $user->hasPermissionTo('manage_incidents')) {
+            if ($user->type === 'end_user' || $incident->queue_id === null
+                || ! HelixdeskIncidentAuthorization::hasIncidentPermission($user, 'update', (int) $incident->queue_id)) {
+                throw new AccessDeniedHttpException('Forbidden.');
+            }
+
+            if (! IncidentQueueScope::canAccess($user, $incident)) {
                 throw new AccessDeniedHttpException('Forbidden.');
             }
         } else {
@@ -183,8 +204,10 @@ class IncidentWorkflowService
                 if ((int) $incident->reported_by_user_id !== (int) $user->id) {
                     throw new AccessDeniedHttpException('Forbidden.');
                 }
-            } elseif (! $user->hasPermissionTo('manage_incidents')) {
-                // Agents can only reply if they have manage_incidents permission.
+            } elseif ($incident->queue_id === null
+                || ! HelixdeskIncidentAuthorization::hasIncidentPermission($user, 'update', (int) $incident->queue_id)) {
+                throw new AccessDeniedHttpException('Forbidden.');
+            } elseif (! IncidentQueueScope::canAccess($user, $incident)) {
                 throw new AccessDeniedHttpException('Forbidden.');
             }
         }

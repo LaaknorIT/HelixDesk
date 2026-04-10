@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 
 class Incident extends TenantModel
 {
@@ -46,5 +48,37 @@ class Incident extends TenantModel
     public function reportedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reported_by_user_id');
+    }
+
+    public function organization(): BelongsTo
+    {
+        return $this->belongsTo(Organization::class);
+    }
+
+    public function queue(): BelongsTo
+    {
+        return $this->belongsTo(Queue::class);
+    }
+
+    public function problems(): BelongsToMany
+    {
+        return $this->belongsToMany(Problem::class, 'incident_problem');
+    }
+
+    public function assets(): BelongsToMany
+    {
+        return $this->belongsToMany(Asset::class, 'asset_incident');
+    }
+
+    public function monitoringEvents(): BelongsToMany
+    {
+        return $this->belongsToMany(MonitoringEvent::class, 'monitoring_event_incident');
+    }
+
+    public function documents(): MorphToMany
+    {
+        return $this->morphToMany(Document::class, 'linkable', 'document_links')
+            ->using(DocumentLink::class)
+            ->withTimestamps();
     }
 }

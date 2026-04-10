@@ -2,13 +2,15 @@
 
 This document turns the high-level requirements in `project-description.md` into concrete technical architecture decisions for the first major version of HelixDesk.
 
+**License:** The application is **AGPL-3.0-or-later** (see repository `LICENSE`). **Billing, payments, and Stripe/Cashier are not part of this codebase.**
+
 ---
 
 ## 1. High-level system overview
 
 ### 1.1 Context
 
-HelixDesk is a **multi-tenant SaaS ServiceDesk** platform hosted in **EU regions only**. It serves:
+HelixDesk is a **multi-tenant ServiceDesk** platform, typically hosted in **EU regions** when data residency matters. It serves:
 
 - One **tenant per MSP or IT department**.  
 - Each tenant serves one or more **customer companies**, each with departments and end users.
@@ -18,9 +20,8 @@ At a high level, the system consists of:
 - **Web Application** (Laravel + Livewire + Filament)  
 - **REST API** (Laravel controllers + OpenAPI docs)  
 - **Background workers / Queues** (Laravel Horizon)  
-- **AI integration layer** (Laravel AI SDK)  
-- **Billing and metering** (Laravel Cashier + Stripe)  
-- **Object storage** (DigitalOcean Spaces / S3-compatible, EU-only)  
+- **AI integration layer** (Laravel AI SDK, when enabled)  
+- **Object storage** (S3-compatible, e.g. EU region)  
 - **External integrations** (SSO, monitoring, Intune/Zabbix, SMS/email providers, status page, etc.)
 
 ---
@@ -35,7 +36,7 @@ Minimum deployment includes:
   - Serve the Laravel/Filament UI and REST API.
   - Stateless; tenant context and auth derived from tokens/session, not local state.
 - **Queue worker nodes**
-  - Run Laravel Horizon and all queued jobs (AI, email, monitoring event processing, imports, reporting, billing metering).
+  - Run Laravel Horizon and all queued jobs (AI, email, monitoring event processing, imports, reporting).
   - Use prioritized queues within a single Horizon configuration.
 - **Database**
   - Single relational database cluster (e.g. managed PostgreSQL or MySQL) in an EU region.
@@ -86,6 +87,9 @@ Foreign key behavior:
 - **Tenant isolation at application layer** via:
   - Tenant global scopes on Eloquent queries.
   - Authorization policies checking `tenant_id` and RBAC, with RBAC implemented via `spatie/laravel-permission` (teams/multi-tenancy mode) and wired to `tenant_id`.
+- **Queue-level incident partitioning** inside a tenant:
+  - Agent incident access is constrained by **`role_queue.incident_permissions`** (per queue, per role) plus optional global **`incident.admin`**, unioned across roles.
+  - API and Filament must evaluate incident actions using **`HelixdeskIncidentAuthorization`** (queue id from the incident or target queue), not bare `incident.read` / `incident.update` on `role_permissions` alone.
 - **Administrative separation**:
 - **Global admins** live in a separate guard/role system and are hidden from tenant UIs.
 - Tenant-facing UIs are separated by persona:
@@ -111,7 +115,7 @@ Foreign key behavior:
 Recommended structure (following Laravel 12 streamlined conventions and existing project patterns):
 
 - `app/Domain/*`
-  - Domain models, aggregates, and domain services per bounded context (e.g. `ITIL`, `Billing`, `Documentation`, `Identity`, `Monitoring`, `ISO`, `PasswordVault`).
+  - Domain models, aggregates, and domain services per bounded context (e.g. `ITIL`, `Documentation`, `Identity`, `Monitoring`, `ISO`, `PasswordVault`).
 - `app/Http/*`
   - Controllers (web + API), HTTP middleware, request validation classes.
 - `app/Filament/*` (or convention chosen in this project)
@@ -124,9 +128,11 @@ Recommended structure (following Laravel 12 streamlined conventions and existing
 - `app/Actions/*`
   - Application-level actions (e.g. `CreateIncident`, `ResolveIncident`, `RecordAIUsage`).
 - `app/Jobs/*`
-  - Jobs for queue processing (AI requests, monitoring event processing, imports, billing metering).
+  - Jobs for queue processing (AI requests, monitoring event processing, imports).
 - `app/Services/*`
-  - Integrations (e.g. SSO, Intune, Zabbix, SMS gateway, status page, Stripe wrappers).
+  - Integrations (e.g. SSO, Intune, Zabbix, SMS gateway, status page).
+- `config/helixdesk_permissions.php`
+  - Canonical list of permission **names** (`{module}.{action}`) and default tenant role → permission assignments; tenant seeding expands this config into rows on **`role_permissions`** (string per role). The legacy Spatie `permissions` table is not used.
 
 Each domain area should be modeled as a **bounded context** with its own:
 
@@ -155,10 +161,12 @@ Initial major bounded contexts:
    - PasswordEntry, Scope (asset/customer/team), MFA enforcement rules.
 8. **AI Integration**
    - AIProviderConfig, AIUsageRecord, AIJob, AIInferenceLog.
-9. **Billing**
-   - Subscription, LicenseAssignment, ConcurrentUsageSample, StripeCustomer, StripeSubscription, MeteredUsageExport.
-10. **Audit & Logging**
+9. **Audit & Logging**
    - AuditLogEntry, TenantAuditView, GlobalAuditView.
+10. **Dashboards**
+   - DashboardLayout, WidgetPreset, role defaults, user overrides.
+
+Historic subscription or metered-billing designs are **not** implemented in the AGPL core.
 
 ---
 
@@ -179,12 +187,11 @@ Use **Laravel Horizon** with a **single logical queue** configured with **priori
 - Low priority:
   - Batch AI analysis (clustering, trend detection)
   - Reporting and KPI aggregations
-  - Billing metering exports to Stripe
 
 Implementation approach:
 
 - Use dedicated job classes with explicit `public $priority` or naming conventions (e.g. `ai-high`, `ai-low`) and map them to Horizon priority handling.
-- Configure Horizon dashboards to group jobs by domain (ITIL, Monitoring, AI, Billing).
+- Configure Horizon dashboards to group jobs by domain (ITIL, Monitoring, AI).
 
 ### 4.2 Critical jobs
 
@@ -196,10 +203,6 @@ Key job categories:
   - Send email/SMS/status page/webhook notifications for major incidents.
 - `RunAIInferenceJob`
   - Execute calls against configured AI provider via Laravel AI SDK.
-- `RecordConcurrentUsageSampleJob`
-  - Snapshot current concurrent users per tenant every hour.
-- `ExportDailyMeteredUsageToStripeJob`
-  - Export highest concurrent user count per tenant per day to Stripe.
 - `EnforcePasswordMFAJob`
   - Validate MFA recency and trigger re-challenge if needed.
 
@@ -279,6 +282,11 @@ Patterns:
 
 - Start with `/api/v1/*`.
 - Use semantic versioning at API level to avoid breaking integrators.
+
+### 6.4 Monitoring event ingestion (implemented surface)
+
+- Primary paths: `GET|POST /api/v1/monitoring-events`, `GET /api/v1/monitoring-events/{id}`.
+- **Alias** for integrators expecting a generic “events” resource: the same controller actions are also mounted at `GET|POST /api/v1/events` and `GET /api/v1/events/{id}` (same `{id}` as monitoring events).
 
 ---
 
