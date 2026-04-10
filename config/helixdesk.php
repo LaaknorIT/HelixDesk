@@ -2,6 +2,13 @@
 
 return [
 
+    'entra' => [
+        /**
+         * Minimum hours since last successful Microsoft Entra sync before a new import is scheduled.
+         */
+        'import_interval_hours' => (int) env('ENTRA_IMPORT_INTERVAL_HOURS', 24),
+    ],
+
     'monitoring' => [
         'deduplication_window_minutes' => (int) env('MONITORING_DEDUP_WINDOW_MINUTES', 15),
 

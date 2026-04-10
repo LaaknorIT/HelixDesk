@@ -82,6 +82,11 @@ class Tenant extends Model
         return $this->hasMany(ServiceOffering::class);
     }
 
+    public function departments(): HasMany
+    {
+        return $this->hasMany(Department::class);
+    }
+
     public function dashboardLayouts(): HasMany
     {
         return $this->hasMany(DashboardLayout::class);

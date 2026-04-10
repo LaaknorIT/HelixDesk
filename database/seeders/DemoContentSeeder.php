@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Asset;
 use App\Models\AssetType;
+use App\Models\Department;
 use App\Models\Incident;
 use App\Models\IncidentMessage;
 use App\Models\Organization;
@@ -42,6 +43,19 @@ class DemoContentSeeder extends Seeder
             ],
             [
                 'parent_organization_id' => null,
+                'external_reference' => null,
+            ],
+        );
+
+        $demoDepartment = Department::query()->withoutGlobalScopes()->firstOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'organization_id' => $organization->getKey(),
+                'name' => 'Customer Care',
+            ],
+            [
+                'parent_department_id' => null,
+                'code' => 'CC',
                 'external_reference' => null,
             ],
         );
@@ -155,6 +169,7 @@ class DemoContentSeeder extends Seeder
                 'is_admin' => false,
                 'tenant_id' => $tenant->getKey(),
                 'organization_id' => $organization->getKey(),
+                'department_id' => $demoDepartment->getKey(),
                 'type' => 'end_user',
             ],
         );
@@ -167,6 +182,7 @@ class DemoContentSeeder extends Seeder
                 'is_admin' => false,
                 'tenant_id' => $tenant->getKey(),
                 'organization_id' => $organization->getKey(),
+                'department_id' => $demoDepartment->getKey(),
                 'type' => 'end_user',
             ],
         );

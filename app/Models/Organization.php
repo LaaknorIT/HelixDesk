@@ -20,7 +20,15 @@ class Organization extends TenantModel
         'parent_organization_id',
         'name',
         'external_reference',
+        'organizational_settings',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'organizational_settings' => 'array',
+        ];
+    }
 
     public function tenant(): BelongsTo
     {
@@ -50,5 +58,10 @@ class Organization extends TenantModel
     public function serviceOfferings(): HasMany
     {
         return $this->hasMany(ServiceOffering::class);
+    }
+
+    public function departments(): HasMany
+    {
+        return $this->hasMany(Department::class);
     }
 }

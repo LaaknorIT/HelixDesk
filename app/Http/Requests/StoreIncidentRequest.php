@@ -6,6 +6,7 @@ use App\Models\Tenant;
 use App\Support\HelixdeskIncidentAuthorization;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreIncidentRequest extends FormRequest
 {
@@ -44,6 +45,8 @@ class StoreIncidentRequest extends FormRequest
      */
     public function rules(): array
     {
+        $tenantId = $this->user()?->tenant_id;
+
         return [
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:65535'],
@@ -51,7 +54,11 @@ class StoreIncidentRequest extends FormRequest
             'priority' => ['nullable', 'string', 'max:50'],
             'queue_id' => ['nullable', 'integer'],
             'category_id' => ['nullable', 'integer'],
-            'department_id' => ['nullable', 'integer'],
+            'department_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('departments', 'id')->where('tenant_id', $tenantId),
+            ],
             'organization_id' => ['nullable', 'integer'],
             'reported_by_user_id' => ['nullable', 'integer'],
             'assigned_agent_id' => ['nullable', 'integer'],

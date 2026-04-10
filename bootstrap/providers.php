@@ -1,13 +1,9 @@
 <?php
 
-use App\Providers\AppServiceProvider;
-use App\Providers\Filament\AgentPanelProvider;
-use App\Providers\Filament\EndUserPanelProvider;
-use App\Providers\Filament\GlobalAdminPanelProvider;
-
 return [
-    AppServiceProvider::class,
-    GlobalAdminPanelProvider::class,
-    AgentPanelProvider::class,
-    EndUserPanelProvider::class,
+    App\Providers\AppServiceProvider::class,
+    App\Providers\Filament\AgentPanelProvider::class,
+    App\Providers\Filament\EndUserPanelProvider::class,
+    App\Providers\Filament\GlobalAdminPanelProvider::class,
+    App\Providers\HorizonServiceProvider::class,
 ];

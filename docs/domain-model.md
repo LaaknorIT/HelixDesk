@@ -48,6 +48,7 @@ Key fields:
 - `parent_organization_id` (nullable, for tree hierarchy)
 - `name`
 - `external_reference` (for MSP CRM/ERP linking)
+- `organizational_settings` (nullable JSON) — per-organization configuration (e.g. integration wizards). Structure is versioned in code; today includes `integrations.microsoft_entra` (enabled flag, Entra IDs, and scope toggles for users, departments, Intune computers, security incidents) for upcoming sync workers.
 
 Relationships:
 
@@ -56,7 +57,24 @@ Relationships:
 - has many `Organization` as children
 - has many `User` (typically end users)
 - has many `Asset`
+- has many `Department` (organizational subdivisions under this org)
 - has many `IdpConnection`
+
+### 1.2a Department
+
+Represents a **department or cost center** within a single `Organization`. Departments can be nested (parent/child) for deeper hierarchy (e.g. Division → Team).
+
+Key fields:
+
+- `id`, `tenant_id`, `organization_id`, `parent_department_id` (nullable)
+- `name`, optional `code`, optional `external_reference`
+
+Relationships:
+
+- belongs to `Tenant`, `Organization`, optional parent `Department`
+- has many child `Department` rows
+- has many `User` (optional home department)
+- referenced by `Incident.department_id`, `Asset.department_id`, and `User.department_id`
 
 ### 1.3 User
 
@@ -67,13 +85,14 @@ Key fields:
 - `id`
 - `tenant_id`
 - `organization_id` (nullable for agents)
+- `department_id` (nullable; home department within the organization)
 - `type` (`agent` for all back-office staff including those who administer the tenant, `end_user`, `global_admin` for platform operators when stored on the same table, etc.)
 - `email`, `name`
 - `last_mfa_at` (for password vault access enforcement)
 
 Relationships:
 
-- belongs to `Tenant`, `Organization` (optional)
+- belongs to `Tenant`, `Organization` (optional), `Department` (optional)
 - belongs to many `Role`, `Team`
 - has many `Incident` as `reported_by` and `assigned_agent`
 - has many `PasswordEntry` as last viewed by
@@ -136,7 +155,7 @@ Key fields:
 
 Relationships:
 
-- belongs to `Tenant`, `Organization` (optional), `Queue`
+- belongs to `Tenant`, `Organization` (optional), `Department` (optional), `Queue`
 - belongs to `User` as `reported_by` and as `assigned_agent`
 - belongs to many `Asset`
 - belongs to many `Problem`

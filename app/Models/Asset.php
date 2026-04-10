@@ -50,6 +50,11 @@ class Asset extends TenantModel
         return $this->belongsTo(Organization::class);
     }
 
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
+
     public function assetType(): BelongsTo
     {
         return $this->belongsTo(AssetType::class);

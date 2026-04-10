@@ -55,6 +55,11 @@ class Incident extends TenantModel
         return $this->belongsTo(Organization::class);
     }
 
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
+
     public function queue(): BelongsTo
     {
         return $this->belongsTo(Queue::class);
