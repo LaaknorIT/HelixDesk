@@ -29,11 +29,11 @@ class PeopleResource extends Resource
 
     protected static ?string $pluralModelLabel = 'People';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Directory';
+    protected static string|UnitEnum|null $navigationGroup = 'Customers';
 
     public static function canAccess(): bool
     {

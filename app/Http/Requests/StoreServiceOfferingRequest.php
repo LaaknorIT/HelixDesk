@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\OrganizationType;
+use App\Models\Organization;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -66,6 +68,17 @@ class StoreServiceOfferingRequest extends FormRequest
                     $validator->errors()->add(
                         'attributes_json',
                         __('The :key attribute is required for this service kind.', ['key' => $key]),
+                    );
+                }
+            }
+
+            $organizationId = $this->input('organization_id');
+            if ($organizationId !== null) {
+                $organization = Organization::query()->find($organizationId);
+                if ($organization === null || $organization->type !== OrganizationType::Customer) {
+                    $validator->errors()->add(
+                        'organization_id',
+                        __('Service offerings can only be assigned to customer organizations.'),
                     );
                 }
             }

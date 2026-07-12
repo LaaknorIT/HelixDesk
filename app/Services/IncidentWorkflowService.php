@@ -161,7 +161,6 @@ class IncidentWorkflowService
         $incident = Incident::query()->create([
             'tenant_id' => $user->tenant_id,
             'organization_id' => $data['organization_id'] ?? $user->organization_id,
-            'department_id' => $data['department_id'] ?? null,
             'reported_by_user_id' => $user->id,
             'assigned_agent_id' => $data['assigned_agent_id'] ?? null,
             'queue_id' => $queueId,

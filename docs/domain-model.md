@@ -35,46 +35,41 @@ Invariants:
 
 ### 1.2 Organization
 
-Represents an organizational unit served by the tenant (MSP or IT department).  
-Organizations form a **tree/folder hierarchy** under a tenant, allowing:
-
-- one root organization with nested sub-organizations (similar to departments), or  
-- multiple top-level organizations (e.g. multiple customers), each with their own sub-structure.
+Represents a node in the **tenant organization tree**: customer groups, billable customers, and departments share one table and one foreign-key target for scoped records.
 
 Key fields:
 
 - `id`
 - `tenant_id`
-- `parent_organization_id` (nullable, for tree hierarchy)
-- `name`
-- `external_reference` (for MSP CRM/ERP linking)
-- `organizational_settings` (nullable JSON) — per-organization configuration (e.g. integration wizards). Structure is versioned in code; today includes `integrations.microsoft_entra` (enabled flag, Entra IDs, and scope toggles for users, departments, Intune computers, security incidents) for upcoming sync workers.
+- `parent_id` (tree parent; root nodes use `-1` for Filament tree compatibility)
+- `type` (`group`, `customer`, `department`)
+- `name`, optional `code`, optional `external_reference`
+- `is_billable` (typically true for `customer` nodes used in invoicing)
+- `order` (sibling sort order in the tree UI)
+- `organizational_settings` (nullable JSON) — per-organization configuration (e.g. Microsoft Entra integration)
+
+Nesting rules:
+
+| Parent type | Allowed child types |
+|-------------|---------------------|
+| *(tenant root)* | `group`, `customer` |
+| `group` | `group`, `customer` |
+| `customer` | `customer`, `department` |
+| `department` | `department` |
 
 Relationships:
 
 - belongs to `Tenant`
 - belongs to `Organization` as parent (optional)
 - has many `Organization` as children
-- has many `User` (typically end users)
-- has many `Asset`
-- has many `Department` (organizational subdivisions under this org)
-- has many `IdpConnection`
+- has many `User`, `Asset`, `ServiceOffering` (service offerings **only** on `customer` nodes)
 
-### 1.2a Department
+Scoped records (`User`, `Asset`, `Incident`, etc.) reference a **single** `organization_id` pointing at the tree node they belong to. Use `organization_id = null` for tenant-wide records (e.g. unassigned CIs).
 
-Represents a **department or cost center** within a single `Organization`. Departments can be nested (parent/child) for deeper hierarchy (e.g. Division → Team).
+UI:
 
-Key fields:
-
-- `id`, `tenant_id`, `organization_id`, `parent_department_id` (nullable)
-- `name`, optional `code`, optional `external_reference`
-
-Relationships:
-
-- belongs to `Tenant`, `Organization`, optional parent `Department`
-- has many child `Department` rows
-- has many `User` (optional home department)
-- referenced by `Incident.department_id`, `Asset.department_id`, and `User.department_id`
+- Agent panel navigation label defaults to **Customers** (configurable via `config/helixdesk.php`).
+- Managed via `OrganizationResource` with a Filament tree index page and standard edit/relation managers for assets, service offerings, and people.
 
 ### 1.3 User
 
@@ -84,8 +79,7 @@ Key fields:
 
 - `id`
 - `tenant_id`
-- `organization_id` (nullable for agents)
-- `department_id` (nullable; home department within the organization)
+- `organization_id` (nullable for agents; scoped tree node for end users)
 - `type` (`agent` for all back-office staff including those who administer the tenant, `end_user`, `global_admin` for platform operators when stored on the same table, etc.)
 - `email`, `name`
 - `last_mfa_at` (for password vault access enforcement)
@@ -140,8 +134,7 @@ Key fields:
 
 - `id`
 - `tenant_id`
-- `organization_id`
-- `department_id` (nullable)
+- `organization_id` (nullable — tree scope node)
 - `reported_by_user_id`
 - `assigned_agent_id` (nullable)
 - `queue_id`
@@ -293,8 +286,7 @@ Key fields:
 
 - `id`
 - `tenant_id`
-- `organization_id` (nullable)
-- `department_id` (nullable)
+- `organization_id` (nullable — tree scope node; null = tenant-wide)
 - `asset_type_id`
 - `name`
 - `asset_identifier` (e.g. asset tag)
@@ -350,7 +342,7 @@ A **business service** consumed by a customer organization: what the company nee
 
 Key fields:
 
-- `id`, `tenant_id`, `organization_id` (customer org; required for MSP clarity)
+- `id`, `tenant_id`, `organization_id` (customer org; required; must be `type = customer`)
 - `name`, `description` (nullable), `code` (nullable, internal reference)
 - `kind` (`internet_connectivity`, `business_application_suite`, `custom`, …) — drives suggested asset/supplier roles and optional required attributes
 - `attributes_json` (nullable) — service-specific facts (e.g. `line_number` for connectivity); validated per `kind` where configured

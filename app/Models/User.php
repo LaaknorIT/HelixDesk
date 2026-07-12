@@ -33,7 +33,6 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     protected $fillable = [
         'tenant_id',
         'organization_id',
-        'department_id',
         'entra_object_id',
         'name',
         'email',
@@ -94,11 +93,6 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
-    }
-
-    public function department(): BelongsTo
-    {
-        return $this->belongsTo(Department::class);
     }
 
     public function dashboardLayouts(): HasMany

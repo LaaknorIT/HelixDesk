@@ -3,7 +3,6 @@
 namespace App\Filament\Agent\Resources\Organizations\RelationManagers;
 
 use App\Filament\Agent\Resources\People\PeopleResource;
-use App\Models\Department;
 use App\Models\User;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -52,16 +51,6 @@ class OrganizationUsersRelationManager extends RelationManager
                 ])
                 ->required()
                 ->native(false),
-            Select::make('department_id')
-                ->label('Department')
-                ->options(fn (): array => Department::query()
-                    ->where('organization_id', $organizationId)
-                    ->orderBy('name')
-                    ->pluck('name', 'id')
-                    ->all())
-                ->searchable()
-                ->preload()
-                ->default(null),
         ]);
     }
 
@@ -76,9 +65,6 @@ class OrganizationUsersRelationManager extends RelationManager
                     ->searchable(),
                 TextColumn::make('type')
                     ->badge(),
-                TextColumn::make('department.name')
-                    ->label('Department')
-                    ->placeholder('—'),
             ])
             ->headerActions([
                 CreateAction::make()

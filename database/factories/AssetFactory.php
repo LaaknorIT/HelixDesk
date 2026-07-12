@@ -22,7 +22,6 @@ class AssetFactory extends Factory
         return [
             'tenant_id' => Tenant::factory(),
             'organization_id' => null,
-            'department_id' => null,
             'asset_type_id' => AssetType::factory(),
             'name' => fake()->words(3, true),
             'asset_identifier' => fake()->bothify('AST-####'),

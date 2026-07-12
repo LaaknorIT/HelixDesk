@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Enums\OrganizationType;
 use App\Jobs\OrganizationSettingsImport;
 use App\Jobs\SyncNextMicrosoftEntraIntegrationJob;
-use App\Models\Department;
 use App\Models\MonitoringEvent;
 use App\Models\Organization;
 use App\Models\Tenant;
@@ -78,15 +78,22 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
 
         app(MicrosoftEntraOrganizationSyncService::class)->sync($target);
 
+        $department = Organization::query()
+            ->where('tenant_id', $tenant->id)
+            ->where('parent_id', $organization->id)
+            ->where('type', OrganizationType::Department)
+            ->where('name', 'Operations')
+            ->first();
+
+        $this->assertNotNull($department);
+
         $this->assertDatabaseHas('users', [
             'tenant_id' => $tenant->id,
-            'organization_id' => $organization->id,
+            'organization_id' => $department->id,
             'email' => 'syncuser@example.test',
             'entra_object_id' => '11111111-1111-1111-1111-111111111111',
             'type' => 'end_user',
         ]);
-
-        $this->assertSame(1, Department::query()->where('organization_id', $organization->id)->where('name', 'Operations')->count());
 
         $organization->refresh();
         $this->assertNotNull(data_get($organization->organizational_settings, 'settings.0.config.last_entra_sync_at'));

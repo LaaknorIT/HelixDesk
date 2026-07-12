@@ -2,11 +2,13 @@
 
 namespace App\Filament\Agent\Resources\ServiceOfferings\Schemas;
 
+use App\Enums\OrganizationType;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
 
 class ServiceOfferingForm
@@ -20,8 +22,13 @@ class ServiceOfferingForm
         return $schema
             ->components([
                 Select::make('organization_id')
-                    ->label('Organization')
-                    ->relationship('organization', 'name')
+                    ->label('Customer')
+                    ->relationship(
+                        name: 'organization',
+                        titleAttribute: 'name',
+                        modifyQueryUsing: fn (Builder $query): Builder => $query
+                            ->where('type', OrganizationType::Customer->value),
+                    )
                     ->searchable()
                     ->preload()
                     ->required(),

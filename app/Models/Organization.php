@@ -2,23 +2,32 @@
 
 namespace App\Models;
 
+use App\Enums\OrganizationType;
+use App\Support\OrganizationHierarchy;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use SolutionForest\FilamentTree\Concern\ModelTree;
 
 class Organization extends TenantModel
 {
     /** @use HasFactory<OrganizationFactory> */
     use HasFactory;
 
+    use ModelTree;
+
     /**
      * @var list<string>
      */
     protected $fillable = [
         'tenant_id',
-        'parent_organization_id',
+        'type',
+        'parent_id',
         'name',
+        'code',
+        'is_billable',
+        'order',
         'external_reference',
         'organizational_settings',
     ];
@@ -26,23 +35,36 @@ class Organization extends TenantModel
     protected function casts(): array
     {
         return [
+            'type' => OrganizationType::class,
+            'is_billable' => 'boolean',
+            'order' => 'integer',
+            'parent_id' => 'integer',
             'organizational_settings' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        static::saving(function (Organization $organization): void {
+            OrganizationHierarchy::assertValidParent($organization);
+        });
+    }
+
+    public function determineTitleColumnName(): string
+    {
+        return 'name';
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
     }
 
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
-    }
-
-    public function parent(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'parent_organization_id');
-    }
-
-    public function children(): HasMany
-    {
-        return $this->hasMany(self::class, 'parent_organization_id');
     }
 
     public function users(): HasMany
@@ -60,8 +82,8 @@ class Organization extends TenantModel
         return $this->hasMany(ServiceOffering::class);
     }
 
-    public function departments(): HasMany
+    public function acceptsServiceOfferings(): bool
     {
-        return $this->hasMany(Department::class);
+        return $this->type->acceptsServiceOfferings();
     }
 }

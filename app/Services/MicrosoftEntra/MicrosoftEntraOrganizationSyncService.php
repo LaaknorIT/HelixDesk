@@ -2,9 +2,9 @@
 
 namespace App\Services\MicrosoftEntra;
 
+use App\Enums\OrganizationType;
 use App\Models\Asset;
 use App\Models\AssetType;
-use App\Models\Department;
 use App\Models\MonitoringEvent;
 use App\Models\MonitoringEventSource;
 use App\Models\Organization;
@@ -123,21 +123,24 @@ final class MicrosoftEntraOrganizationSyncService
                 continue;
             }
 
-            $departmentId = null;
+            $scopeOrganizationId = null;
             $deptName = trim((string) ($u['department'] ?? ''));
             if ($linkDepartments && $deptName !== '') {
-                $department = Department::query()->firstOrCreate(
+                $departmentOrganization = Organization::query()->firstOrCreate(
                     [
                         'tenant_id' => $target->tenantId,
-                        'organization_id' => $organization->getKey(),
+                        'parent_id' => $organization->getKey(),
+                        'type' => OrganizationType::Department->value,
                         'name' => $deptName,
                     ],
                     [
                         'code' => null,
                         'external_reference' => null,
+                        'is_billable' => false,
+                        'order' => 0,
                     ]
                 );
-                $departmentId = (int) $department->getKey();
+                $scopeOrganizationId = (int) $departmentOrganization->getKey();
             }
 
             if (! $importUsers) {
@@ -148,6 +151,8 @@ final class MicrosoftEntraOrganizationSyncService
             if ($displayName === '') {
                 $displayName = $email;
             }
+
+            $userOrganizationId = $scopeOrganizationId ?? $organization->getKey();
 
             try {
                 $user = User::query()
@@ -161,8 +166,7 @@ final class MicrosoftEntraOrganizationSyncService
                         'entra_object_id' => $graphId,
                         'name' => $displayName,
                         'email' => $email,
-                        'organization_id' => $organization->getKey(),
-                        'department_id' => $linkDepartments ? $departmentId : null,
+                        'organization_id' => $userOrganizationId,
                         'type' => 'end_user',
                         'password' => Hash::make(Str::password(32)),
                     ]);
@@ -170,8 +174,7 @@ final class MicrosoftEntraOrganizationSyncService
                     $user->update([
                         'name' => $displayName,
                         'email' => $email,
-                        'organization_id' => $organization->getKey(),
-                        'department_id' => $linkDepartments ? $departmentId : null,
+                        'organization_id' => $userOrganizationId,
                         'type' => 'end_user',
                     ]);
                 }
@@ -275,7 +278,6 @@ final class MicrosoftEntraOrganizationSyncService
                 Asset::query()->create([
                     'tenant_id' => $target->tenantId,
                     'organization_id' => $organization->getKey(),
-                    'department_id' => null,
                     'asset_type_id' => $assetType->getKey(),
                     'name' => $name,
                     'asset_identifier' => $identifier,

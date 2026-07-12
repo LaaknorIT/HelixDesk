@@ -12,8 +12,10 @@
         "laravel/horizon": "^5.45",
         "laravel/tinker": "^2.10.1",
         "predis/predis": "^3.4",
+        "solution-forest/filament-tree": "^4.0",
         "spatie/laravel-activitylog": "^5.0",
-        "spatie/laravel-permission": "^7.2"
+        "spatie/laravel-permission": "^7.2",
+        "staudenmeir/laravel-adjacency-list": "^1.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",

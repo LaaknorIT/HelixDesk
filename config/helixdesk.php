@@ -2,6 +2,13 @@
 
 return [
 
+    'organizations' => [
+        'navigation_group' => env('HELIXDESK_ORG_NAV_GROUP', 'Customers'),
+        'navigation_label' => env('HELIXDESK_ORG_NAV_LABEL', 'Customers'),
+        'model_label' => env('HELIXDESK_ORG_MODEL_LABEL', 'Customer'),
+        'plural_model_label' => env('HELIXDESK_ORG_PLURAL_MODEL_LABEL', 'Customers'),
+    ],
+
     'entra' => [
         /**
          * Minimum hours since last successful Microsoft Entra sync before a new import is scheduled.
