@@ -54,12 +54,11 @@ class StoreIncidentRequest extends FormRequest
             'priority' => ['nullable', 'string', 'max:50'],
             'queue_id' => ['nullable', 'integer'],
             'category_id' => ['nullable', 'integer'],
-            'department_id' => [
+            'organization_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('departments', 'id')->where('tenant_id', $tenantId),
+                Rule::exists('organizations', 'id')->where('tenant_id', $tenantId),
             ],
-            'organization_id' => ['nullable', 'integer'],
             'reported_by_user_id' => ['nullable', 'integer'],
             'assigned_agent_id' => ['nullable', 'integer'],
         ];

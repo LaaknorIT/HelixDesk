@@ -12,7 +12,6 @@ class Incident extends TenantModel
     protected $fillable = [
         'tenant_id',
         'organization_id',
-        'department_id',
         'reported_by_user_id',
         'assigned_agent_id',
         'queue_id',
@@ -53,11 +52,6 @@ class Incident extends TenantModel
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
-    }
-
-    public function department(): BelongsTo
-    {
-        return $this->belongsTo(Department::class);
     }
 
     public function queue(): BelongsTo

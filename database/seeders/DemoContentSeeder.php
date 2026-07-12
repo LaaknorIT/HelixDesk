@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
+use App\Enums\OrganizationType;
 use App\Models\Asset;
 use App\Models\AssetType;
-use App\Models\Department;
 use App\Models\Incident;
 use App\Models\IncidentMessage;
 use App\Models\Organization;
@@ -42,21 +42,25 @@ class DemoContentSeeder extends Seeder
                 'name' => 'Demo Customer',
             ],
             [
-                'parent_organization_id' => null,
+                'type' => OrganizationType::Customer,
+                'parent_id' => Organization::defaultParentKey(),
+                'is_billable' => true,
                 'external_reference' => null,
             ],
         );
 
-        $demoDepartment = Department::query()->withoutGlobalScopes()->firstOrCreate(
+        $demoDepartment = Organization::query()->withoutGlobalScopes()->firstOrCreate(
             [
                 'tenant_id' => $tenant->getKey(),
-                'organization_id' => $organization->getKey(),
+                'parent_id' => $organization->getKey(),
+                'type' => OrganizationType::Department,
                 'name' => 'Customer Care',
             ],
             [
-                'parent_department_id' => null,
                 'code' => 'CC',
                 'external_reference' => null,
+                'is_billable' => false,
+                'order' => 0,
             ],
         );
 
@@ -168,8 +172,7 @@ class DemoContentSeeder extends Seeder
                 'password' => $password,
                 'is_admin' => false,
                 'tenant_id' => $tenant->getKey(),
-                'organization_id' => $organization->getKey(),
-                'department_id' => $demoDepartment->getKey(),
+                'organization_id' => $demoDepartment->getKey(),
                 'type' => 'end_user',
             ],
         );
@@ -181,8 +184,7 @@ class DemoContentSeeder extends Seeder
                 'password' => $password,
                 'is_admin' => false,
                 'tenant_id' => $tenant->getKey(),
-                'organization_id' => $organization->getKey(),
-                'department_id' => $demoDepartment->getKey(),
+                'organization_id' => $demoDepartment->getKey(),
                 'type' => 'end_user',
             ],
         );
@@ -224,7 +226,6 @@ class DemoContentSeeder extends Seeder
         Incident::query()->create([
             'tenant_id' => $tenant->getKey(),
             'organization_id' => $organization->getKey(),
-            'department_id' => null,
             'reported_by_user_id' => $endUser2->getKey(),
             'assigned_agent_id' => null,
             'queue_id' => $generalQueue?->getKey(),

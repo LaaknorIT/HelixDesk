@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Validation\ValidationException;
 
 class ServiceOffering extends TenantModel
 {
@@ -33,6 +34,21 @@ class ServiceOffering extends TenantModel
         return [
             'attributes_json' => 'array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        static::saving(function (ServiceOffering $offering): void {
+            $organization = $offering->organization;
+
+            if ($organization !== null && ! $organization->acceptsServiceOfferings()) {
+                throw ValidationException::withMessages([
+                    'organization_id' => __('Service offerings can only be assigned to customer organizations.'),
+                ]);
+            }
+        });
     }
 
     public function tenant(): BelongsTo

@@ -44,11 +44,6 @@ class StoreAssetRequest extends FormRequest
                 'integer',
                 Rule::exists('organizations', 'id')->where('tenant_id', $tenantId),
             ],
-            'department_id' => [
-                'nullable',
-                'integer',
-                Rule::exists('departments', 'id')->where('tenant_id', $tenantId),
-            ],
             'asset_identifier' => ['nullable', 'string', 'max:255'],
             'serial_number' => ['nullable', 'string', 'max:255'],
             'purchase_date' => ['nullable', 'date'],

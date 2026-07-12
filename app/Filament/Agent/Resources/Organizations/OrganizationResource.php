@@ -8,8 +8,10 @@ use App\Filament\Agent\Resources\Organizations\Pages\EditOrganization;
 use App\Filament\Agent\Resources\Organizations\Pages\EditOrganizationIntegration;
 use App\Filament\Agent\Resources\Organizations\Pages\ListOrganizations;
 use App\Filament\Agent\Resources\Organizations\Pages\ListOrganizationSettings;
+use App\Filament\Agent\Resources\Organizations\Pages\OrganizationTree;
 use App\Filament\Agent\Resources\Organizations\RelationManagers\ChildOrganizationsRelationManager;
-use App\Filament\Agent\Resources\Organizations\RelationManagers\DepartmentsRelationManager;
+use App\Filament\Agent\Resources\Organizations\RelationManagers\OrganizationAssetsRelationManager;
+use App\Filament\Agent\Resources\Organizations\RelationManagers\OrganizationServiceOfferingsRelationManager;
 use App\Filament\Agent\Resources\Organizations\RelationManagers\OrganizationUsersRelationManager;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationForm;
 use App\Filament\Agent\Resources\Organizations\Tables\OrganizationsTable;
@@ -30,13 +32,37 @@ class OrganizationResource extends Resource
 {
     protected static ?string $model = Organization::class;
 
-    protected static ?string $navigationLabel = 'Organizations';
+    protected static ?string $modelLabel = null;
+
+    protected static ?string $pluralModelLabel = null;
 
     protected static ?int $navigationSort = 1;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Directory';
+    protected static string|UnitEnum|null $navigationGroup = 'Customers';
+
+    protected static ?string $navigationLabel = 'Customers';
+
+    public static function getNavigationLabel(): string
+    {
+        return (string) config('helixdesk.organizations.navigation_label', static::$navigationLabel ?? 'Customers');
+    }
+
+    public static function getModelLabel(): string
+    {
+        return (string) config('helixdesk.organizations.model_label', 'Customer');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return (string) config('helixdesk.organizations.plural_model_label', 'Customers');
+    }
+
+    public static function getNavigationGroup(): string|UnitEnum|null
+    {
+        return config('helixdesk.organizations.navigation_group', static::$navigationGroup ?? 'Customers');
+    }
 
     public static function canAccess(): bool
     {
@@ -46,27 +72,56 @@ class OrganizationResource extends Resource
             return false;
         }
 
-        return $user->hasPermissionTo('tenant.admin');
+        return $user->hasPermissionTo('organization.read')
+            || $user->hasPermissionTo('tenant.admin');
     }
 
     public static function canCreate(): bool
     {
-        return Auth::user()?->hasPermissionTo('tenant.admin') ?? false;
+        $user = Auth::user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasPermissionTo('organization.create')
+            || $user->hasPermissionTo('tenant.admin');
     }
 
     public static function canEdit(Model $record): bool
     {
-        return Auth::user()?->hasPermissionTo('tenant.admin') ?? false;
+        $user = Auth::user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasPermissionTo('organization.update')
+            || $user->hasPermissionTo('tenant.admin');
     }
 
     public static function canDelete(Model $record): bool
     {
-        return Auth::user()?->hasPermissionTo('tenant.admin') ?? false;
+        $user = Auth::user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasPermissionTo('organization.delete')
+            || $user->hasPermissionTo('tenant.admin');
     }
 
     public static function canDeleteAny(): bool
     {
-        return Auth::user()?->hasPermissionTo('tenant.admin') ?? false;
+        $user = Auth::user();
+
+        if ($user === null) {
+            return false;
+        }
+
+        return $user->hasPermissionTo('organization.delete')
+            || $user->hasPermissionTo('tenant.admin');
     }
 
     public static function form(Schema $schema): Schema
@@ -83,7 +138,8 @@ class OrganizationResource extends Resource
     {
         return [
             ChildOrganizationsRelationManager::class,
-            DepartmentsRelationManager::class,
+            OrganizationAssetsRelationManager::class,
+            OrganizationServiceOfferingsRelationManager::class,
             OrganizationUsersRelationManager::class,
         ];
     }
@@ -91,7 +147,8 @@ class OrganizationResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ListOrganizations::route('/'),
+            'index' => OrganizationTree::route('/'),
+            'list' => ListOrganizations::route('/list'),
             'create' => CreateOrganization::route('/create'),
             'edit' => EditOrganization::route('/{record}/edit'),
             'settings.integrations.create' => CreateOrganizationIntegration::route('/{record}/settings/integrations/create'),
@@ -122,6 +179,6 @@ class OrganizationResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->withCount(['users', 'children', 'departments']);
+            ->withCount(['users', 'children', 'assets']);
     }
 }

@@ -65,7 +65,6 @@ class ProcessMonitoringEventJob implements ShouldQueue
             $incident = Incident::query()->create([
                 'tenant_id' => $tenantId,
                 'organization_id' => null,
-                'department_id' => null,
                 'reported_by_user_id' => null,
                 'assigned_agent_id' => null,
                 'queue_id' => $queue->getKey(),

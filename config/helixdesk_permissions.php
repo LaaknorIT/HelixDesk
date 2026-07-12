@@ -58,6 +58,10 @@ return [
             'label' => 'Roles & access',
             'actions' => ['read', 'admin'],
         ],
+        'organization' => [
+            'label' => 'Customers',
+            'actions' => ['read', 'create', 'update', 'delete', 'admin'],
+        ],
     ],
 
     'tenant_roles' => [
@@ -93,6 +97,10 @@ return [
                 'monitoring_event.create',
                 'monitoring_event.update',
                 'dashboard.read',
+                'organization.read',
+                'organization.create',
+                'organization.update',
+                'organization.delete',
             ],
         ],
     ],

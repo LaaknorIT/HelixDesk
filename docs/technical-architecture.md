@@ -146,7 +146,8 @@ Each domain area should be modeled as a **bounded context** with its own:
 Initial major bounded contexts:
 
 1. **Identity & Tenancy**
-   - Tenant, Organization (tree hierarchy), User, Role, Team, Queue, IdP configuration.
+   - Tenant, Organization (unified tree: `group` / `customer` / `department` on one table), User, Role, Team, Queue, IdP configuration.
+   - Agent panel: `OrganizationResource` with **Filament Tree** index (`solution-forest/filament-tree`) and standard edit/relation managers for assets, service offerings, and people. Navigation label defaults to **Customers** (`config/helixdesk.php`).
 2. **ITIL Core**
    - Incident, Problem, Change, MajorIncident, SLA, Workflow.
 3. **CMDB & Assets**
