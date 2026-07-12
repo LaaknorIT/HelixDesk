@@ -2,6 +2,38 @@
 
 return [
 
+    'demo_logins' => [
+        'password' => 'password',
+        'tenant_slug' => 'demo-tenant',
+        'accounts' => [
+            [
+                'email' => 'demo-globaladmin@helixdesk.local',
+                'label' => 'Demo Global Admin',
+                'panels' => ['global-admin'],
+            ],
+            [
+                'email' => 'demo-agent@helixdesk.local',
+                'label' => 'Demo Agent',
+                'panels' => ['agent'],
+            ],
+            [
+                'email' => 'demo-tenantadmin@helixdesk.local',
+                'label' => 'Demo Tenant Admin',
+                'panels' => ['agent'],
+            ],
+            [
+                'email' => 'demo-enduser1@helixdesk.local',
+                'label' => 'Demo End User 1',
+                'panels' => ['end-user'],
+            ],
+            [
+                'email' => 'demo-enduser2@helixdesk.local',
+                'label' => 'Demo End User 2',
+                'panels' => ['end-user'],
+            ],
+        ],
+    ],
+
     'organizations' => [
         'navigation_group' => env('HELIXDESK_ORG_NAV_GROUP', 'Customers'),
         'navigation_label' => env('HELIXDESK_ORG_NAV_LABEL', 'Customers'),
