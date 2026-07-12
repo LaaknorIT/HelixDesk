@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Auth\Login;
 use App\Http\Middleware\SyncFilamentTenantContext;
 use App\Models\Tenant;
 use Filament\Http\Middleware\Authenticate;
@@ -35,7 +36,7 @@ class EndUserPanelProvider extends PanelProvider
             ], isPersistent: true)
             ->tenantMenu(false)
             ->tenantSwitcher(false)
-            ->login()
+            ->login(Login::class)
             ->colors([
                 'primary' => Color::Rose,
             ])
