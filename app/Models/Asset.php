@@ -59,9 +59,9 @@ class Asset extends TenantModel
         return $this->belongsTo(User::class, 'owner_user_id');
     }
 
-    public function incidents(): BelongsToMany
+    public function workItems(): BelongsToMany
     {
-        return $this->belongsToMany(Incident::class, 'asset_incident');
+        return $this->belongsToMany(WorkItem::class, 'asset_work_item');
     }
 
     public function parentRelationships(): HasMany

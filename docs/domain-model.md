@@ -64,7 +64,7 @@ Relationships:
 - has many `Organization` as children
 - has many `User`, `Asset`, `ServiceOffering` (service offerings **only** on `customer` nodes)
 
-Scoped records (`User`, `Asset`, `Incident`, etc.) reference a **single** `organization_id` pointing at the tree node they belong to. Use `organization_id = null` for tenant-wide records (e.g. unassigned CIs).
+Scoped records (`User`, `Asset`, `WorkItem`, etc.) reference a **single** `organization_id` pointing at the tree node they belong to. Use `organization_id = null` for tenant-wide records (e.g. unassigned CIs).
 
 UI:
 
@@ -88,7 +88,7 @@ Relationships:
 
 - belongs to `Tenant`, `Organization` (optional), `Department` (optional)
 - belongs to many `Role`, `Team`
-- has many `Incident` as `reported_by` and `assigned_agent`
+- has many `WorkItem` as `reported_by` and `assigned_agent`
 - has many `PasswordEntry` as last viewed by
 
 Invariants:
@@ -101,8 +101,8 @@ Invariants:
 **Role**
 
 - `id`, `tenant_id`, `name`, `description` (Spatie `roles` with `team_id` = tenant)
-- permission strings are attached via **`role_permissions`** (`role_id`, `permission`, `guard_name`, timestamps). There is **no** separate `permissions` lookup table; the string is the canonical permission name (e.g. `problem.read`, `tenant.admin`). **Incident** actions (`incident.read`, `incident.update`, …) are **not** stored here except **`incident.admin`** (full incident bypass); per-queue incident rights live on the **`role_queue`** pivot.
-- belongs to many `Queue` via **`role_queue`** (`role_id`, `queue_id`, `incident_permissions` JSON, timestamps). The JSON holds booleans per incident action (read, create, update, delete, admin) for that queue on that role.
+- permission strings are attached via **`role_permissions`** (`role_id`, `permission`, `guard_name`, timestamps). There is **no** separate `permissions` lookup table; the string is the canonical permission name (e.g. `problem.read`, `tenant.admin`). **Work item** actions (`work_item.read`, `work_item.update`, …) are **not** stored here except **`work_item.admin`** (full bypass); per-queue work-item rights live on the **`role_queue`** pivot.
+- belongs to many `Queue` via **`role_queue`** (`role_id`, `queue_id`, `work_item_permissions` JSON, timestamps). The JSON holds booleans per work-item action (read, create, update, delete, admin) for that queue on that role.
 - users belong to many roles.
 - Default seeded roles and **`{module}.{action}`** permission names are defined in `config/helixdesk_permissions.php`. The **Tenant Admin** role receives all catalog permissions by default (`*` expansion) but can be edited like any other role.
 
@@ -115,9 +115,9 @@ Invariants:
 **Queue**
 
 - `id`, `tenant_id`, `name`, `description`
-- `default_mail_account_id` (nullable FK) — outbound address when incidents were not created from email
-- routing unit for incidents/events/requests.
-- has many `Incident`
+- `default_mail_account_id` (nullable FK) — outbound address when work items were not created from email
+- routing unit for work items and monitoring-driven tickets.
+- has many `WorkItem`
 - belongs to many `Role` via **`role_queue`**
 - belongs to many `MailAccount` via **`queue_mail_account`**
 
@@ -133,14 +133,30 @@ See [`email-handling.md`](email-handling.md) for inbound/outbound flows.
 
 Queue-scoped authorization invariant:
 
-- For agents, **incident** capabilities are evaluated per **`queue_id`** using **`role_queue.incident_permissions`** (and **`incident.admin`** on `role_permissions` if present). Legacy data may use global `incident.*` on `role_permissions` only when the pivot JSON is null.
-- An agent can read an incident only when they have **read** (or **admin**) for that incident’s queue on at least one assigned role; list/index scopes use the union of queue IDs where **read** is granted.
+- For agents, **work item** capabilities are evaluated per **`queue_id`** using **`role_queue.work_item_permissions`** (and **`work_item.admin`** on `role_permissions` if present). Legacy data may use global `work_item.*` on `role_permissions` only when the pivot JSON is null.
+- An agent can read a work item only when they have **read** (or **admin**) for that work item’s queue on at least one assigned role; list/index scopes use the union of queue IDs where **read** is granted.
 
 ---
 
-## 2. ITIL core: incidents, problems, changes, major incidents
+## 2. ITIL core: work items, problems, changes, major work_items
 
-### 2.1 Incident
+### 2.1 WorkItem (ticket)
+
+The unified actionable record for service desk work. The UI label is **Ticket**; the Eloquent model is **`WorkItem`** (`work_items` table).
+
+**`type`** (ITIL/product meaning — reclassifiable):
+
+| `type` value | Meaning |
+|--------------|---------|
+| `incident` | Unplanned service disruption (ITIL incident) |
+| `service_request` | Standard fulfillment (access, hardware, information) |
+| `task` | Operational or proactive work (recurring checks, patch rollout, reminders) |
+| `defect` | Software bug |
+| `feature_request` | Product enhancement request |
+
+**`source`** (how it entered the system — orthogonal to `type`):
+
+- `portal`, `email`, `api`, `monitoring`, …
 
 Key fields:
 
@@ -150,14 +166,15 @@ Key fields:
 - `reported_by_user_id`
 - `assigned_agent_id` (nullable)
 - `queue_id`
+- `type` (see table above; default `incident`)
 - `title`
 - `description`
 - `priority` (enum: Low, Medium, High, Critical)
-- `category_id` (FK to incident category)
+- `category_id` (FK to category taxonomy within a type)
 - `status` (enum with default workflow; customizable via workflow engine)
 - `sla_policy_id` (nullable)
 - `opened_at`, `resolved_at`, `closed_at`
-- `source` (`portal`, `email`, `api`, `monitoring`, …)
+- `source`
 - `mail_account_id` (nullable — receiving mailbox for reply-from-same-address)
 - `inbound_message_id` (nullable — first RFC `Message-ID`)
 
@@ -167,17 +184,25 @@ Relationships:
 - belongs to `User` as `reported_by` and as `assigned_agent`
 - belongs to many `Asset`
 - belongs to many `Problem`
-- has many `Event` links
-- has many `WorkLog` / `Comment`
+- has many `MonitoringEvent` links (via pivot)
+- has many `WorkItemMessage` (conversation thread)
+
+Related entities kept **separate** (not ticket types):
+
+- **`MonitoringEvent`** — raw monitoring signal; may spawn a work item via rules
+- **`Problem`** — root-cause investigation linked to many work items
+- **`Change`** — planned change with its own approval workflow
+- **`TaskSchedule`** (future) — recurring definition that generates `task`-type work items
 
 Invariants:
 
 - `tenant_id` matches all related entities (organization, queue).
-- Status transitions must follow tenant-defined workflow rules.
+- Status transitions must follow tenant-defined workflow rules (per `type` when type-specific workflows are configured).
+- Reclassifying `type` is allowed; audit the change and optionally swap workflow/queue/SLA.
 
 ### 2.2 Problem
 
-Represents the underlying cause of multiple incidents, within a single tenant.
+Represents the underlying cause of multiple work items, within a single tenant.
 
 Key fields:
 
@@ -193,7 +218,7 @@ Key fields:
 Relationships:
 
 - belongs to `Tenant`
-- has many `Incident` (many-to-many)
+- has many `WorkItem` (many-to-many)
 - optionally linked to `KnowledgeArticle`
 
 Invariants:
@@ -220,7 +245,7 @@ Relationships:
 
 - belongs to `Tenant`
 - belongs to many `Asset`
-- belongs to many `Incident` / `Problem`
+- belongs to many `WorkItem` / `Problem`
 - belongs to `Risk` (optional)
 
 Invariants:
@@ -241,7 +266,7 @@ Key fields:
 Relationships:
 
 - belongs to `Tenant`
-- has many `Incident`
+- has many `WorkItem`
 - has many `MajorIncidentUpdate` (timeline events and communications)
 
 ---
@@ -263,17 +288,17 @@ Key fields:
 Relationships:
 
 - belongs to `Tenant`
-- used by many `Incident`
+- used by many `WorkItem`
 
 ### 3.2 WorkflowDefinition
 
-Generic workflow definition for entities like incidents, changes, documents.
+Generic workflow definition for entities like work items, changes, documents.
 
 Key fields:
 
 - `id`
 - `tenant_id`
-- `entity_type` (`incident`, `change`, `document`)
+- `entity_type` (`work_item`, `change`, `document`)
 - `name`
 - `definition_json` (states, transitions, guards)
 - `is_default`
@@ -316,7 +341,7 @@ Relationships:
 - belongs to `Tenant`, `AssetType`
 - belongs to `Organization` (optional)
 - belongs to `User` as owner (optional)
-- belongs to many `Incident`, `Change`, `Event`
+- belongs to many `WorkItem`, `Change`, `Event`
 - belongs to many `ServiceOffering` (technical realization pivot **`service_offering_asset`**)
 - has many `AssetRelationship` as parent/child
 - documents via **`document_links`** (morph)
@@ -439,7 +464,7 @@ Relationships:
 - belongs to `Tenant`
 - belongs to `EventSource`
 - belongs to many `Asset`
-- belongs to many `Incident`
+- belongs to many `WorkItem`
 
 Invariants:
 
@@ -472,7 +497,7 @@ Key fields:
 Relationships:
 
 - belongs to `Tenant`
-- may link to `Incident`, `Change`, `Risk`, `ImprovementAction`
+- may link to `WorkItem`, `Change`, `Risk`, `ImprovementAction`
 
 ### 7.2 Risk
 
@@ -589,7 +614,7 @@ Key fields:
 - `tokens_input`
 - `tokens_output`
 - `credits_charged`
-- `context_type` (`incident_suggestion`, `kb_answer`, etc.)
+- `context_type` (`work_item_suggestion`, `kb_answer`, etc.)
 - `created_at`
 
 Used for:

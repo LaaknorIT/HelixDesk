@@ -22,7 +22,7 @@ class TenantRole extends SpatieRole
     public function queues(): BelongsToMany
     {
         return $this->belongsToMany(Queue::class, 'role_queue', 'role_id', 'queue_id')
-            ->withPivot('incident_permissions')
+            ->withPivot('work_item_permissions')
             ->withTimestamps();
     }
 }

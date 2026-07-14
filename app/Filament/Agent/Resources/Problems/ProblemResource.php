@@ -5,7 +5,7 @@ namespace App\Filament\Agent\Resources\Problems;
 use App\Filament\Agent\Resources\Problems\Pages\CreateProblem;
 use App\Filament\Agent\Resources\Problems\Pages\EditProblem;
 use App\Filament\Agent\Resources\Problems\Pages\ListProblems;
-use App\Filament\Agent\Resources\Problems\RelationManagers\IncidentsRelationManager;
+use App\Filament\Agent\Resources\Problems\RelationManagers\WorkItemsRelationManager;
 use App\Filament\Agent\Resources\Problems\Schemas\ProblemForm;
 use App\Filament\Agent\Resources\Problems\Tables\ProblemsTable;
 use App\Models\Problem;
@@ -80,7 +80,7 @@ class ProblemResource extends Resource
     public static function getRelations(): array
     {
         return [
-            IncidentsRelationManager::class,
+            WorkItemsRelationManager::class,
         ];
     }
 

@@ -24,10 +24,10 @@ class DashboardLayoutFactory extends Factory
             'role_name' => 'Agent',
             'user_id' => null,
             'layout_json' => [
-                ['widget' => 'my_incidents', 'x' => 0, 'y' => 0, 'w' => 6, 'h' => 3],
+                ['widget' => 'my_work_items', 'x' => 0, 'y' => 0, 'w' => 6, 'h' => 3],
                 ['widget' => 'monitoring_events', 'x' => 6, 'y' => 0, 'w' => 6, 'h' => 3],
             ],
-            'locked_widgets' => ['my_incidents'],
+            'locked_widgets' => ['my_work_items'],
             'is_active' => true,
         ];
     }

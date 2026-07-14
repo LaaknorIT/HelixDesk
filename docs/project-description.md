@@ -17,7 +17,7 @@ The system must support key processes from:
 
 Main purposes:
 
-- Efficient handling of incidents and support  
+- Efficient handling of work_items and support  
 - Structured IT operations and asset management  
 - Documentation and knowledge sharing  
 - Automation and AI-assisted support  
@@ -73,7 +73,7 @@ Each tenant has:
 
 - its own users (agents and end users)  
 - its own customers/companies, departments, and users in a hierarchy  
-- its own incidents  
+- its own work_items  
 - its own assets and CMDB relationships  
 - its own documentation  
 - its own configurations  
@@ -132,7 +132,7 @@ End users are users belonging to a customer company (served by an MSP or IT depa
 
 End users can:
 
-- register incidents  
+- register work_items  
 - chat with support  
 - read the knowledge base (subject to access rules, possibly public or authenticated)  
 - see the status of their own cases  
@@ -153,7 +153,7 @@ Agents work for the MSP or IT department.
 
 Agents can:
 
-- handle incidents  
+- handle work_items  
 - create and manage problems  
 - handle changes  
 - create and maintain documentation  
@@ -167,7 +167,7 @@ Agents can belong to:
 
 These distinctions must be documented in the design document:
 
-- **Queues**: primary routing units for incidents/events/requests; tenant admins attach queues to **roles** so agents inherit queue visibility from their assigned roles.  
+- **Queues**: primary routing units for work-items/events/requests; tenant admins attach queues to **roles** so agents inherit queue visibility from their assigned roles.  
 - **Teams**: logical organizational units (e.g. “Network team”, “Desktop team”).  
 
 ---
@@ -193,14 +193,14 @@ The system uses **RBAC (Role-Based Access Control)**.
 
 Users receive capabilities by **assigning roles**. Each role carries `{module}.{action}` permissions and the **incident queues** that role may work in; there is no separate access-control group entity.
 
-Permissions are named **`{module}.{action}`** (for example `problem.read`, `change.approve`, `tenant.admin`). Modules and their actions are declared in `config/helixdesk_permissions.php`. Tenant admins manage **roles** under **Settings → Roles**: each role has a **global permission matrix** for non-incident modules, and a separate **per-queue incident matrix** (add a queue, then set read/create/update/delete/admin for incidents in that queue only). **`incident.admin`** remains a global capability for full incident access.
+Permissions are named **`{module}.{action}`** (for example `problem.read`, `change.approve`, `tenant.admin`). Modules and their actions are declared in `config/helixdesk_permissions.php`. Tenant admins manage **roles** under **Settings → Roles**: each role has a **global permission matrix** for non-incident modules, and a separate **per-queue incident matrix** (add a queue, then set read/create/update/delete/admin for work_items in that queue only). **`work_item.admin`** remains a global capability for full incident access.
 
 For incident access, **queue-scoped incident rights** on each role determine what agents can do:
 
 - Each **queue** attached to a role carries a small matrix of incident actions (read, create, update, …).
-- **Which incidents** a user sees is the union of queues where they have **read** (or they hold **`incident.admin`**).
+- **Which work_items** a user sees is the union of queues where they have **read** (or they hold **`work_item.admin`**).
 
-Example: a role may have read/update in `Support` but only read in `Sales`; agents with that role see both queues in the index, but can only update incidents in `Support`.
+Example: a role may have read/update in `Support` but only read in `Sales`; agents with that role see both queues in the index, but can only update work_items in `Support`.
 
 Tenant admins manage **queues** in the Agent panel (Settings) and configure **roles** (including queue attachments and matrices) under **Settings → Roles**. Effective incident access is the union of queue-specific rights from all roles assigned to the user.
 
@@ -210,8 +210,8 @@ Examples:
 
 | Permission        | Description |
 | ----------------- | ------------------------ |
-| `incident.read`   | read incidents           |
-| `incident.update` | update incidents         |
+| `work_item.read`   | read work_items           |
+| `work_item.update` | update work_items         |
 | `change.approve`  | approve changes          |
 | `document.update` | edit documentation       |
 | `tenant.admin`    | manage roles & access    |
@@ -286,11 +286,11 @@ Status workflow (default):
 
 ### **6.2 Problem Management**
 
-A **problem** represents an *underlying cause of multiple incidents*, within a **single tenant**.
+A **problem** represents an *underlying cause of multiple work_items*, within a **single tenant**.
 
 Functions:
 
-- link incidents to a problem  
+- link work_items to a problem  
 - root cause analysis  
 - workaround description  
 - permanent fix description  
@@ -339,7 +339,7 @@ Planning and visualization:
 
 A **major incident**:
 
-- can link many related incidents  
+- can link many related work_items  
 - can send status updates to all affected stakeholders  
 
 Functions:
@@ -377,13 +377,13 @@ Example fields:
 - `warranty_date`  
 - `lifecycle_status`  
 - `owner` (user, team, or customer)  
-- linked incidents  
+- linked work_items  
 
 The system should support **full CMDB-style relationships**, such as:
 
 - “Service A depends on Server B and Database C”  
 - upstream/downstream dependencies  
-- impact analysis on incidents and changes  
+- impact analysis on work_items and changes  
 
 ---
 
@@ -436,7 +436,7 @@ Examples:
 Knowledge base articles:
 
 - can be **public** (unauthenticated) or restricted to authenticated users within a tenant  
-- can be linked to incidents, problems, and services  
+- can be linked to work_items, problems, and services  
 
 ---
 
@@ -493,11 +493,11 @@ Examples:
 
 Event handling:
 
-- Events can automatically create incidents.  
-- Events can be linked to existing incidents based on rules/correlation.  
+- Events can automatically create work_items.  
+- Events can be linked to existing work_items based on rules/correlation.  
 - **Event deduplication is required** (e.g. suppressing repeated identical alerts within a window).  
 - When the monitoring system detects that the condition is resolved, the event (and optionally its associated incident, based on configuration) can be **automatically closed**.  
-- Event-driven incidents can be routed to **separate queues/teams** from normal support incidents (e.g. dedicated NOC/operations teams).  
+- Event-driven work_items can be routed to **separate queues/teams** from normal support work_items (e.g. dedicated NOC/operations teams).  
 
 ---
 
@@ -505,8 +505,8 @@ Event handling:
 
 The system must support:
 
-- improvement suggestions (e.g. improvements derived from incidents, problems, non-conformances)  
-- analysis of incidents for trends and recurring issues  
+- improvement suggestions (e.g. improvements derived from work_items, problems, non-conformances)  
+- analysis of work_items for trends and recurring issues  
 - KPI tracking (e.g. SLA compliance, MTTR, CSAT, risk metrics)  
 
 ---
@@ -515,7 +515,7 @@ The system must support:
 
 ### **11.1 Non-conformance**
 
-Non-conformances are similar to incidents but used in the quality system (ISO 9001 context).
+Non-conformances are similar to work_items but used in the quality system (ISO 9001 context).
 
 Examples:
 
@@ -524,7 +524,7 @@ Examples:
 
 Non-conformances can be linked to:
 
-- incidents  
+- work_items  
 - changes  
 - risks  
 - improvement actions  
@@ -609,9 +609,9 @@ The agent dashboard must be **widget-based**.
 
 Possible widgets include:
 
-- my incidents  
-- incidents in my queues  
-- major incidents  
+- my work_items  
+- work_items in my queues  
+- major work_items  
 - monitoring alerts / events  
 - SLA breaches  
 - key KPIs (e.g. MTTR, open problems, open changes, risks)  
@@ -652,7 +652,7 @@ By default, AI should focus on **assistance** (suggestions), with **manual appro
 AI chatbot can:
 
 - answer questions based on the knowledge base and documentation  
-- create incidents on behalf of the end user  
+- create work_items on behalf of the end user  
 - escalate to a human agent when needed  
 
 ---
@@ -662,7 +662,7 @@ AI chatbot can:
 AI can:
 
 - suggest solutions and troubleshooting steps  
-- find similar historical incidents and problems  
+- find similar historical work_items and problems  
 - suggest creation or linking of a problem  
 - help draft responses to customers and documentation articles  
 
@@ -672,7 +672,7 @@ AI can:
 
 AI can:
 
-- link incidents to appropriate problems  
+- link work_items to appropriate problems  
 - suggest relevant knowledge base and documentation articles  
 
 These actions should normally require **agent confirmation**.
@@ -711,8 +711,8 @@ REST API is provided for:
 
 Example endpoints:
 
-- `GET /api/incidents`  
-- `POST /api/incidents`  
+- `GET /api/work_items`  
+- `POST /api/work_items`  
 - `GET /api/assets`  
 - `POST /api/events`  
 
@@ -746,7 +746,7 @@ The boundary between **core** and **add-on** features should stay clear in techn
 The system must log:
 
 - user actions  
-- changes in incidents, problems, changes, risks, non-conformances, and documentation  
+- changes in work_items, problems, changes, risks, non-conformances, and documentation  
 - access to passwords and sensitive data  
 - changes to permissions, roles, and tenant configuration  
 - global admin access to tenants  

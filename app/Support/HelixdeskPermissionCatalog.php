@@ -8,7 +8,7 @@ namespace App\Support;
 final class HelixdeskPermissionCatalog
 {
     /**
-     * @return list<string> All permission names (e.g. incident.read).
+     * @return list<string> All permission names (e.g. work_item.read).
      */
     public static function allPermissionNames(): array
     {
@@ -64,14 +64,14 @@ final class HelixdeskPermissionCatalog
     }
 
     /**
-     * Modules shown on the global role matrix (incident is configured per queue).
+     * Modules shown on the global role matrix (work item is configured per queue).
      *
      * @return array<string, array{label: string, actions: list<string>}>
      */
-    public static function modulesWithActionsExcludingIncident(): array
+    public static function modulesWithActionsExcludingWorkItem(): array
     {
         $modules = self::modulesWithActions();
-        unset($modules['incident']);
+        unset($modules['work_item']);
 
         return $modules;
     }
@@ -79,9 +79,9 @@ final class HelixdeskPermissionCatalog
     /**
      * @return list<string>
      */
-    public static function incidentModuleActions(): array
+    public static function workItemModuleActions(): array
     {
-        return config('helixdesk_permissions.modules.incident.actions', []);
+        return config('helixdesk_permissions.modules.work_item.actions', []);
     }
 
     /**

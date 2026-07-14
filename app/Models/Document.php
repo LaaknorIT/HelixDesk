@@ -37,9 +37,9 @@ class Document extends TenantModel
         return $this->belongsTo(User::class, 'owner_user_id');
     }
 
-    public function incidents(): MorphToMany
+    public function workItems(): MorphToMany
     {
-        return $this->morphedByMany(Incident::class, 'linkable', 'document_links')
+        return $this->morphedByMany(WorkItem::class, 'linkable', 'document_links')
             ->using(DocumentLink::class)
             ->withTimestamps();
     }

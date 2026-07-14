@@ -55,7 +55,7 @@ final class MicrosoftEntraOrganizationSyncService
                 $this->syncManagedDevices($client, $target, $organization);
             }
 
-            if (($scopes['security_incidents'] ?? false)) {
+            if (($scopes['security_work_items'] ?? false)) {
                 $this->syncSecurityIncidents($client, $target, $organization);
             }
 
@@ -303,20 +303,20 @@ final class MicrosoftEntraOrganizationSyncService
     ): void {
         $source = $this->monitoringEventSource($target, $organization);
 
-        foreach ($client->paginateCollection('security/incidents', [
+        foreach ($client->paginateCollection('security/work_items', [
             '$top' => 50,
-        ]) as $incident) {
-            $extId = (string) ($incident['id'] ?? '');
+        ]) as $workItem) {
+            $extId = (string) ($workItem['id'] ?? '');
             if ($extId === '') {
                 continue;
             }
 
-            $graphStatus = strtolower((string) ($incident['status'] ?? 'active'));
+            $graphStatus = strtolower((string) ($workItem['status'] ?? 'active'));
             $closed = $this->graphIncidentIsClosed($graphStatus);
             $ourStatus = $closed ? 'closed' : 'open';
 
-            $severity = $this->normalizeSeverity($incident['severity'] ?? 'medium');
-            $title = (string) ($incident['displayName'] ?? 'Security incident');
+            $severity = $this->normalizeSeverity($workItem['severity'] ?? 'medium');
+            $title = (string) ($workItem['displayName'] ?? 'Security incident');
 
             $existing = MonitoringEvent::query()
                 ->where('tenant_id', $target->tenantId)

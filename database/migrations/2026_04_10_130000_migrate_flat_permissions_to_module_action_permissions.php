@@ -16,15 +16,15 @@ return new class extends Migration
     {
         $guard = config('auth.defaults.guard', 'web');
 
-        if (! Permission::query()->where('name', 'view_incidents')->where('guard_name', $guard)->exists()) {
+        if (! Permission::query()->where('name', 'view_work_items')->where('guard_name', $guard)->exists()) {
             app(PermissionRegistrar::class)->forgetCachedPermissions();
 
             return;
         }
 
         $map = [
-            'view_incidents' => ['incident.read'],
-            'manage_incidents' => ['incident.create', 'incident.update', 'incident.delete'],
+            'view_work_items' => ['work_item.read'],
+            'manage_work_items' => ['work_item.create', 'work_item.update', 'work_item.delete'],
             'manage_problems' => ['problem.read', 'problem.create', 'problem.update', 'problem.delete', 'problem.admin'],
             'manage_changes' => ['change.read', 'change.create', 'change.update', 'change.delete', 'change.admin'],
             'approve_changes' => ['change.approve'],
@@ -63,8 +63,8 @@ return new class extends Migration
             ->delete();
 
         DB::table('workflow_transitions')
-            ->where('required_permission', 'manage_incidents')
-            ->update(['required_permission' => 'incident.update']);
+            ->where('required_permission', 'manage_work_items')
+            ->update(['required_permission' => 'work_item.update']);
 
         DB::table('workflow_transitions')
             ->where('required_permission', 'manage_changes')

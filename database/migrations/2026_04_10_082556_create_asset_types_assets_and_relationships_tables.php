@@ -24,7 +24,6 @@ return new class extends Migration
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
             $table->foreignId('organization_id')->nullable()->constrained('organizations')->nullOnDelete();
-            $table->unsignedBigInteger('department_id')->nullable();
             $table->foreignId('asset_type_id')->constrained('asset_types')->cascadeOnDelete();
             $table->string('name');
             $table->string('asset_identifier')->nullable();
@@ -50,10 +49,10 @@ return new class extends Migration
             $table->index(['tenant_id', 'child_asset_id']);
         });
 
-        Schema::create('asset_incident', function (Blueprint $table) {
-            $table->foreignId('incident_id')->constrained('incidents')->cascadeOnDelete();
+        Schema::create('asset_work_item', function (Blueprint $table) {
+            $table->foreignId('work_item_id')->constrained('work_items')->cascadeOnDelete();
             $table->foreignId('asset_id')->constrained('assets')->cascadeOnDelete();
-            $table->primary(['incident_id', 'asset_id']);
+            $table->primary(['work_item_id', 'asset_id']);
         });
     }
 
@@ -62,7 +61,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('asset_incident');
+        Schema::dropIfExists('asset_work_item');
         Schema::dropIfExists('asset_relationships');
         Schema::dropIfExists('assets');
         Schema::dropIfExists('asset_types');

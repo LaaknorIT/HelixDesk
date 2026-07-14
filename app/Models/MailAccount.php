@@ -61,9 +61,9 @@ class MailAccount extends TenantModel
         return $this->belongsToMany(Queue::class, 'queue_mail_account');
     }
 
-    public function incidents(): HasMany
+    public function workItems(): HasMany
     {
-        return $this->hasMany(Incident::class);
+        return $this->hasMany(WorkItem::class);
     }
 
     public function processedInboundEmails(): HasMany

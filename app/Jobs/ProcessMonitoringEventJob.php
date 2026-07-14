@@ -2,10 +2,11 @@
 
 namespace App\Jobs;
 
-use App\Enums\IncidentSource;
-use App\Models\Incident;
+use App\Enums\WorkItemSource;
+use App\Enums\WorkItemType;
 use App\Models\MonitoringEvent;
 use App\Models\Tenant;
+use App\Models\WorkItem;
 use App\Services\TenantContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -34,13 +35,13 @@ class ProcessMonitoringEventJob implements ShouldQueue
         setPermissionsTeamId($tenantId);
 
         try {
-            if ($event->incidents()->exists()) {
+            if ($event->workItems()->exists()) {
                 return;
             }
 
             $autoSeverities = array_map(
                 'strtolower',
-                config('helixdesk.monitoring.auto_incident_severities', [])
+                config('helixdesk.monitoring.auto_work_item_severities', [])
             );
 
             if (! in_array(strtolower($event->severity), $autoSeverities, true)) {
@@ -63,24 +64,25 @@ class ProcessMonitoringEventJob implements ShouldQueue
 
             $title = mb_substr('[Monitoring] '.$event->message, 0, 250);
 
-            $incident = Incident::query()->create([
+            $workItem = WorkItem::query()->create([
                 'tenant_id' => $tenantId,
                 'organization_id' => null,
                 'reported_by_user_id' => null,
                 'assigned_agent_id' => null,
                 'queue_id' => $queue->getKey(),
+                'type' => WorkItemType::Incident,
                 'title' => $title,
                 'description' => $event->message,
                 'priority' => $priority,
                 'category_id' => null,
                 'status' => 'New',
-                'source' => IncidentSource::Monitoring,
+                'source' => WorkItemSource::Monitoring,
                 'opened_at' => Carbon::now(),
                 'resolved_at' => null,
                 'closed_at' => null,
             ]);
 
-            $event->incidents()->attach($incident->getKey());
+            $event->workItems()->attach($workItem->getKey());
         } finally {
             $tenantContext->setTenantId(null);
             setPermissionsTeamId(null);

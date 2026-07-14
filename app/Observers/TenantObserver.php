@@ -21,7 +21,7 @@ class TenantObserver
     {
         $this->seedTenantPermissionsAndRoles($tenant);
 
-        $this->seedDefaultIncidentWorkflow($tenant);
+        $this->seedDefaultWorkItemWorkflow($tenant);
         $this->seedDefaultQueue($tenant);
         $this->seedDefaultChangeWorkflow($tenant);
         $this->seedDefaultAssetTypes($tenant);
@@ -60,11 +60,11 @@ class TenantObserver
             $forRolePermissionsTable = array_values(array_filter(
                 $expanded,
                 static function (string $permission): bool {
-                    if (! str_starts_with($permission, 'incident.')) {
+                    if (! str_starts_with($permission, 'work_item.')) {
                         return true;
                     }
 
-                    return $permission === 'incident.admin';
+                    return $permission === 'work_item.admin';
                 }
             ));
 
@@ -85,18 +85,18 @@ class TenantObserver
         );
     }
 
-    private function seedDefaultIncidentWorkflow(Tenant $tenant): void
+    private function seedDefaultWorkItemWorkflow(Tenant $tenant): void
     {
         $workflowDefinition = WorkflowDefinition::query()->firstOrCreate(
             [
                 'tenant_id' => $tenant->getKey(),
-                'entity_type' => 'incident',
+                'entity_type' => 'work_item',
                 'is_default' => true,
             ],
-            ['name' => 'Default Incident Workflow']
+            ['name' => 'Default Work Item Workflow']
         );
 
-        foreach ($this->defaultIncidentTransitions() as $transition) {
+        foreach ($this->defaultWorkItemTransitions() as $transition) {
             WorkflowTransition::query()->updateOrCreate([
                 'tenant_id' => $tenant->getKey(),
                 'workflow_definition_id' => $workflowDefinition->getKey(),
@@ -111,9 +111,9 @@ class TenantObserver
     /**
      * @return array<int, array{from_status: string, to_status: string, required_permission: ?string}>
      */
-    private function defaultIncidentTransitions(): array
+    private function defaultWorkItemTransitions(): array
     {
-        $permission = 'incident.update';
+        $permission = 'work_item.update';
 
         return [
             [
@@ -144,7 +144,7 @@ class TenantObserver
             [
                 'from_status' => 'Resolved',
                 'to_status' => 'Closed',
-                // End users can close their own incidents once they are resolved.
+                // End users can close their own work_items once they are resolved.
                 'required_permission' => null,
             ],
             [
@@ -229,11 +229,11 @@ class TenantObserver
         if ($tenantAdmin !== null && $allQueueIds !== []) {
             $tenantAdminConfig = config('helixdesk_permissions.tenant_roles.tenant_admin', []);
             $expanded = HelixdeskPermissionCatalog::expandRoleAssignment($tenantAdminConfig['permissions'] ?? []);
-            $incidentPayload = $this->incidentPermissionBoolMapFromExpanded($expanded);
+            $workItemPayload = $this->workItemPermissionBoolMapFromExpanded($expanded);
             $sync = [];
 
             foreach ($allQueueIds as $queueId) {
-                $sync[(int) $queueId] = ['incident_permissions' => json_encode($incidentPayload)];
+                $sync[(int) $queueId] = ['work_item_permissions' => json_encode($workItemPayload)];
             }
 
             $tenantAdmin->queues()->sync($sync);
@@ -257,11 +257,11 @@ class TenantObserver
         if ($ids !== []) {
             $agentConfig = config('helixdesk_permissions.tenant_roles.agent', []);
             $expanded = HelixdeskPermissionCatalog::expandRoleAssignment($agentConfig['permissions'] ?? []);
-            $incidentPayload = $this->incidentPermissionBoolMapFromExpanded($expanded);
+            $workItemPayload = $this->workItemPermissionBoolMapFromExpanded($expanded);
             $sync = [];
 
             foreach ($ids as $queueId) {
-                $sync[(int) $queueId] = ['incident_permissions' => json_encode($incidentPayload)];
+                $sync[(int) $queueId] = ['work_item_permissions' => json_encode($workItemPayload)];
             }
 
             $agentRole->queues()->sync($sync);
@@ -272,13 +272,13 @@ class TenantObserver
      * @param  list<string>  $expandedNames
      * @return array<string, bool>
      */
-    private function incidentPermissionBoolMapFromExpanded(array $expandedNames): array
+    private function workItemPermissionBoolMapFromExpanded(array $expandedNames): array
     {
-        $actions = config('helixdesk_permissions.modules.incident.actions', []);
+        $actions = config('helixdesk_permissions.modules.work_item.actions', []);
         $map = array_fill_keys($actions, false);
 
         foreach ($expandedNames as $name) {
-            if ($name === 'incident.admin') {
+            if ($name === 'work_item.admin') {
                 foreach ($actions as $action) {
                     $map[$action] = true;
                 }
@@ -286,8 +286,8 @@ class TenantObserver
                 break;
             }
 
-            if (str_starts_with($name, 'incident.')) {
-                $action = substr($name, strlen('incident.'));
+            if (str_starts_with($name, 'work_item.')) {
+                $action = substr($name, strlen('work_item.'));
 
                 if (array_key_exists($action, $map)) {
                     $map[$action] = true;
@@ -327,11 +327,11 @@ class TenantObserver
             [
                 'user_id' => null,
                 'layout_json' => [
-                    ['widget' => 'my_incidents', 'x' => 0, 'y' => 0, 'w' => 6, 'h' => 3],
-                    ['widget' => 'incidents_in_queue', 'x' => 6, 'y' => 0, 'w' => 6, 'h' => 3],
+                    ['widget' => 'my_work_items', 'x' => 0, 'y' => 0, 'w' => 6, 'h' => 3],
+                    ['widget' => 'work_items_in_queue', 'x' => 6, 'y' => 0, 'w' => 6, 'h' => 3],
                     ['widget' => 'monitoring_events', 'x' => 0, 'y' => 3, 'w' => 12, 'h' => 3],
                 ],
-                'locked_widgets' => ['my_incidents'],
+                'locked_widgets' => ['my_work_items'],
                 'is_active' => true,
             ],
         );
@@ -345,11 +345,11 @@ class TenantObserver
             [
                 'user_id' => null,
                 'layout_json' => [
-                    ['widget' => 'major_incidents', 'x' => 0, 'y' => 0, 'w' => 6, 'h' => 3],
+                    ['widget' => 'major_work_items', 'x' => 0, 'y' => 0, 'w' => 6, 'h' => 3],
                     ['widget' => 'sla_breaches', 'x' => 6, 'y' => 0, 'w' => 6, 'h' => 3],
                     ['widget' => 'kpis', 'x' => 0, 'y' => 3, 'w' => 12, 'h' => 3],
                 ],
-                'locked_widgets' => ['major_incidents'],
+                'locked_widgets' => ['major_work_items'],
                 'is_active' => true,
             ],
         );

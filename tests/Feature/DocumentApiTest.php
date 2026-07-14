@@ -3,9 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\Document;
-use App\Models\Incident;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\WorkItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -60,7 +60,7 @@ class DocumentApiTest extends TestCase
             'status' => 'published',
         ]);
 
-        $incident = Incident::query()->create([
+        $workItem = WorkItem::query()->create([
             'tenant_id' => $tenant->id,
             'title' => 'Cannot log in',
             'description' => 'User locked out.',
@@ -69,18 +69,18 @@ class DocumentApiTest extends TestCase
             'opened_at' => now(),
         ]);
 
-        $incident->documents()->attach($document->getKey());
+        $workItem->documents()->attach($document->getKey());
 
         $this->assertDatabaseHas('document_links', [
             'document_id' => $document->getKey(),
-            'linkable_id' => $incident->getKey(),
-            'linkable_type' => Incident::class,
+            'linkable_id' => $workItem->getKey(),
+            'linkable_type' => WorkItem::class,
         ]);
 
         $this->actingAs($agent);
 
         $this->getJson('/api/v1/documents/'.$document->getKey())
             ->assertOk()
-            ->assertJsonPath('data.incidents.0.id', $incident->getKey());
+            ->assertJsonPath('data.work_items.0.id', $workItem->getKey());
     }
 }

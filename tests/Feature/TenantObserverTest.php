@@ -67,8 +67,8 @@ class TenantObserverTest extends TestCase
             ->where('name', 'Tenant Admin')
             ->firstOrFail();
 
-        $incidentActionCount = count(HelixdeskPermissionCatalog::incidentModuleActions());
-        $expectedRolePermissionCount = count(HelixdeskPermissionCatalog::allPermissionNames()) - ($incidentActionCount - 1);
+        $workItemActionCount = count(HelixdeskPermissionCatalog::workItemModuleActions());
+        $expectedRolePermissionCount = count(HelixdeskPermissionCatalog::allPermissionNames()) - ($workItemActionCount - 1);
 
         $this->assertSame(
             $expectedRolePermissionCount,
@@ -90,13 +90,13 @@ class TenantObserverTest extends TestCase
             ->pluck('permission')
             ->all();
 
-        foreach (HelixdeskPermissionCatalog::modulesWithActionsExcludingIncident() as $module => $cfg) {
+        foreach (HelixdeskPermissionCatalog::modulesWithActionsExcludingWorkItem() as $module => $cfg) {
             foreach ($cfg['actions'] as $action) {
                 $this->assertContains("{$module}.{$action}", $assigned);
             }
         }
 
-        $this->assertContains('incident.admin', $assigned);
+        $this->assertContains('work_item.admin', $assigned);
 
         $general = $tenant->fresh()->generalQueue();
         $this->assertNotNull($general);
@@ -108,11 +108,11 @@ class TenantObserverTest extends TestCase
 
         $this->assertNotNull($pivot);
 
-        $incidentPivot = json_decode((string) $pivot->incident_permissions, true);
-        $this->assertIsArray($incidentPivot);
+        $workItemPivot = json_decode((string) $pivot->work_item_permissions, true);
+        $this->assertIsArray($workItemPivot);
 
-        foreach (HelixdeskPermissionCatalog::incidentModuleActions() as $action) {
-            $this->assertTrue($incidentPivot[$action] ?? false);
+        foreach (HelixdeskPermissionCatalog::workItemModuleActions() as $action) {
+            $this->assertTrue($workItemPivot[$action] ?? false);
         }
 
         $agentRole = TenantRole::query()
@@ -127,7 +127,7 @@ class TenantObserverTest extends TestCase
 
         foreach ($agentAssigned as $permission) {
             $this->assertFalse(
-                str_starts_with((string) $permission, 'incident.') && (string) $permission !== 'incident.admin'
+                str_starts_with((string) $permission, 'work_item.') && (string) $permission !== 'work_item.admin'
             );
         }
     }

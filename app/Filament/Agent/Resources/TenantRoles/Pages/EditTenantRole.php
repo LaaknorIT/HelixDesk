@@ -31,7 +31,7 @@ class EditTenantRole extends EditRecord
     {
         $matrix = [];
 
-        foreach (HelixdeskPermissionCatalog::modulesWithActionsExcludingIncident() as $moduleKey => $module) {
+        foreach (HelixdeskPermissionCatalog::modulesWithActionsExcludingWorkItem() as $moduleKey => $module) {
             $matrix[$moduleKey] = [];
             foreach ($module['actions'] as $action) {
                 $matrix[$moduleKey][$action] = false;
@@ -65,10 +65,10 @@ class EditTenantRole extends EditRecord
             }
         }
 
-        $incidentRows = [];
+        $workItemRows = [];
 
         foreach ($record->queues()->orderBy('name')->get() as $queue) {
-            $raw = $queue->pivot->incident_permissions ?? null;
+            $raw = $queue->pivot->work_item_permissions ?? null;
             $decoded = [];
 
             if (is_string($raw) && $raw !== '') {
@@ -79,9 +79,9 @@ class EditTenantRole extends EditRecord
                 $decoded = [];
             }
 
-            $incidentRows[] = [
+            $workItemRows[] = [
                 'queue_id' => $queue->getKey(),
-                'actions' => RolePermissionMatrixSync::normalizeIncidentActions($decoded),
+                'actions' => RolePermissionMatrixSync::normalizeWorkItemActions($decoded),
             ];
         }
 
@@ -89,14 +89,14 @@ class EditTenantRole extends EditRecord
             ...$data,
             'name' => $record->name,
             'global_matrix' => $matrix,
-            'incident_queue_permissions' => $incidentRows,
+            'work_item_queue_permissions' => $workItemRows,
         ];
     }
 
     public function form(Schema $schema): Schema
     {
         $matrixActions = HelixdeskPermissionCatalog::orderedMatrixActions();
-        $modules = HelixdeskPermissionCatalog::modulesWithActionsExcludingIncident();
+        $modules = HelixdeskPermissionCatalog::modulesWithActionsExcludingWorkItem();
         $actionLabels = HelixdeskPermissionCatalog::actionLabels();
 
         $matrixRows = [];
@@ -141,7 +141,7 @@ class EditTenantRole extends EditRecord
                 ->schema($cells);
         }
 
-        $incidentActions = HelixdeskPermissionCatalog::incidentModuleActions();
+        $workItemActions = HelixdeskPermissionCatalog::workItemModuleActions();
         $repeaterSchema = [
             Select::make('queue_id')
                 ->label('Queue')
@@ -160,7 +160,7 @@ class EditTenantRole extends EditRecord
                 ->preload(),
         ];
 
-        foreach ($incidentActions as $action) {
+        foreach ($workItemActions as $action) {
             $repeaterSchema[] = Toggle::make("actions.{$action}")
                 ->label($actionLabels[$action] ?? $action)
                 ->default(false);
@@ -176,12 +176,12 @@ class EditTenantRole extends EditRecord
                             ->maxLength(255),
                     ]),
                 Section::make('Permissions')
-                    ->description('Capabilities for this role. Incident actions are configured per queue below.')
+                    ->description('Capabilities for this role. Work item actions are configured per queue below.')
                     ->schema($matrixRows),
-                Section::make('Incident permissions by queue')
-                    ->description('Add a queue, then choose which incident actions apply in that queue. Users with this role only see incidents in queues listed here.')
+                Section::make('Work item permissions by queue')
+                    ->description('Add a queue, then choose which work item actions apply in that queue. Users with this role only see tickets in queues listed here.')
                     ->schema([
-                        Repeater::make('incident_queue_permissions')
+                        Repeater::make('work_item_queue_permissions')
                             ->label('')
                             ->addActionLabel('Add queue')
                             ->reorderable(false)
@@ -204,7 +204,7 @@ class EditTenantRole extends EditRecord
         RolePermissionMatrixSync::sync(
             $record,
             $data['global_matrix'] ?? [],
-            $data['incident_queue_permissions'] ?? [],
+            $data['work_item_queue_permissions'] ?? [],
         );
 
         return $record;

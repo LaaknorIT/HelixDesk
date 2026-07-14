@@ -30,8 +30,8 @@ class Problem extends TenantModel
         return $this->belongsTo(Tenant::class);
     }
 
-    public function incidents(): BelongsToMany
+    public function workItems(): BelongsToMany
     {
-        return $this->belongsToMany(Incident::class, 'incident_problem');
+        return $this->belongsToMany(WorkItem::class, 'work_item_problem');
     }
 }

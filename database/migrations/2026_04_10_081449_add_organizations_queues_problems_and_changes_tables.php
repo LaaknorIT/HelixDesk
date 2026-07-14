@@ -14,12 +14,17 @@ return new class extends Migration
         Schema::create('organizations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->constrained('tenants')->cascadeOnDelete();
-            $table->foreignId('parent_organization_id')->nullable()->constrained('organizations')->cascadeOnDelete();
+            $table->string('type')->default('customer');
             $table->string('name');
+            $table->string('code')->nullable();
+            $table->boolean('is_billable')->default(false);
+            $table->unsignedInteger('order')->default(0);
+            $table->bigInteger('parent_id')->default(-1);
             $table->string('external_reference')->nullable();
             $table->timestamps();
 
-            $table->index(['tenant_id', 'parent_organization_id']);
+            $table->index(['tenant_id', 'parent_id']);
+            $table->index(['tenant_id', 'type']);
         });
 
         Schema::create('queues', function (Blueprint $table) {
@@ -46,10 +51,10 @@ return new class extends Migration
             $table->index(['tenant_id', 'status']);
         });
 
-        Schema::create('incident_problem', function (Blueprint $table) {
-            $table->foreignId('incident_id')->constrained('incidents')->cascadeOnDelete();
+        Schema::create('work_item_problem', function (Blueprint $table) {
+            $table->foreignId('work_item_id')->constrained('work_items')->cascadeOnDelete();
             $table->foreignId('problem_id')->constrained('problems')->cascadeOnDelete();
-            $table->primary(['incident_id', 'problem_id']);
+            $table->primary(['work_item_id', 'problem_id']);
         });
 
         Schema::create('changes', function (Blueprint $table) {
@@ -74,7 +79,7 @@ return new class extends Migration
             $table->foreignId('organization_id')->nullable()->after('tenant_id')->constrained('organizations')->nullOnDelete();
         });
 
-        Schema::table('incidents', function (Blueprint $table) {
+        Schema::table('work_items', function (Blueprint $table) {
             $table->foreign('organization_id')->references('id')->on('organizations')->nullOnDelete();
             $table->foreign('queue_id')->references('id')->on('queues')->nullOnDelete();
         });
@@ -85,7 +90,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('incidents', function (Blueprint $table) {
+        Schema::table('work_items', function (Blueprint $table) {
             $table->dropForeign(['organization_id']);
             $table->dropForeign(['queue_id']);
         });
@@ -96,7 +101,7 @@ return new class extends Migration
         });
 
         Schema::dropIfExists('changes');
-        Schema::dropIfExists('incident_problem');
+        Schema::dropIfExists('work_item_problem');
         Schema::dropIfExists('problems');
         Schema::dropIfExists('queues');
         Schema::dropIfExists('organizations');

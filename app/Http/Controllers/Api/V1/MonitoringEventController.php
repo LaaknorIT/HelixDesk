@@ -67,7 +67,7 @@ class MonitoringEventController extends Controller
         }
 
         return response()->json([
-            'data' => $monitoring_event->load(['source', 'incidents']),
+            'data' => $monitoring_event->load(['source', 'workItems']),
         ]);
     }
 }

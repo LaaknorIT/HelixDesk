@@ -36,8 +36,8 @@ Implementation:
 
 Queue visibility guard:
 
-- Agent access to incident lists/details is restricted to incidents in queues assigned to that agent.
-- Queue assignment is therefore part of effective authorization, alongside `incident.read` / `incident.update`.
+- Agent access to incident lists/details is restricted to work_items in queues assigned to that agent.
+- Queue assignment is therefore part of effective authorization, alongside `work_item.read` / `work_item.update`.
 
 SLA integration:
 
@@ -45,12 +45,12 @@ SLA integration:
   - Determine SLA policy from queue, priority, and/or customer.
   - Set target response and resolution times.
 - Background jobs:
-  - Monitor SLA timers (queue jobs) and mark incidents as breached when thresholds are crossed.
+  - Monitor SLA timers (queue jobs) and mark work_items as breached when thresholds are crossed.
   - Trigger notifications/escalations if configured.
 
 ---
 
-## 2. Monitoring events and auto-incidents
+## 2. Monitoring events and auto-work_items
 
 ### 2.1 Event ingestion
 
@@ -87,7 +87,7 @@ Steps:
 
 ### 2.3 Separation of queues
 
-- Event-driven incidents are typically routed to:
+- Event-driven work_items are typically routed to:
   - special **monitoring/operations queues**, not standard service desk queues.
 - This separation is configured per tenant and queue, allowing:
   - Dedicated NOC teams to work from their own dashboards.
@@ -136,7 +136,7 @@ Implementation:
 Use cases:
 
 - Link KB articles to:
-  - incidents (for resolution references),
+  - work_items (for resolution references),
   - problems (for root cause knowledge),
   - services/assets (for service catalogs).
 - Link helpdesk guides and IT docs to:
@@ -197,7 +197,7 @@ Behavior:
   - change details
   - linked assets/services
   - risk assessment
-  - related incidents/problems.
+  - related work-items/problems.
 
 ### 4.1.2 Change Kanban board
 
@@ -276,7 +276,7 @@ When an agent opens an incident:
 1. UI calls backend endpoint to fetch AI suggestions.
 2. Backend enqueues `RunAIInferenceJob` with:
    - incident context (sanitized)
-   - request type (`incident_suggestion`).
+   - request type (`work_item_suggestion`).
 3. Job:
    - selects appropriate AI provider based on:
      - tenant’s configuration (BYO key vs. HelixDesk AI).
@@ -287,7 +287,7 @@ When an agent opens an incident:
    - store `AIInferenceLog` with summarized suggestion.
 5. Agent UI shows:
    - proposed solution,
-   - similar incidents/problems,
+   - similar work-items/problems,
    - suggested KB articles.
 6. If agent accepts:
    - apply changes (e.g. add work log, link problem),
@@ -297,7 +297,7 @@ When an agent opens an incident:
 
 Scheduled job:
 
-1. Picks incidents/problems that match criteria (e.g. last N days, unresolved).
+1. Picks work-items/problems that match criteria (e.g. last N days, unresolved).
 2. Groups them for clustering or trend analysis.
 3. Enqueues low-priority `RunAIInferenceJob` tasks.
 4. Uses results to:
@@ -318,9 +318,9 @@ All such jobs:
 
 Widgets:
 
-- My incidents
+- My work_items
 - Incidents in my queues
-- Major incidents
+- Major work_items
 - Monitoring alerts/events
 - SLA breaches
 - KPIs (e.g. MTTR, open problems, open changes, risk distribution)

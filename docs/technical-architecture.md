@@ -69,7 +69,7 @@ Single shared database with **row-level tenancy**:
 
 Key decisions:
 
-- **No cross-tenant entities**: All domain entities (incidents, assets, problems, changes, risks, etc.) are tenant-local.
+- **No cross-tenant entities**: All domain entities (work_items, assets, problems, changes, risks, etc.) are tenant-local.
 - **Global-only entities**: Some tables (e.g. `tenants`, `global_integrations`, `ai_providers`) are managed at the global level but may still reference tenant IDs in configuration.
 - **Sharding readiness**: The schema and application layers should be designed so that splitting tenants across multiple databases in the future is possible, e.g.:
   - Avoid cross-tenant joins.
@@ -87,19 +87,19 @@ Foreign key behavior:
 - **Tenant isolation at application layer** via:
   - Tenant global scopes on Eloquent queries.
   - Authorization policies checking `tenant_id` and RBAC, with RBAC implemented via `spatie/laravel-permission` (teams/multi-tenancy mode) and wired to `tenant_id`.
-- **Queue-level incident partitioning** inside a tenant:
-  - Agent incident access is constrained by **`role_queue.incident_permissions`** (per queue, per role) plus optional global **`incident.admin`**, unioned across roles.
-  - API and Filament must evaluate incident actions using **`HelixdeskIncidentAuthorization`** (queue id from the incident or target queue), not bare `incident.read` / `incident.update` on `role_permissions` alone.
+- **Queue-level work item partitioning** inside a tenant:
+  - Agent ticket access is constrained by **`role_queue.work_item_permissions`** (per queue, per role) plus optional global **`work_item.admin`**, unioned across roles.
+  - API and Filament must evaluate work item actions using **`HelixdeskWorkItemAuthorization`** (queue id from the work item or target queue), not bare `work_item.read` / `work_item.update` on `role_permissions` alone.
 - **Administrative separation**:
 - **Global admins** live in a separate guard/role system and are hidden from tenant UIs.
 - Tenant-facing UIs are separated by persona:
-  - an **Agent panel** where tenant agents/tenant admins manage incidents,
-  - an **End-user panel** where end users can only manage their own incidents (create, reply, close).
+  - an **Agent panel** where tenant agents/tenant admins manage work_items,
+  - an **End-user panel** where end users can only manage their own work_items (create, reply, close).
 - Tenant scoping inside tenant-facing Filament panels is handled via Filament's built-in `tenant()` feature (panel tenancy), not by exposing tenant identifiers in UI forms/tables.
-- Incident handling in tenant-facing panels uses a dedicated **record view/edit page** (instead of list-row quick actions), so new workflows can be added without overloading list tables.
-- Incident conversation data supports:
-  - threaded external replies (`incident_messages.parent_message_id`),
-  - agent-only internal notes (`incident_messages.is_internal = true`),
+- Work item handling in tenant-facing panels uses a dedicated **record view/edit page** (instead of list-row quick actions), so new workflows can be added without overloading list tables.
+- Work item conversation data supports:
+  - threaded external replies (`work_item_messages.parent_message_id`),
+  - agent-only internal notes (`work_item_messages.is_internal = true`),
   - status and priority updates in the record page workflow.
 - Global admin access to a tenant is recorded in a dedicated table (e.g. `tenant_impersonations` or similar).
 - **Data residency**:
@@ -149,7 +149,7 @@ Initial major bounded contexts:
    - Tenant, Organization (unified tree: `group` / `customer` / `department` on one table), User, Role, Team, Queue, IdP configuration.
    - Agent panel: `OrganizationResource` with **Filament Tree** index (`solution-forest/filament-tree`) and standard edit/relation managers for assets, service offerings, and people. Navigation label defaults to **Customers** (`config/helixdesk.php`).
 2. **ITIL Core**
-   - Incident, Problem, Change, MajorIncident, SLA, Workflow.
+   - WorkItem, Problem, Change, MajorIncident, SLA, Workflow.
 3. **CMDB & Assets**
    - Asset, AssetType, AssetRelationship, LifecycleRule.
 4. **Documentation**
@@ -199,13 +199,13 @@ Implementation approach:
 Key job categories:
 
 - `ProcessMonitoringEventJob`
-  - Deduplicate events, correlate with existing incidents, create or update incidents.
+  - Deduplicate events, correlate with existing work_items, create or update work_items.
 - `PollMailAccountsJob` / `PollMailAccountJob`
   - Scheduled mailbox polling (IMAP, POP3, Microsoft Graph shared mailboxes).
-- `SendIncidentReplyMailJob`
-  - Outbound email when agents reply on email-sourced incidents (and portal tickets with a queue default mailbox).
+- `SendWorkItemReplyMailJob`
+  - Outbound email when agents reply on email-sourced work_items (and portal tickets with a queue default mailbox).
 - `SendMajorIncidentNotificationJob`
-  - Send email/SMS/status page/webhook notifications for major incidents.
+  - Send email/SMS/status page/webhook notifications for major work_items.
 - `RunAIInferenceJob`
   - Execute calls against configured AI provider via Laravel AI SDK.
 - `EnforcePasswordMFAJob`
@@ -252,12 +252,12 @@ Backlog providers use the same abstraction with new provider-specific services.
 
 ### 5.3 Communications (email, SMS, status page, webhooks)
 
-**Incident email channel** (implemented — see [`email-handling.md`](email-handling.md)):
+**Ticket email channel** (implemented — see [`email-handling.md`](email-handling.md)):
 
 - Tenant-scoped **`mail_accounts`** with IMAP, POP3, or Microsoft Graph inbound polling and SMTP/Graph outbound.
 - Many mail accounts per **`queue`**; **`queues.default_mail_account_id`** for portal-created tickets.
 - Inbound ingest via `PollMailAccountJob` → `InboundMailIngestionService` (dedup, threading, requester resolution, attachments).
-- Agent replies dispatch `SendIncidentReplyMailJob` → `OutboundIncidentMailService` (reply-from-same-address).
+- Agent replies dispatch `SendWorkItemReplyMailJob` → `OutboundWorkItemMailService` (reply-from-same-address).
 - Graph mail reuses organization integrations via `integration_type` + `integration_id` on `mail_accounts`.
 - **Google Workspace mail (planned):** Gmail API + service account domain-wide delegation; see [`docs/google-workspace-mail.md`](google-workspace-mail.md).
 
@@ -332,7 +332,7 @@ Patterns:
 Key strategies:
 
 - Index common filters:
-  - `tenant_id`, `status`, `queue_id`, `assigned_agent_id` on incidents.
+  - `tenant_id`, `status`, `queue_id`, `assigned_agent_id` on work_items.
   - `tenant_id`, `asset_type`, `lifecycle_status` on assets.
 - Use **pagination** and **cursor-based pagination** for large lists.
 - Cache:

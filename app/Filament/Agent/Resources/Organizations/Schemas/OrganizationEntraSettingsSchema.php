@@ -52,9 +52,9 @@ class OrganizationEntraSettingsSchema
                                 ->label(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['computers']['label'])
                                 ->helperText(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['computers']['description'])
                                 ->default(false),
-                            Toggle::make('entra_scope_security_incidents')
-                                ->label(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['security_incidents']['label'])
-                                ->helperText(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['security_incidents']['description'])
+                            Toggle::make('entra_scope_security_work_items')
+                                ->label(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['security_work_items']['label'])
+                                ->helperText(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['security_work_items']['description'])
                                 ->default(false),
                         ]),
                     Step::make(__('API permissions'))

@@ -45,7 +45,7 @@ class QueueForm
                             ->live(),
                         Select::make('default_mail_account_id')
                             ->label('Default outbound address')
-                            ->helperText('Used when agents reply on incidents not created from email (portal, API, etc.).')
+                            ->helperText('Used when agents reply on work_items not created from email (portal, API, etc.).')
                             ->options(fn (Get $get): array => MailAccount::query()
                                 ->whereIn('id', $get('mail_account_ids') ?? [])
                                 ->orderBy('name')

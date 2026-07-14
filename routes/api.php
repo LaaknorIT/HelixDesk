@@ -2,11 +2,11 @@
 
 use App\Http\Controllers\Api\V1\AssetController;
 use App\Http\Controllers\Api\V1\DocumentController;
-use App\Http\Controllers\Api\V1\IncidentController;
 use App\Http\Controllers\Api\V1\MonitoringEventController;
 use App\Http\Controllers\Api\V1\ServiceOfferingController;
 use App\Http\Controllers\Api\V1\SupplierController;
 use App\Http\Controllers\Api\V1\TenantController;
+use App\Http\Controllers\Api\V1\WorkItemController;
 use App\Http\Middleware\EnsureGlobalAdmin;
 use Illuminate\Support\Facades\Route;
 
@@ -17,11 +17,11 @@ Route::prefix('v1')->middleware('auth')->group(function (): void {
         'show',
     ])->middleware(EnsureGlobalAdmin::class);
 
-    Route::get('incidents', [IncidentController::class, 'index']);
-    Route::post('incidents', [IncidentController::class, 'store']);
-    Route::get('incidents/{incident}', [IncidentController::class, 'show']);
-    Route::patch('incidents/{incident}/status', [IncidentController::class, 'updateStatus']);
-    Route::post('incidents/{incident}/messages', [IncidentController::class, 'storeMessage']);
+    Route::get('work-items', [WorkItemController::class, 'index']);
+    Route::post('work-items', [WorkItemController::class, 'store']);
+    Route::get('work-items/{work_item}', [WorkItemController::class, 'show']);
+    Route::patch('work-items/{work_item}/status', [WorkItemController::class, 'updateStatus']);
+    Route::post('work-items/{work_item}/messages', [WorkItemController::class, 'storeMessage']);
 
     Route::get('assets', [AssetController::class, 'index']);
     Route::post('assets', [AssetController::class, 'store']);

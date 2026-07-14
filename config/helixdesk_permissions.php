@@ -18,8 +18,8 @@ return [
     ],
 
     'modules' => [
-        'incident' => [
-            'label' => 'Incidents',
+        'work_item' => [
+            'label' => 'Work items',
             'actions' => ['read', 'create', 'update', 'delete', 'admin'],
         ],
         'problem' => [
@@ -72,9 +72,9 @@ return [
         'agent' => [
             'name' => 'Agent',
             'permissions' => [
-                'incident.read',
-                'incident.create',
-                'incident.update',
+                'work_item.read',
+                'work_item.create',
+                'work_item.update',
                 'problem.read',
                 'problem.create',
                 'problem.update',

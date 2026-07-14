@@ -1,15 +1,15 @@
 # Email handling
 
-HelixDesk uses email as a first-class incident channel: inbound mail creates or updates incidents, and agent replies from the queue send outbound mail. Multiple mail accounts can route into the same queue; replies use the address the customer originally wrote to, or the queue’s default outbound address when the ticket was not created by email.
+HelixDesk uses email as a first-class ticket channel: inbound mail creates or updates work items, and agent replies from the queue send outbound mail. Multiple mail accounts can route into the same queue; replies use the address the customer originally wrote to, or the queue’s default outbound address when the ticket was not created by email.
 
 ## Goals
 
 - **Inbound**: scheduled polling via IMAP, POP3, Microsoft Graph (Microsoft 365), or **Gmail API** (Google Workspace — [planned](google-workspace-mail.md)).
-- **Outbound**: SMTP, Microsoft Graph, or **Gmail API**, using the incident’s receiving mailbox or the queue default.
+- **Outbound**: SMTP, Microsoft Graph, or **Gmail API**, using the work item’s receiving mailbox or the queue default.
 - **Multi-account queues**: many `mail_accounts` linked to one `queue` via `queue_mail_account`.
 - **Threading**: RFC `Message-ID`, `In-Reply-To`, and `References` for reply correlation.
 - **Requesters**: match `From` to an existing `User` by email, or auto-create an `end_user`.
-- **Attachments**: stored on disk (local/S3-compatible) and linked to `incident_messages`.
+- **Attachments**: stored on disk (local/S3-compatible) and linked to `work_item_messages`.
 - **Internal notes**: never sent by email.
 
 ## Data model
@@ -54,7 +54,7 @@ Optional FK to `mail_accounts`. Used for outbound mail when the incident was **n
 | `mail_account_id` | Mailbox that received the original email (reply-from-same-address) |
 | `inbound_message_id` | First RFC `Message-ID` for the thread |
 
-### `incident_messages` email fields
+### `work_item_messages` email fields
 
 | Field | Purpose |
 |-------|---------|
@@ -69,7 +69,7 @@ Optional FK to `mail_accounts`. Used for outbound mail when the incident was **n
 
 Dedup table: unique `(mail_account_id, message_id)`.
 
-### `incident_message_attachments`
+### `work_item_message_attachments`
 
 `filename`, `mime_type`, `size`, `storage_path` per message attachment.
 
@@ -89,9 +89,9 @@ Dedup table: unique `(mail_account_id, message_id)`.
 
 ## Outbound flow
 
-1. Agent posts a non-internal reply via `IncidentWorkflowService::addMessage`.
-2. Service dispatches `SendIncidentReplyMailJob` (not for internal notes or end-user portal replies unless configured later).
-3. `OutboundIncidentMailService` resolves the sending account:
+1. Agent posts a non-internal reply via `WorkItemWorkflowService::addMessage`.
+2. Service dispatches `SendWorkItemReplyMailJob` (not for internal notes or end-user portal replies unless configured later).
+3. `OutboundWorkItemMailService` resolves the sending account:
    - If `incident.mail_account_id` is set → use that account.
    - Else → `queue.default_mail_account_id`.
    - If neither → skip send (log warning).

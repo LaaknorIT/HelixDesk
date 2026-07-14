@@ -10,9 +10,9 @@ final class RolePermissionMatrixSync
 {
     /**
      * @param  array<string, array<string, bool>>  $globalMatrix  module => action => on
-     * @param  list<array{queue_id: int|string|null, actions: array<string, bool>}>  $incidentQueueRows
+     * @param  list<array{queue_id: int|string|null, actions: array<string, bool>}>  $workItemQueueRows
      */
-    public static function sync(TenantRole $role, array $globalMatrix, array $incidentQueueRows, ?string $guardName = null): void
+    public static function sync(TenantRole $role, array $globalMatrix, array $workItemQueueRows, ?string $guardName = null): void
     {
         $guardName ??= config('auth.defaults.guard', 'web');
 
@@ -31,7 +31,7 @@ final class RolePermissionMatrixSync
         $queueIds = [];
         $sync = [];
 
-        foreach ($incidentQueueRows as $row) {
+        foreach ($workItemQueueRows as $row) {
             $queueId = isset($row['queue_id']) ? (int) $row['queue_id'] : 0;
 
             if ($queueId <= 0) {
@@ -40,7 +40,7 @@ final class RolePermissionMatrixSync
 
             if (isset($queueIds[$queueId])) {
                 throw ValidationException::withMessages([
-                    'incident_queue_permissions' => __('Each queue may only appear once.'),
+                    'work_item_queue_permissions' => __('Each queue may only appear once.'),
                 ]);
             }
 
@@ -48,7 +48,7 @@ final class RolePermissionMatrixSync
 
             $actions = $row['actions'] ?? [];
             $sync[$queueId] = [
-                'incident_permissions' => json_encode(self::normalizeIncidentActions($actions)),
+                'work_item_permissions' => json_encode(self::normalizeWorkItemActions($actions)),
             ];
         }
 
@@ -61,9 +61,9 @@ final class RolePermissionMatrixSync
      * @param  array<string, bool>  $actions
      * @return array<string, bool>
      */
-    public static function normalizeIncidentActions(array $actions): array
+    public static function normalizeWorkItemActions(array $actions): array
     {
-        $keys = config('helixdesk_permissions.modules.incident.actions', []);
+        $keys = config('helixdesk_permissions.modules.work_item.actions', []);
         $out = array_fill_keys($keys, false);
 
         foreach ($keys as $key) {

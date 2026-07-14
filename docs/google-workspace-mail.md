@@ -25,7 +25,7 @@ HelixDesk today supports Google mail only via **IMAP/SMTP + App Passwords**. Tha
 | Parity with M365 Graph mail | Same queue linking, threading, reply-from-same-address, attachments |
 | Per-customer credentials | Each organization can have its own Google Cloud / Workspace integration (like multiple Entra apps) |
 | Workspace-first | Optimized for `@customer.com` mailboxes; personal `@gmail.com` remains on IMAP/App Password unless we add user OAuth later |
-| Reuse ingest pipeline | `InboundMailIngestionService`, `OutboundIncidentMailService`, `PollMailAccountJob` — only transport layer changes |
+| Reuse ingest pipeline | `InboundMailIngestionService`, `OutboundWorkItemMailService`, `PollMailAccountJob` — only transport layer changes |
 | Admin setup clarity | Filament wizard on Organization, similar to Microsoft Entra settings |
 
 **Non-goals (v1):**
@@ -53,7 +53,7 @@ flowchart LR
   GWS --> Auth[Service account JWT + domain-wide delegation]
   Auth --> Gmail
   Fetch --> Ingest[InboundMailIngestionService]
-  Reply[SendIncidentReplyMailJob] --> Out[GmailApiOutboundMailService]
+  Reply[SendWorkItemReplyMailJob] --> Out[GmailApiOutboundMailService]
   Out --> Gmail
 ```
 
@@ -242,14 +242,14 @@ No changes to:
 
 ### 8.1 Send path
 
-Extend `OutboundIncidentMailService` (or `GmailApiOutboundMailService` helper):
+Extend `OutboundWorkItemMailService` (or `GmailApiOutboundMailService` helper):
 
 1. Resolve account (incident mailbox or queue default) — unchanged.
 2. Build RFC 2822 MIME (reuse Symfony Mailer / existing MIME builder used for SMTP).
 3. Base64url-encode raw message.
 4. `POST users/{mailbox}/messages/send` with body `{ "raw": "..." }`.
 5. For threading, set `In-Reply-To`, `References`, and `Subject` on the MIME (Gmail threadId optional enhancement in v2).
-6. Store returned `Message-ID` / Gmail `id` on `incident_messages`.
+6. Store returned `Message-ID` / Gmail `id` on `work_item_messages`.
 
 **From address:** Must match delegated `mailbox_address` (or send-as alias configured in Gmail for that user).
 
@@ -295,7 +295,7 @@ No new job types. Existing:
 
 - `PollMailAccountsJob` → `PollMailAccountJob`
 - `InboundMailFetcherFactory` returns `GmailApiInboundMailFetcher` when `protocol === GoogleGmailApi`
-- `SendIncidentReplyMailJob` → branch in `OutboundIncidentMailService`
+- `SendWorkItemReplyMailJob` → branch in `OutboundWorkItemMailService`
 
 ---
 
@@ -336,7 +336,7 @@ Use recorded HTTP fixtures (like Entra sync tests) rather than live Google in CI
 - Feature tests with mocked API
 
 ### Phase C — Outbound
-- `google_gmail_api` outbound in `OutboundIncidentMailService`
+- `google_gmail_api` outbound in `OutboundWorkItemMailService`
 - Threading headers on send
 - Attachment support via MIME raw send
 

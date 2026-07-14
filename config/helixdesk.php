@@ -52,7 +52,7 @@ return [
         'poll_interval_minutes' => (int) env('MAIL_POLL_INTERVAL_MINUTES', 5),
         'connection_timeout_seconds' => (int) env('MAIL_CONNECTION_TIMEOUT_SECONDS', 15),
         'attachment_disk' => env('MAIL_ATTACHMENT_DISK', 'local'),
-        'attachment_path' => env('MAIL_ATTACHMENT_PATH', 'incident-mail-attachments'),
+        'attachment_path' => env('MAIL_ATTACHMENT_PATH', 'work-item-mail-attachments'),
     ],
 
     'monitoring' => [
@@ -60,9 +60,9 @@ return [
 
         /**
          * When an event is first ingested (not a deduplicated repeat), automatically create
-         * an incident for these severity values (lowercase).
+         * a work item for these severity values (lowercase).
          */
-        'auto_incident_severities' => array_map('strtolower', array_filter(array_map('trim', explode(',', (string) env(
+        'auto_work_item_severities' => array_map('strtolower', array_filter(array_map('trim', explode(',', (string) env(
             'MONITORING_AUTO_INCIDENT_SEVERITIES',
             'critical,high'
         ))))),

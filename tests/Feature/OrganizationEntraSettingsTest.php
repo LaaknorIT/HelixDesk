@@ -28,7 +28,7 @@ class OrganizationEntraSettingsTest extends TestCase
                         'users' => true,
                         'departments' => false,
                         'computers' => true,
-                        'security_incidents' => false,
+                        'security_work_items' => false,
                     ],
                 ],
             ],
@@ -44,7 +44,7 @@ class OrganizationEntraSettingsTest extends TestCase
                 'users' => true,
                 'departments' => false,
                 'computers' => true,
-                'security_incidents' => false,
+                'security_work_items' => false,
             ])
         );
     }
@@ -61,7 +61,7 @@ class OrganizationEntraSettingsTest extends TestCase
                         'users' => true,
                         'departments' => false,
                         'computers' => false,
-                        'security_incidents' => false,
+                        'security_work_items' => false,
                     ],
                 ],
             ],
@@ -87,7 +87,7 @@ class OrganizationEntraSettingsTest extends TestCase
                         'users' => true,
                         'departments' => false,
                         'computers' => false,
-                        'security_incidents' => false,
+                        'security_work_items' => false,
                     ],
                 ],
             ],
@@ -100,7 +100,7 @@ class OrganizationEntraSettingsTest extends TestCase
             'entra_scope_users' => false,
             'entra_scope_departments' => false,
             'entra_scope_computers' => false,
-            'entra_scope_security_incidents' => false,
+            'entra_scope_security_work_items' => false,
         ]);
 
         $this->assertNull(data_get($merged, 'integrations.microsoft_entra'));
@@ -121,7 +121,7 @@ class OrganizationEntraSettingsTest extends TestCase
                         'users' => false,
                         'departments' => false,
                         'computers' => false,
-                        'security_incidents' => false,
+                        'security_work_items' => false,
                     ],
                 ],
             ],
@@ -137,7 +137,7 @@ class OrganizationEntraSettingsTest extends TestCase
                 'entra_scope_users' => true,
                 'entra_scope_departments' => false,
                 'entra_scope_computers' => false,
-                'entra_scope_security_incidents' => false,
+                'entra_scope_security_work_items' => false,
             ],
         );
 
@@ -162,7 +162,7 @@ class OrganizationEntraSettingsTest extends TestCase
                         'users' => true,
                         'departments' => false,
                         'computers' => false,
-                        'security_incidents' => false,
+                        'security_work_items' => false,
                     ],
                 ],
             ]],
@@ -179,7 +179,7 @@ class OrganizationEntraSettingsTest extends TestCase
                 'entra_scope_users' => true,
                 'entra_scope_departments' => false,
                 'entra_scope_computers' => false,
-                'entra_scope_security_incidents' => false,
+                'entra_scope_security_work_items' => false,
             ],
         );
 

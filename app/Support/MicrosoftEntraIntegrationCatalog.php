@@ -44,9 +44,9 @@ final class MicrosoftEntraIntegrationCatalog
                 ],
                 'setup_notes' => 'Requires Intune / Microsoft Endpoint Manager in the tenant. Use read-only scope first; expand only if workflows need writes.',
             ],
-            'security_incidents' => [
-                'label' => 'Security incidents',
-                'description' => 'Ingest Microsoft 365 Defender / unified security incidents for correlation with service desk work.',
+            'security_work_items' => [
+                'label' => 'Security work_items',
+                'description' => 'Ingest Microsoft 365 Defender / unified security work_items for correlation with service desk work.',
                 'application_permissions' => [
                     'SecurityIncident.Read.All',
                 ],
@@ -65,7 +65,7 @@ final class MicrosoftEntraIntegrationCatalog
     }
 
     /**
-     * @param  array<string, bool>  $scopesEnabled  keys: users, departments, computers, security_incidents
+     * @param  array<string, bool>  $scopesEnabled  keys: users, departments, computers, security_work_items
      */
     public static function collectApplicationPermissions(array $scopesEnabled): array
     {
@@ -145,7 +145,7 @@ final class MicrosoftEntraIntegrationCatalog
             'users' => (bool) $get('entra_scope_users'),
             'departments' => (bool) $get('entra_scope_departments'),
             'computers' => (bool) $get('entra_scope_computers'),
-            'security_incidents' => (bool) $get('entra_scope_security_incidents'),
+            'security_work_items' => (bool) $get('entra_scope_security_work_items'),
         ];
     }
 }

@@ -62,7 +62,7 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
                             'users' => true,
                             'departments' => true,
                             'computers' => false,
-                            'security_incidents' => false,
+                            'security_work_items' => false,
                         ],
                     ],
                 ]],
@@ -107,7 +107,7 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
             if (str_contains($url, 'login.microsoftonline.com')) {
                 return Http::response(['access_token' => 'fake-token', 'expires_in' => 3600], 200);
             }
-            if (str_contains($url, 'graph.microsoft.com/v1.0/security/incidents')) {
+            if (str_contains($url, 'graph.microsoft.com/v1.0/security/work_items')) {
                 return Http::response([
                     'value' => [[
                         'id' => 'inc-42',
@@ -137,7 +137,7 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
                             'users' => false,
                             'departments' => false,
                             'computers' => false,
-                            'security_incidents' => true,
+                            'security_work_items' => true,
                         ],
                     ],
                 ]],
@@ -173,7 +173,7 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
             'azure_tenant_id' => 'tenant-guid',
             'application_client_id' => 'client-guid',
             'client_secret' => 'secret',
-            'scopes' => ['users' => true, 'departments' => false, 'computers' => false, 'security_incidents' => false],
+            'scopes' => ['users' => true, 'departments' => false, 'computers' => false, 'security_work_items' => false],
         ];
 
         Organization::factory()->create([
@@ -225,7 +225,7 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
                         'azure_tenant_id' => 'tenant-guid',
                         'application_client_id' => 'client-guid',
                         'client_secret' => 'secret',
-                        'scopes' => ['users' => true, 'departments' => false, 'computers' => false, 'security_incidents' => false],
+                        'scopes' => ['users' => true, 'departments' => false, 'computers' => false, 'security_work_items' => false],
                     ],
                 ]],
             ],
@@ -256,7 +256,7 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
                         'azure_tenant_id' => 'tenant-guid',
                         'application_client_id' => 'client-guid',
                         'client_secret' => 'secret',
-                        'scopes' => ['users' => true, 'departments' => false, 'computers' => false, 'security_incidents' => false],
+                        'scopes' => ['users' => true, 'departments' => false, 'computers' => false, 'security_work_items' => false],
                     ],
                 ]],
             ],

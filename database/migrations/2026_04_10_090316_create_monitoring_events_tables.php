@@ -42,10 +42,10 @@ return new class extends Migration
             $table->index(['tenant_id', 'status']);
         });
 
-        Schema::create('monitoring_event_incident', function (Blueprint $table) {
+        Schema::create('monitoring_event_work_item', function (Blueprint $table) {
             $table->foreignId('monitoring_event_id')->constrained('monitoring_events')->cascadeOnDelete();
-            $table->foreignId('incident_id')->constrained('incidents')->cascadeOnDelete();
-            $table->primary(['monitoring_event_id', 'incident_id']);
+            $table->foreignId('work_item_id')->constrained('work_items')->cascadeOnDelete();
+            $table->primary(['monitoring_event_id', 'work_item_id']);
         });
     }
 
@@ -54,7 +54,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('monitoring_event_incident');
+        Schema::dropIfExists('monitoring_event_work_item');
         Schema::dropIfExists('monitoring_events');
         Schema::dropIfExists('monitoring_event_sources');
     }

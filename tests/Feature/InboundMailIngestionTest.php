@@ -2,13 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Enums\IncidentSource;
-use App\Models\Incident;
-use App\Models\IncidentMessage;
+use App\Enums\WorkItemSource;
 use App\Models\MailAccount;
 use App\Models\ProcessedInboundEmail;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\WorkItem;
+use App\Models\WorkItemMessage;
 use App\Services\Mail\InboundMailIngestionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -41,19 +41,19 @@ class InboundMailIngestionTest extends TestCase
 
         app(InboundMailIngestionService::class)->ingest($account, $raw);
 
-        $incident = Incident::query()->where('tenant_id', $tenant->id)->first();
-        $this->assertNotNull($incident);
-        $this->assertSame(IncidentSource::Email, $incident->source);
-        $this->assertSame($account->id, $incident->mail_account_id);
-        $this->assertSame('<new-ticket@example.com>', $incident->inbound_message_id);
-        $this->assertSame($queue->id, $incident->queue_id);
+        $workItem = WorkItem::query()->where('tenant_id', $tenant->id)->first();
+        $this->assertNotNull($workItem);
+        $this->assertSame(WorkItemSource::Email, $workItem->source);
+        $this->assertSame($account->id, $workItem->mail_account_id);
+        $this->assertSame('<new-ticket@example.com>', $workItem->inbound_message_id);
+        $this->assertSame($queue->id, $workItem->queue_id);
 
         $requester = User::query()->where('email', 'customer@example.com')->first();
         $this->assertNotNull($requester);
         $this->assertSame('end_user', $requester->type);
 
-        $this->assertDatabaseHas('incident_messages', [
-            'incident_id' => $incident->id,
+        $this->assertDatabaseHas('work_item_messages', [
+            'work_item_id' => $workItem->id,
             'external_message_id' => '<new-ticket@example.com>',
             'from_address' => 'customer@example.com',
         ]);
@@ -77,22 +77,22 @@ class InboundMailIngestionTest extends TestCase
             'email' => 'customer@example.com',
         ]);
 
-        $incident = Incident::query()->create([
+        $workItem = WorkItem::query()->create([
             'tenant_id' => $tenant->id,
             'queue_id' => $queue?->id,
             'reported_by_user_id' => $requester->id,
             'title' => 'Printer broken',
             'priority' => 'normal',
             'status' => 'New',
-            'source' => IncidentSource::Email,
+            'source' => WorkItemSource::Email,
             'mail_account_id' => $account->id,
             'inbound_message_id' => '<original@example.com>',
             'opened_at' => now(),
         ]);
 
-        IncidentMessage::query()->create([
+        WorkItemMessage::query()->create([
             'tenant_id' => $tenant->id,
-            'incident_id' => $incident->id,
+            'work_item_id' => $workItem->id,
             'author_user_id' => $requester->id,
             'body' => 'Initial message',
             'external_message_id' => '<original@example.com>',
@@ -109,8 +109,8 @@ class InboundMailIngestionTest extends TestCase
 
         app(InboundMailIngestionService::class)->ingest($account, $raw);
 
-        $this->assertSame(1, Incident::query()->where('tenant_id', $tenant->id)->count());
-        $this->assertSame(2, IncidentMessage::query()->where('incident_id', $incident->id)->count());
+        $this->assertSame(1, WorkItem::query()->where('tenant_id', $tenant->id)->count());
+        $this->assertSame(2, WorkItemMessage::query()->where('work_item_id', $workItem->id)->count());
     }
 
     public function test_duplicate_message_id_is_ignored(): void
@@ -134,7 +134,7 @@ class InboundMailIngestionTest extends TestCase
 
         app(InboundMailIngestionService::class)->ingest($account, $raw);
 
-        $this->assertSame(0, Incident::query()->count());
+        $this->assertSame(0, WorkItem::query()->count());
     }
 
     public function test_inbound_email_with_attachment_is_stored(): void
@@ -169,7 +169,7 @@ class InboundMailIngestionTest extends TestCase
 
         app(InboundMailIngestionService::class)->ingest($account, $raw);
 
-        $this->assertDatabaseHas('incident_message_attachments', [
+        $this->assertDatabaseHas('work_item_message_attachments', [
             'tenant_id' => $tenant->id,
             'filename' => 'log.txt',
         ]);

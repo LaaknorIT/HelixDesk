@@ -3,17 +3,19 @@
 namespace Database\Seeders;
 
 use App\Enums\OrganizationType;
+use App\Enums\WorkItemSource;
+use App\Enums\WorkItemType;
 use App\Models\Asset;
 use App\Models\AssetType;
-use App\Models\Incident;
-use App\Models\IncidentMessage;
 use App\Models\Organization;
 use App\Models\ServiceOffering;
 use App\Models\Supplier;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\WorkItem;
+use App\Models\WorkItemMessage;
 use App\Observers\TenantObserver;
-use App\Services\IncidentWorkflowService;
+use App\Services\WorkItemWorkflowService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
@@ -164,7 +166,7 @@ class DemoContentSeeder extends Seeder
         $tenantAdminUser->syncRoles(['Tenant Admin']);
         setPermissionsTeamId(null);
 
-        // Two end users to demonstrate "only see your own incidents".
+        // Two end users to demonstrate "only see your own tickets".
         $endUser1 = User::query()->updateOrCreate(
             ['email' => 'demo-enduser1@helixdesk.local'],
             [
@@ -189,67 +191,71 @@ class DemoContentSeeder extends Seeder
             ],
         );
 
-        // Clear prior demo incidents/messages to keep the seeder idempotent.
-        $demoIncidentIds = Incident::query()
+        // Clear prior demo tickets/messages to keep the seeder idempotent.
+        $demoWorkItemIds = WorkItem::query()
             ->where('tenant_id', $tenant->getKey())
             ->where('title', 'like', 'Demo%')
             ->pluck('id');
 
-        if ($demoIncidentIds->isNotEmpty()) {
-            IncidentMessage::query()
+        if ($demoWorkItemIds->isNotEmpty()) {
+            WorkItemMessage::query()
                 ->where('tenant_id', $tenant->getKey())
-                ->whereIn('incident_id', $demoIncidentIds)
+                ->whereIn('work_item_id', $demoWorkItemIds)
                 ->delete();
 
-            Incident::query()
+            WorkItem::query()
                 ->where('tenant_id', $tenant->getKey())
-                ->whereIn('id', $demoIncidentIds)
+                ->whereIn('id', $demoWorkItemIds)
                 ->delete();
         }
 
-        $workflow = app(IncidentWorkflowService::class);
+        $workflow = app(WorkItemWorkflowService::class);
 
-        // End-user 1: create an open incident + a reply.
-        $endUser1Incident = $workflow->createIncident([
-            'title' => 'Demo (End User 1) - Open incident',
-            'description' => 'Demo incident created in local environment.',
+        // End-user 1: open ticket + a reply.
+        $endUser1WorkItem = $workflow->createWorkItem([
+            'title' => 'Demo (End User 1) - Open ticket',
+            'description' => 'Demo work item created in local environment.',
             'priority' => 'High',
+            'type' => WorkItemType::Incident,
         ], $endUser1);
 
         $workflow->addMessage(
-            $endUser1Incident,
+            $endUser1WorkItem,
             'Demo reply from End User 1.',
             $endUser1
         );
 
-        // End-user 2: create a Resolved incident (end-user should be able to close it).
-        Incident::query()->create([
+        // End-user 2: resolved ticket (end-user should be able to close it).
+        WorkItem::query()->create([
             'tenant_id' => $tenant->getKey(),
             'organization_id' => $organization->getKey(),
             'reported_by_user_id' => $endUser2->getKey(),
             'assigned_agent_id' => null,
             'queue_id' => $generalQueue?->getKey(),
-            'title' => 'Demo (End User 2) - Resolved incident',
-            'description' => 'Demo incident already resolved; End User 2 can close it.',
+            'type' => WorkItemType::Incident,
+            'title' => 'Demo (End User 2) - Resolved ticket',
+            'description' => 'Demo work item already resolved; End User 2 can close it.',
             'priority' => 'Medium',
             'category_id' => null,
             'status' => 'Resolved',
+            'source' => WorkItemSource::Portal,
             'opened_at' => now(),
             'resolved_at' => now(),
             'closed_at' => null,
         ]);
 
-        // Agent: create an in-progress incident to exercise agent transitions.
+        // Agent: in-progress ticket to exercise agent transitions.
         setPermissionsTeamId($tenant->getKey());
 
-        $agentIncident = $workflow->createIncident([
-            'title' => 'Demo (Agent) - In progress incident',
-            'description' => 'Demo incident for agent workflow transitions.',
+        $agentWorkItem = $workflow->createWorkItem([
+            'title' => 'Demo (Agent) - In progress ticket',
+            'description' => 'Demo work item for agent workflow transitions.',
             'priority' => 'Medium',
+            'type' => WorkItemType::ServiceRequest,
         ], $agent);
 
-        $workflow->transition($agentIncident, 'Assigned', $agent);
-        $workflow->transition($agentIncident, 'In Progress', $agent);
+        $workflow->transition($agentWorkItem, 'Assigned', $agent);
+        $workflow->transition($agentWorkItem, 'In Progress', $agent);
 
         setPermissionsTeamId(null);
     }

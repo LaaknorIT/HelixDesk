@@ -23,7 +23,7 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 - [x] Queues for routing and incident scope
 - [x] Spatie **roles** with team scoping (`TenantRole`, `team_id` = tenant)
 - [x] Config-driven `{module}.{action}` permissions and role matrix UI (**Settings → Roles**)
-- [x] **Per-queue incident permissions** on `role_queue` (`incident_permissions` JSON); global **`incident.admin`** for full bypass
+- [x] **Per-queue work item permissions** on `role_queue` (`work_item_permissions` JSON); global **`work_item.admin`** for full bypass
 - [ ] **Teams** as first-class org units (if required beyond current model): CRUD, reporting, optional linkage to queues/workflows
 - [ ] **SSO / Entra** and tenant-level IdP configuration (spec item; not wired in app yet)
 - [ ] **Google Workspace Gmail API** mail (service account + domain-wide delegation) — [`docs/google-workspace-mail.md`](google-workspace-mail.md)
@@ -32,13 +32,13 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 
 ## Phase B — ITIL core (service desk)
 
-- [x] **Incidents**: Filament (agent + end-user), default workflow, API v1, queue-scoped authorization
-- [x] **Email → incidents**: inbound polling, threaded replies, outbound agent replies from queue mailbox
+- [x] **Work items (tickets)**: Filament (agent + end-user), `type` enum, default workflow, API v1, queue-scoped authorization
+- [x] **Email → work_items**: inbound polling, threaded replies, outbound agent replies from queue mailbox
 - [x] **Problems**: Filament resource, permissions, baseline model
 - [x] **Changes**: Filament resource, workflow service, permissions, tests
-- [ ] **Major incidents**: dedicated entity/workflows/UI (vs normal incidents only)
+- [ ] **Major work_items**: dedicated entity/workflows/UI (vs normal work_items only)
 - [ ] **SLA / priority automation** (rules, timers, escalation) beyond static priority field
-- [ ] Richer **knowledge base** integration (published docs ↔ incidents) if distinct from current Documentation module
+- [ ] Richer **knowledge base** integration (published docs ↔ work_items) if distinct from current Documentation module
 
 ---
 
@@ -46,7 +46,7 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 
 - [~] **Assets** / CMDB: models, relationships, Filament, API v1
 - [x] **Service catalog**: `Supplier`, `ServiceOffering`, pivots to assets/suppliers, config-driven kinds/roles ([`docs/service-catalog.md`](service-catalog.md))
-- [~] **Documents**: Filament, API v1, links to incidents, **assets, suppliers, service offerings**
+- [~] **Documents**: Filament, API v1, links to work_items, **assets, suppliers, service offerings**
 - [ ] **Deeper CMDB**: discovery feeds, lifecycle policies, compliance views
 - [ ] **Documentation approval workflows** (draft → review → publish) per product spec
 
@@ -55,7 +55,7 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 ## Phase D — Monitoring & operations
 
 - [~] **Monitoring events**: ingestion service, API, Filament, sources
-- [ ] **Processing**: deduplication, correlation, auto-create/update incidents or problems, routing rules
+- [ ] **Processing**: deduplication, correlation, auto-create/update work_items or problems, routing rules
 - [ ] **Operator runbooks** (link events ↔ docs ↔ changes)
 
 ---
@@ -63,18 +63,18 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 ## Phase E — Dashboards & tenant configuration
 
 - [~] **Dashboard layouts** model, Filament resource, seeded role defaults
-- [ ] **Widget library** and real KPIs (SLA, backlog, major incidents, monitoring summary)
+- [ ] **Widget library** and real KPIs (SLA, backlog, major work_items, monitoring summary)
 - [ ] **End-user** dashboard needs (if any) vs agent-focused layouts
 
 ---
 
 ## Phase F — API, integrations, background processing
 
-- [~] REST **API v1** for core entities (tenants, incidents, assets, documents, monitoring events)
+- [~] REST **API v1** for core entities (tenants, work_items, assets, documents, monitoring events)
 - [ ] **OpenAPI** (or equivalent) published and kept in sync with routes
 - [ ] **Laravel Horizon** + **Redis** in deployment and `composer.json` / ops docs (architecture assumes them)
-- [x] **Incident email channel**: mail accounts, IMAP/POP3/Graph inbound polling, SMTP/Graph outbound, queue default address, attachments ([`docs/email-handling.md`](email-handling.md))
-- [ ] **Queue-heavy jobs**: major-incident / status notifications, reporting, AI tasks (incident reply mail uses Horizon)
+- [x] **Ticket email channel**: mail accounts, IMAP/POP3/Graph inbound polling, SMTP/Graph outbound, queue default address, attachments ([`docs/email-handling.md`](email-handling.md))
+- [ ] **Queue-heavy jobs**: major-incident / status notifications, reporting, AI tasks (work item reply mail uses Horizon)
 - [ ] **S3-compatible storage** for attachments/exports (config + implementation paths)
 
 ---
@@ -101,7 +101,7 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 3. **Dashboards Phase E**: ship a small set of high-value widgets tied to real queries.
 4. **Operations**: add Horizon + Redis + storage to default deployment story so architecture matches `technical-architecture.md`.
 5. **API docs**: OpenAPI for v1 to support integrations.
-6. **Major incidents & SLA** when service-desk depth is the priority.
+6. **Major work_items & SLA** when service-desk depth is the priority.
 
 ---
 

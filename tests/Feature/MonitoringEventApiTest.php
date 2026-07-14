@@ -99,7 +99,7 @@ class MonitoringEventApiTest extends TestCase
 
     public function test_process_job_creates_incident_for_configured_severities(): void
     {
-        Config::set('helixdesk.monitoring.auto_incident_severities', ['critical']);
+        Config::set('helixdesk.monitoring.auto_work_item_severities', ['critical']);
 
         $tenant = Tenant::factory()->create();
 
@@ -124,14 +124,14 @@ class MonitoringEventApiTest extends TestCase
 
         (new ProcessMonitoringEventJob((int) $eventId))->handle(app(TenantContext::class));
 
-        $this->assertDatabaseCount('incidents', 1);
+        $this->assertDatabaseCount('work_items', 1);
         $event = MonitoringEvent::query()->findOrFail($eventId);
-        $this->assertTrue($event->incidents()->exists());
+        $this->assertTrue($event->workItems()->exists());
     }
 
     public function test_process_job_does_not_duplicate_incident(): void
     {
-        Config::set('helixdesk.monitoring.auto_incident_severities', ['critical']);
+        Config::set('helixdesk.monitoring.auto_work_item_severities', ['critical']);
 
         $tenant = Tenant::factory()->create();
 
@@ -158,6 +158,6 @@ class MonitoringEventApiTest extends TestCase
         $job->handle($tenantContext);
         $job->handle($tenantContext);
 
-        $this->assertDatabaseCount('incidents', 1);
+        $this->assertDatabaseCount('work_items', 1);
     }
 }

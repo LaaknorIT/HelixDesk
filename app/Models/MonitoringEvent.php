@@ -43,8 +43,8 @@ class MonitoringEvent extends TenantModel
         return $this->belongsTo(MonitoringEventSource::class, 'monitoring_event_source_id');
     }
 
-    public function incidents(): BelongsToMany
+    public function workItems(): BelongsToMany
     {
-        return $this->belongsToMany(Incident::class, 'monitoring_event_incident');
+        return $this->belongsToMany(WorkItem::class, 'monitoring_event_work_item');
     }
 }

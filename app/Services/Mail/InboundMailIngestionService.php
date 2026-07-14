@@ -2,13 +2,14 @@
 
 namespace App\Services\Mail;
 
-use App\Enums\IncidentSource;
-use App\Models\Incident;
-use App\Models\IncidentMessage;
-use App\Models\IncidentMessageAttachment;
+use App\Enums\WorkItemSource;
+use App\Enums\WorkItemType;
 use App\Models\MailAccount;
 use App\Models\ProcessedInboundEmail;
 use App\Models\Queue;
+use App\Models\WorkItem;
+use App\Models\WorkItemMessage;
+use App\Models\WorkItemMessageAttachment;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -44,9 +45,9 @@ class InboundMailIngestionService
                 'processed_at' => Carbon::now(),
             ]);
 
-            $incident = $this->resolveIncident($account, $parsed);
+            $workItem = $this->resolveWorkItem($account, $parsed);
 
-            if ($incident === null) {
+            if ($workItem === null) {
                 return;
             }
 
@@ -57,17 +58,17 @@ class InboundMailIngestionService
                 organizationId: $account->organization_id,
             );
 
-            if ($incident->reported_by_user_id === null) {
-                $incident->reported_by_user_id = $requester->getKey();
-                $incident->save();
+            if ($workItem->reported_by_user_id === null) {
+                $workItem->reported_by_user_id = $requester->getKey();
+                $workItem->save();
             }
 
-            $parentMessage = $this->resolveParentMessage($incident, $parsed);
+            $parentMessage = $this->resolveParentMessage($workItem, $parsed);
 
-            /** @var IncidentMessage $message */
-            $message = IncidentMessage::query()->create([
+            /** @var WorkItemMessage $message */
+            $message = WorkItemMessage::query()->create([
                 'tenant_id' => $account->tenant_id,
-                'incident_id' => $incident->getKey(),
+                'work_item_id' => $workItem->getKey(),
                 'author_user_id' => $requester->getKey(),
                 'parent_message_id' => $parentMessage?->getKey(),
                 'is_internal' => false,
@@ -84,9 +85,9 @@ class InboundMailIngestionService
         });
     }
 
-    private function resolveIncident(MailAccount $account, ParsedInboundEmail $parsed): ?Incident
+    private function resolveWorkItem(MailAccount $account, ParsedInboundEmail $parsed): ?WorkItem
     {
-        $existing = $this->findIncidentForReply($account, $parsed);
+        $existing = $this->findWorkItemForReply($account, $parsed);
         if ($existing !== null) {
             return $existing;
         }
@@ -103,18 +104,19 @@ class InboundMailIngestionService
             organizationId: $account->organization_id,
         );
 
-        return Incident::query()->create([
+        return WorkItem::query()->create([
             'tenant_id' => $account->tenant_id,
             'organization_id' => $account->organization_id,
             'reported_by_user_id' => $requester->getKey(),
             'assigned_agent_id' => null,
             'queue_id' => $queue->getKey(),
+            'type' => WorkItemType::Incident,
             'title' => Str::limit($parsed->subject, 250),
             'description' => $parsed->bodyText,
             'priority' => 'normal',
             'category_id' => null,
             'status' => 'New',
-            'source' => IncidentSource::Email,
+            'source' => WorkItemSource::Email,
             'mail_account_id' => $account->getKey(),
             'inbound_message_id' => $parsed->messageId,
             'opened_at' => Carbon::now(),
@@ -123,28 +125,26 @@ class InboundMailIngestionService
         ]);
     }
 
-    private function findIncidentForReply(MailAccount $account, ParsedInboundEmail $parsed): ?Incident
+    private function findWorkItemForReply(MailAccount $account, ParsedInboundEmail $parsed): ?WorkItem
     {
         $candidateIds = $this->collectThreadMessageIds($parsed);
         if ($candidateIds === []) {
             return null;
         }
 
-        $message = IncidentMessage::query()
+        $message = WorkItemMessage::query()
             ->where('tenant_id', $account->tenant_id)
             ->whereIn('external_message_id', $candidateIds)
             ->first();
 
         if ($message === null) {
-            $incident = Incident::query()
+            return WorkItem::query()
                 ->where('tenant_id', $account->tenant_id)
                 ->whereIn('inbound_message_id', $candidateIds)
                 ->first();
-
-            return $incident;
         }
 
-        return $message->incident;
+        return $message->workItem;
     }
 
     /**
@@ -167,14 +167,14 @@ class InboundMailIngestionService
         return array_values(array_unique($ids));
     }
 
-    private function resolveParentMessage(Incident $incident, ParsedInboundEmail $parsed): ?IncidentMessage
+    private function resolveParentMessage(WorkItem $workItem, ParsedInboundEmail $parsed): ?WorkItemMessage
     {
         if ($parsed->inReplyTo === null) {
             return null;
         }
 
-        return IncidentMessage::query()
-            ->where('incident_id', $incident->getKey())
+        return WorkItemMessage::query()
+            ->where('work_item_id', $workItem->getKey())
             ->where('external_message_id', $parsed->inReplyTo)
             ->first();
     }
@@ -195,10 +195,10 @@ class InboundMailIngestionService
     /**
      * @param  list<array{filename: string, mime_type: string|null, content: string}>  $attachments
      */
-    private function storeAttachments(IncidentMessage $message, array $attachments): void
+    private function storeAttachments(WorkItemMessage $message, array $attachments): void
     {
         $disk = (string) config('helixdesk.mail.attachment_disk', 'local');
-        $basePath = (string) config('helixdesk.mail.attachment_path', 'incident-mail-attachments');
+        $basePath = (string) config('helixdesk.mail.attachment_path', 'work-item-mail-attachments');
 
         foreach ($attachments as $attachment) {
             $filename = $attachment['filename'];
@@ -207,9 +207,9 @@ class InboundMailIngestionService
 
             Storage::disk($disk)->put($path, $attachment['content']);
 
-            IncidentMessageAttachment::query()->create([
+            WorkItemMessageAttachment::query()->create([
                 'tenant_id' => $message->tenant_id,
-                'incident_message_id' => $message->getKey(),
+                'work_item_message_id' => $message->getKey(),
                 'filename' => $filename,
                 'mime_type' => $attachment['mime_type'],
                 'size' => strlen($attachment['content']),

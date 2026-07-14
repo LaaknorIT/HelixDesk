@@ -38,15 +38,15 @@ class Queue extends TenantModel
         return $this->belongsTo(Tenant::class);
     }
 
-    public function incidents(): HasMany
+    public function workItems(): HasMany
     {
-        return $this->hasMany(Incident::class);
+        return $this->hasMany(WorkItem::class);
     }
 
     public function roles(): BelongsToMany
     {
         return $this->belongsToMany(TenantRole::class, 'role_queue', 'queue_id', 'role_id')
-            ->withPivot('incident_permissions')
+            ->withPivot('work_item_permissions')
             ->withTimestamps();
     }
 }

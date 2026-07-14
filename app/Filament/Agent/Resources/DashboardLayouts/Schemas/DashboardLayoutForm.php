@@ -73,7 +73,7 @@ class DashboardLayoutForm
                     ->columns(5)
                     ->required(),
                 TagsInput::make('locked_widgets')
-                    ->placeholder('my_incidents')
+                    ->placeholder('my_work_items')
                     ->default([])
                     ->helperText('Widget identifiers users cannot remove in personal overrides.'),
                 Toggle::make('is_active')
