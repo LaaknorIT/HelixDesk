@@ -184,7 +184,8 @@ Global admins can:
 - configure default AI access and global AI providers  
 - manage global integrations (e.g. global monitoring integrations, SMS/email providers, status page providers)  
 - temporarily grant themselves access to a tenant (hidden from tenant admin), with full auditing  
-- assign **Tenant Admin** role to eligible users on a tenant from the Global Admin tenant edit screen (tenant agents of that tenant, or global admins); this is **add-only** (no revoke from this UI), roles **stack** (e.g. an agent keeps the Agent role when promoted), and does **not** change `tenant_id`, `is_admin`, or automatic agent-panel access for global admins  
+- assign **Tenant Admin** role to eligible users on a tenant from the Global Admin tenant edit screen (tenant agents of that tenant, or global admins); this is **add-only** (no revoke from this UI), roles **stack** (e.g. an agent keeps the Agent role when promoted), and does **not** change `tenant_id`, `type`, or `is_admin`
+- global admins who hold the **Tenant Admin** Spatie role for a tenant (via `team_id`) may access that tenant’s agent panel at `/agent/{slug}/` through extended Filament tenancy gates (`canAccessPanel`, `canAccessTenant`, `getTenants`); this is **role-based access**, not impersonation and not time-limited self-service access
 - global admins assigned as tenant administrators remain **hidden** from tenant People and other tenant-facing user lists  
 
 ---

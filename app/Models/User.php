@@ -71,7 +71,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     {
         return match ($panel->getId()) {
             'global-admin' => (bool) $this->is_admin,
-            'agent' => $this->isTenantStaff(),
+            'agent' => $this->isTenantStaff() || ($this->is_admin && $this->hasAnyTenantAdminAssignment()),
             'end-user' => $this->tenant_id !== null && $this->type === 'end_user',
             default => false,
         };
@@ -100,18 +100,88 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return $this->hasMany(DashboardLayout::class);
     }
 
+    public function isTenantAdminFor(Tenant|int $tenant): bool
+    {
+        $tenantId = is_int($tenant) ? $tenant : (int) $tenant->getKey();
+
+        if ($tenantId <= 0) {
+            return false;
+        }
+
+        $roleName = config('helixdesk_permissions.tenant_roles.tenant_admin.name');
+
+        return DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_type', $this->getMorphClass())
+            ->where('model_has_roles.model_id', $this->getKey())
+            ->where('model_has_roles.team_id', $tenantId)
+            ->where('roles.name', $roleName)
+            ->exists();
+    }
+
+    public function hasAnyTenantAdminAssignment(): bool
+    {
+        $roleName = config('helixdesk_permissions.tenant_roles.tenant_admin.name');
+
+        return DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_type', $this->getMorphClass())
+            ->where('model_has_roles.model_id', $this->getKey())
+            ->where('roles.name', $roleName)
+            ->exists();
+    }
+
     public function canAccessTenant(Model $tenant): bool
     {
-        return $this->tenant_id !== null && (int) $this->tenant_id === (int) $tenant->getKey();
+        if ($this->tenant_id !== null && (int) $this->tenant_id === (int) $tenant->getKey()) {
+            return true;
+        }
+
+        return $this->is_admin && $this->isTenantAdminFor($tenant);
     }
 
     public function getTenants(Panel $panel): array|Collection
     {
-        if ($this->tenant === null) {
+        $tenants = collect();
+
+        if ($this->tenant !== null) {
+            $tenants->push($this->tenant);
+        }
+
+        if ($this->is_admin) {
+            foreach ($this->tenantAdminAssignmentTenants() as $assignedTenant) {
+                if (! $tenants->contains(fn (Tenant $existing): bool => (int) $existing->getKey() === (int) $assignedTenant->getKey())) {
+                    $tenants->push($assignedTenant);
+                }
+            }
+        }
+
+        return $tenants;
+    }
+
+    /**
+     * @return Collection<int, Tenant>
+     */
+    public function tenantAdminAssignmentTenants(): Collection
+    {
+        $roleName = config('helixdesk_permissions.tenant_roles.tenant_admin.name');
+
+        $teamIds = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_type', $this->getMorphClass())
+            ->where('model_has_roles.model_id', $this->getKey())
+            ->where('roles.name', $roleName)
+            ->pluck('model_has_roles.team_id')
+            ->unique()
+            ->values();
+
+        if ($teamIds->isEmpty()) {
             return collect();
         }
 
-        return collect([$this->tenant]);
+        return Tenant::query()
+            ->whereIn('id', $teamIds)
+            ->get();
     }
 
     /**

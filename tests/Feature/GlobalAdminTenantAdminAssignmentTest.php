@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\TenantAdminAssignmentService;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Panel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -201,6 +202,126 @@ class GlobalAdminTenantAdminAssignmentTest extends TestCase
             'team_id' => $tenant->id,
             'role_id' => $tenantAdminRole->id,
         ]);
+    }
+
+    public function test_global_admin_with_tenant_admin_role_can_access_assigned_tenant_agent_panel(): void
+    {
+        $tenant = Tenant::factory()->create([
+            'slug' => 'demo-tenant',
+        ]);
+
+        $globalAdmin = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+
+        app(TenantAdminAssignmentService::class)->assign($tenant, $globalAdmin);
+
+        $this->actingAs($globalAdmin)
+            ->get(route('filament.agent.pages.dashboard', ['tenant' => $tenant]))
+            ->assertOk();
+    }
+
+    public function test_global_admin_without_tenant_admin_role_cannot_access_agent_panel(): void
+    {
+        $tenant = Tenant::factory()->create();
+
+        $globalAdmin = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+
+        $this->actingAs($globalAdmin)
+            ->get(route('filament.agent.pages.dashboard', ['tenant' => $tenant]))
+            ->assertForbidden();
+    }
+
+    public function test_global_admin_with_tenant_admin_role_for_one_tenant_cannot_access_another(): void
+    {
+        $tenantA = Tenant::factory()->create();
+        $tenantB = Tenant::factory()->create();
+
+        $globalAdmin = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+
+        app(TenantAdminAssignmentService::class)->assign($tenantA, $globalAdmin);
+
+        $this->actingAs($globalAdmin)
+            ->get(route('filament.agent.pages.dashboard', ['tenant' => $tenantA]))
+            ->assertOk();
+
+        $this->actingAs($globalAdmin)
+            ->get(route('filament.agent.pages.dashboard', ['tenant' => $tenantB]))
+            ->assertNotFound();
+    }
+
+    public function test_tenant_agent_panel_access_unchanged(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $agentPanel = Panel::make()->id('agent');
+
+        $agent = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'type' => 'agent',
+            'is_admin' => false,
+        ]);
+
+        $this->assertTrue($agent->canAccessPanel($agentPanel));
+        $this->assertTrue($agent->canAccessTenant($tenant));
+
+        $this->actingAs($agent)
+            ->get(route('filament.agent.pages.dashboard', ['tenant' => $tenant]))
+            ->assertOk();
+    }
+
+    public function test_get_tenants_includes_tenant_admin_assignments_for_global_admin(): void
+    {
+        $tenantA = Tenant::factory()->create();
+        $tenantB = Tenant::factory()->create();
+        $agentPanel = Panel::make()->id('agent');
+
+        $globalAdmin = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+
+        app(TenantAdminAssignmentService::class)->assign($tenantA, $globalAdmin);
+        app(TenantAdminAssignmentService::class)->assign($tenantB, $globalAdmin);
+
+        $tenantIds = $globalAdmin->getTenants($agentPanel)
+            ->pluck('id')
+            ->all();
+
+        $this->assertContains($tenantA->id, $tenantIds);
+        $this->assertContains($tenantB->id, $tenantIds);
+        $this->assertCount(2, $tenantIds);
+    }
+
+    public function test_global_admin_tenant_admin_gate_methods_are_consistent(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $otherTenant = Tenant::factory()->create();
+        $agentPanel = Panel::make()->id('agent');
+
+        $globalAdmin = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+
+        app(TenantAdminAssignmentService::class)->assign($tenant, $globalAdmin);
+
+        $this->assertTrue($globalAdmin->canAccessPanel($agentPanel));
+        $this->assertTrue($globalAdmin->canAccessTenant($tenant));
+        $this->assertFalse($globalAdmin->canAccessTenant($otherTenant));
+        $this->assertTrue($globalAdmin->getTenants($agentPanel)->contains(fn (Tenant $t): bool => (int) $t->getKey() === (int) $tenant->getKey()));
+        $this->assertFalse($globalAdmin->getTenants($agentPanel)->contains(fn (Tenant $t): bool => (int) $t->getKey() === (int) $otherTenant->getKey()));
     }
 
     private function tenantAdminRoleFor(Tenant $tenant): TenantRole

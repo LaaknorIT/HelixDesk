@@ -154,6 +154,12 @@ Initial major bounded contexts:
    - Tenant, Organization (unified tree: `group` / `customer` / `department` on one table), User, Role, Team, Queue, IdP configuration.
    - Agent panel: `OrganizationResource` with **Filament Tree** index (`solution-forest/filament-tree`) and standard edit/relation managers for assets, service offerings, and people. Navigation label defaults to **Customers** (`config/helixdesk.php`).
    - Global Admin panel: `TenantResource` edit page includes **`TenantAdminsRelationManager`** — lists users with the tenant-scoped **Tenant Admin** Spatie role, with an add-only action backed by **`TenantAdminAssignmentService`** (eligible candidates: tenant agents + global admins; excludes existing tenant admins).
+   - **Agent panel access gates** (`User` implements `FilamentUser` + `HasTenants`):
+     - `canAccessPanel('agent')`: `isTenantStaff()` (`tenant_id` + `type = agent`) **or** global admin with at least one **Tenant Admin** Spatie assignment (`model_has_roles.team_id`).
+     - `canAccessTenant($tenant)`: matching `tenant_id` **or** (`is_admin` && `isTenantAdminFor($tenant)` — explicit `model_has_roles.team_id` check for the **Tenant Admin** role).
+     - `getTenants()`: home tenant (if any) **plus** tenants where the user holds **Tenant Admin** (for global admins with assignments). All three methods must agree so Filament does not return 403/404 mismatches.
+     - `SyncFilamentTenantContext` middleware sets `team_id` from the URL tenant; no change required for global-admin tenant-admin access.
+     - This is **not** impersonation: `tenant_id` and `type` stay unchanged; global admins remain excluded from tenant People queries.
 2. **ITIL Core**
    - WorkItem, Problem, Change, MajorIncident, SLA, Workflow.
 3. **CMDB & Assets**

@@ -40,6 +40,14 @@ class GlobalAdminPanelAccessTest extends TestCase
 
         $this->assertFalse($nonAdminUserNoTenant->canAccessPanel($agentPanel));
 
+        $globalAdminWithoutAssignment = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+
+        $this->assertFalse($globalAdminWithoutAssignment->canAccessPanel($agentPanel));
+
         $tenant = Tenant::factory()->create();
 
         $agentUser = User::factory()->create([
