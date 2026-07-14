@@ -91,7 +91,6 @@ class OrganizationEntraSettingsSchema
                                 ->default(false),
                         ]),
                 ])
-                    ->skippable()
                     ->columnSpanFull(),
             ]);
     }

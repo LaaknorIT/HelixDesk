@@ -238,6 +238,41 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
         });
     }
 
+    public function test_sync_next_microsoft_entra_job_skips_when_no_sync_scopes_enabled(): void
+    {
+        Http::fake();
+
+        $tenant = Tenant::factory()->create();
+        $organization = Organization::factory()->create([
+            'tenant_id' => $tenant->id,
+            'organizational_settings' => [
+                'settings' => [[
+                    'id' => 'int-no-scopes',
+                    'type' => OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA,
+                    'config' => [
+                        'enabled' => true,
+                        'azure_tenant_id' => 'tenant-guid',
+                        'application_client_id' => 'client-guid',
+                        'client_secret' => 'secret',
+                        'scopes' => [
+                            'users' => false,
+                            'departments' => false,
+                            'computers' => false,
+                            'security_work_items' => false,
+                        ],
+                    ],
+                ]],
+            ],
+        ]);
+
+        (new SyncNextMicrosoftEntraIntegrationJob((int) $organization->id, 'int-no-scopes'))
+            ->handle(app(MicrosoftEntraOrganizationSyncService::class));
+
+        $organization->refresh();
+        $this->assertNull(data_get($organization->organizational_settings, 'settings.0.config.last_entra_sync_at'));
+        Http::assertNothingSent();
+    }
+
     public function test_sync_next_microsoft_entra_job_records_failure_without_advancing_cursor(): void
     {
         Http::fake([

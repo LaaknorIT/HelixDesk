@@ -13,6 +13,10 @@ final class OrganizationIntegrationProvisioner
      */
     public static function create(Organization $organization, string $integrationType, array $formData): array
     {
+        if ($integrationType === OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA) {
+            OrganizationIntegrationSettings::validateEntraFormDataForSave($formData);
+        }
+
         $result = match ($integrationType) {
             OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA => OrganizationIntegrationSettings::createMicrosoftEntraIntegration(
                 $organization->organizational_settings,

@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Organization;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 final class OrganizationIntegrationSettings
 {
@@ -211,29 +212,72 @@ final class OrganizationIntegrationSettings
      */
     public static function entraConfigReadyForSync(array $config): bool
     {
+        return self::entraConfigSyncSkipReason($config) === null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    public static function entraConfigSyncSkipReason(array $config): ?string
+    {
         if (! ($config['enabled'] ?? false)) {
-            return false;
+            return 'integration_disabled';
         }
 
         $tenant = trim((string) ($config['azure_tenant_id'] ?? ''));
         $client = trim((string) ($config['application_client_id'] ?? ''));
         $secret = trim((string) ($config['client_secret'] ?? ''));
-        if ($tenant === '' || $client === '' || $secret === '') {
-            return false;
+        if ($tenant === '') {
+            return 'missing_azure_tenant_id';
+        }
+        if ($client === '') {
+            return 'missing_application_client_id';
+        }
+        if ($secret === '') {
+            return 'missing_client_secret';
         }
 
         $scopes = $config['scopes'] ?? [];
         if (! is_array($scopes)) {
-            return false;
+            return 'invalid_scopes';
         }
 
         foreach ($scopes as $on) {
             if ($on) {
-                return true;
+                return null;
             }
         }
 
-        return false;
+        return 'no_sync_scopes_enabled';
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function entraFormHasSyncScope(array $data): bool
+    {
+        return ($data['entra_scope_users'] ?? false)
+            || ($data['entra_scope_departments'] ?? false)
+            || ($data['entra_scope_computers'] ?? false)
+            || ($data['entra_scope_security_work_items'] ?? false);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function validateEntraFormDataForSave(array $data): void
+    {
+        if (! ($data['entra_enabled'] ?? false)) {
+            return;
+        }
+
+        if (self::entraFormHasSyncScope($data)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'entra_scope_users' => __('Select at least one capability to sync when the integration is enabled.'),
+        ]);
     }
 
     /**

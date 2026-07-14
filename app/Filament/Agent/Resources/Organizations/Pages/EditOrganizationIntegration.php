@@ -2,6 +2,7 @@
 
 namespace App\Filament\Agent\Resources\Organizations\Pages;
 
+use App\Filament\Agent\Resources\Organizations\Concerns\HandlesMicrosoftEntraIntegrationSave;
 use App\Filament\Agent\Resources\Organizations\OrganizationResource;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationEntraSettingsSchema;
 use App\Support\OrganizationIntegrationSettings;
@@ -11,6 +12,8 @@ use Illuminate\Contracts\Support\Htmlable;
 
 class EditOrganizationIntegration extends EditRecord
 {
+    use HandlesMicrosoftEntraIntegrationSave;
+
     protected static string $resource = OrganizationResource::class;
 
     public string $integrationId;
@@ -71,13 +74,22 @@ class EditOrganizationIntegration extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $this->validateMicrosoftEntraFormData($data);
+
         $merged = OrganizationIntegrationSettings::replaceMicrosoftEntraIntegration(
             $this->record->organizational_settings,
             $this->integrationId,
             $data,
         );
 
+        $this->savedMicrosoftEntraIntegrationId = $this->integrationId;
+
         return ['organizational_settings' => $merged];
+    }
+
+    protected function afterSave(): void
+    {
+        $this->queueMicrosoftEntraSyncIfReady();
     }
 
     protected function getRedirectUrl(): ?string

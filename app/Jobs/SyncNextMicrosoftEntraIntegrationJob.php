@@ -25,7 +25,21 @@ class SyncNextMicrosoftEntraIntegrationJob implements ShouldQueue
     public function handle(MicrosoftEntraOrganizationSyncService $syncService): void
     {
         $organization = Organization::query()->withoutGlobalScopes()->find($this->organizationId);
-        if ($organization === null || $organization->tenant_id === null) {
+        if ($organization === null) {
+            Log::warning('Microsoft Entra sync skipped: organization not found.', [
+                'organization_id' => $this->organizationId,
+                'integration_id' => $this->integrationId,
+            ]);
+
+            return;
+        }
+
+        if ($organization->tenant_id === null) {
+            Log::warning('Microsoft Entra sync skipped: organization has no tenant.', [
+                'organization_id' => $this->organizationId,
+                'integration_id' => $this->integrationId,
+            ]);
+
             return;
         }
 
@@ -35,11 +49,24 @@ class SyncNextMicrosoftEntraIntegrationJob implements ShouldQueue
         );
 
         if ($entry === null) {
+            Log::warning('Microsoft Entra sync skipped: integration entry not found.', [
+                'organization_id' => $this->organizationId,
+                'integration_id' => $this->integrationId,
+            ]);
+
             return;
         }
 
         $config = is_array($entry['config'] ?? null) ? $entry['config'] : [];
-        if (! OrganizationIntegrationSettings::entraConfigReadyForSync($config)) {
+        $skipReason = OrganizationIntegrationSettings::entraConfigSyncSkipReason($config);
+        if ($skipReason !== null) {
+            Log::warning('Microsoft Entra sync skipped: integration is not ready.', [
+                'organization_id' => $this->organizationId,
+                'integration_id' => $this->integrationId,
+                'tenant_id' => $organization->tenant_id,
+                'reason' => $skipReason,
+            ]);
+
             return;
         }
 
@@ -50,8 +77,21 @@ class SyncNextMicrosoftEntraIntegrationJob implements ShouldQueue
             config: $config,
         );
 
+        Log::info('Microsoft Entra sync started.', [
+            'tenant_id' => $target->tenantId,
+            'organization_id' => $target->organizationId,
+            'integration_id' => $target->integrationId,
+            'scopes' => $target->config['scopes'] ?? [],
+        ]);
+
         try {
             $syncService->sync($target);
+
+            Log::info('Microsoft Entra sync completed.', [
+                'tenant_id' => $target->tenantId,
+                'organization_id' => $target->organizationId,
+                'integration_id' => $target->integrationId,
+            ]);
         } catch (Throwable $e) {
             Log::error('Microsoft Entra sync failed', [
                 'tenant_id' => $target->tenantId,

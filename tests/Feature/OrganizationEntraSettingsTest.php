@@ -7,6 +7,7 @@ use App\Models\Tenant;
 use App\Support\MicrosoftEntraIntegrationCatalog;
 use App\Support\OrganizationIntegrationSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class OrganizationEntraSettingsTest extends TestCase
@@ -145,6 +146,41 @@ class OrganizationEntraSettingsTest extends TestCase
         $this->assertCount(1, $merged['settings']);
         $this->assertTrue($merged['settings'][0]['config']['enabled']);
         $this->assertSame('updated-tenant', $merged['settings'][0]['config']['azure_tenant_id']);
+    }
+
+    public function test_entra_config_sync_skip_reason_when_no_scopes_enabled(): void
+    {
+        $config = [
+            'enabled' => true,
+            'azure_tenant_id' => 'tenant-guid',
+            'application_client_id' => 'client-guid',
+            'client_secret' => 'secret',
+            'scopes' => [
+                'users' => false,
+                'departments' => false,
+                'computers' => false,
+                'security_work_items' => false,
+            ],
+        ];
+
+        $this->assertSame('no_sync_scopes_enabled', OrganizationIntegrationSettings::entraConfigSyncSkipReason($config));
+        $this->assertFalse(OrganizationIntegrationSettings::entraConfigReadyForSync($config));
+    }
+
+    public function test_validate_entra_form_rejects_enabled_integration_without_scopes(): void
+    {
+        $this->expectException(ValidationException::class);
+
+        OrganizationIntegrationSettings::validateEntraFormDataForSave([
+            'entra_enabled' => true,
+            'entra_azure_tenant_id' => 'tenant-guid',
+            'entra_application_client_id' => 'client-guid',
+            'entra_client_secret' => 'secret',
+            'entra_scope_users' => false,
+            'entra_scope_departments' => false,
+            'entra_scope_computers' => false,
+            'entra_scope_security_work_items' => false,
+        ]);
     }
 
     public function test_replace_preserves_client_secret_when_secret_field_not_resubmitted(): void
