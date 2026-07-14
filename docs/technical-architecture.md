@@ -153,6 +153,7 @@ Initial major bounded contexts:
 1. **Identity & Tenancy**
    - Tenant, Organization (unified tree: `group` / `customer` / `department` on one table), User, Role, Team, Queue, IdP configuration.
    - Agent panel: `OrganizationResource` with **Filament Tree** index (`solution-forest/filament-tree`) and standard edit/relation managers for assets, service offerings, and people. Navigation label defaults to **Customers** (`config/helixdesk.php`).
+   - Global Admin panel: `TenantResource` edit page includes **`TenantAdminsRelationManager`** — lists users with the tenant-scoped **Tenant Admin** Spatie role, with an add-only action backed by **`TenantAdminAssignmentService`** (eligible candidates: tenant agents + global admins; excludes existing tenant admins).
 2. **ITIL Core**
    - WorkItem, Problem, Change, MajorIncident, SLA, Workflow.
 3. **CMDB & Assets**

@@ -373,3 +373,32 @@ Resolution order at runtime:
 2. Active `role_default` for one of the user's tenant roles (e.g. `Admin`, `Agent`).
 3. Application fallback widget set.
 
+---
+
+## 8. Global admin assigns tenant administrator
+
+**Actor:** platform global admin (`users.is_admin = true`).
+
+**Goal:** grant a user the **Tenant Admin** Spatie role for a specific tenant without changing their `tenant_id` or agent-panel access rules.
+
+**Flow:**
+
+1. Global admin opens **Global Admin → Tenants → Edit tenant**.
+2. On the **Tenant administrators** relation tab, reviews current holders of the tenant-scoped **Tenant Admin** role (name + email + source badge: tenant agent vs global admin).
+3. Clicks **Add tenant administrator**, selects an eligible user:
+   - agents belonging to that tenant (`type = agent`, matching `tenant_id`), or
+   - any global admin (`is_admin = true`).
+4. System assigns the **Tenant Admin** role via `assignRole()` with `team_id` set to the tenant (roles stack — existing **Agent** role is retained).
+5. Global admins assigned this way remain hidden from tenant **People**; their `tenant_id` and `is_admin` are unchanged.
+
+**Constraints:**
+
+- Add-only from this UI (no revoke action).
+- Users who already hold **Tenant Admin** for the tenant are excluded from the candidate list.
+- End users and agents from other tenants are not eligible.
+
+**Implementation:**
+
+- `App\Services\TenantAdminAssignmentService`
+- `App\Filament\GlobalAdmin\Resources\Tenants\RelationManagers\TenantAdminsRelationManager`
+

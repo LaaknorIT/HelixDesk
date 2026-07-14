@@ -94,6 +94,7 @@ Relationships:
 Invariants:
 
 - Back-office staff (`type = agent`) must belong to a tenant; **tenant administration** is a **Spatie role** (default name `Tenant Admin`, configurable in `config/helixdesk_permissions.php`) with full permission assignment via `*` (or explicitly including `tenant.admin`), not a separate `users.type`.
+- **Tenant Admin** may be assigned from the **Global Admin** panel (`TenantAdminsRelationManager` on tenant edit) to tenant agents or global admins via `TenantAdminAssignmentService` (`assignRole()` with `team_id` = tenant id). Global admins receive the role without `tenant_id` changes and without automatic agent-panel access; they stay hidden from tenant People.
 - End users must belong to an `Organization`.
 
 ### 1.4 Role, Team, Queue

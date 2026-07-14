@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Tenant extends Model
@@ -23,6 +24,25 @@ class Tenant extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function tenantAdminUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            User::class,
+            'model_has_roles',
+            'team_id',
+            'model_id',
+            'id',
+            'id',
+        )
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->whereIn('model_has_roles.role_id', function ($query): void {
+                $query->select('id')
+                    ->from('roles')
+                    ->whereColumn('roles.team_id', 'model_has_roles.team_id')
+                    ->where('roles.name', config('helixdesk_permissions.tenant_roles.tenant_admin.name'));
+            });
     }
 
     public function tenantRoles(): HasMany

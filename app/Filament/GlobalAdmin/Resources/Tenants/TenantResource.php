@@ -5,6 +5,7 @@ namespace App\Filament\GlobalAdmin\Resources\Tenants;
 use App\Filament\GlobalAdmin\Resources\Tenants\Pages\CreateTenant;
 use App\Filament\GlobalAdmin\Resources\Tenants\Pages\EditTenant;
 use App\Filament\GlobalAdmin\Resources\Tenants\Pages\ListTenants;
+use App\Filament\GlobalAdmin\Resources\Tenants\RelationManagers\TenantAdminsRelationManager;
 use App\Filament\GlobalAdmin\Resources\Tenants\Schemas\TenantForm;
 use App\Filament\GlobalAdmin\Resources\Tenants\Tables\TenantsTable;
 use App\Models\Tenant;
@@ -33,7 +34,7 @@ class TenantResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            TenantAdminsRelationManager::class,
         ];
     }
 
