@@ -79,10 +79,30 @@ class User extends Authenticatable implements FilamentUser, HasTenants
 
     /**
      * Back-office users for a tenant (agents, tenant admins). Permissions come from Spatie roles, not from `type`.
+     * Global admins assigned as tenant administrators count as staff when team context matches that tenant.
      */
     public function isTenantStaff(): bool
     {
-        return $this->tenant_id !== null && $this->type === 'agent';
+        if ($this->tenant_id !== null && $this->type === 'agent') {
+            return true;
+        }
+
+        if ($this->is_admin) {
+            $teamId = $this->effectiveTenantId();
+
+            if ($teamId !== null && $this->isTenantAdminFor($teamId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function effectiveTenantId(): ?int
+    {
+        $teamId = getPermissionsTeamId() ?? $this->tenant_id;
+
+        return $teamId !== null ? (int) $teamId : null;
     }
 
     public function tenant(): BelongsTo
@@ -202,13 +222,13 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             return false;
         }
 
-        $teamId = getPermissionsTeamId() ?? $this->tenant_id;
+        $teamId = $this->effectiveTenantId();
 
         if ($teamId === null) {
             return false;
         }
 
-        return $this->helixdeskPermissionNamesForTeam((int) $teamId, $guardName)->contains($permission);
+        return $this->helixdeskPermissionNamesForTeam($teamId, $guardName)->contains($permission);
     }
 
     /**

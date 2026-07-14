@@ -16,7 +16,7 @@ final class HelixdeskWorkItemAuthorization
 {
     public static function hasWorkItemPermission(User $user, string $action, int $queueId): bool
     {
-        if ($user->tenant_id === null || $user->type !== 'agent') {
+        if (! $user->isTenantStaff()) {
             return false;
         }
 
@@ -32,7 +32,7 @@ final class HelixdeskWorkItemAuthorization
      */
     public static function canAccessWorkItemWorkspace(User $user): bool
     {
-        if ($user->tenant_id === null || $user->type !== 'agent') {
+        if (! $user->isTenantStaff()) {
             return false;
         }
 
@@ -48,20 +48,20 @@ final class HelixdeskWorkItemAuthorization
      */
     public static function queueIdsForWorkItemAction(User $user, string $action): array
     {
-        if ($user->tenant_id === null) {
+        $tenantId = $user->effectiveTenantId();
+
+        if ($tenantId === null) {
             return [];
         }
 
         if ($user->hasPermissionTo('work_item.admin')) {
             return Queue::query()
-                ->where('tenant_id', $user->tenant_id)
+                ->where('tenant_id', $tenantId)
                 ->pluck('id')
                 ->map(fn ($id): int => (int) $id)
                 ->values()
                 ->all();
         }
-
-        $tenantId = (int) $user->tenant_id;
         $guard = config('auth.defaults.guard', 'web');
 
         $roleIds = DB::table('model_has_roles')

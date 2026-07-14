@@ -390,7 +390,7 @@ Resolution order at runtime:
    - any global admin (`is_admin = true`).
 4. System assigns the **Tenant Admin** role via `assignRole()` with `team_id` set to the tenant (roles stack — existing **Agent** role is retained).
 5. Global admins assigned this way remain hidden from tenant **People**; their `tenant_id`, `type`, and `is_admin` are unchanged.
-6. A global admin with the assignment can open `/agent/{tenant-slug}/` (URL-based tenancy; tenant switcher is off). `SyncFilamentTenantContext` sets `team_id` so Spatie permissions resolve for that tenant.
+6. A global admin with the assignment can open `/agent/{tenant-slug}/` (URL-based tenancy; tenant switcher is off). `SyncFilamentTenantContext` sets `team_id` so Spatie permissions resolve for that tenant. `User::isTenantStaff()` also treats such global admins as back-office staff for resource navigation and work-item authorization.
 
 **Constraints:**
 

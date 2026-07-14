@@ -2,12 +2,17 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Agent\Resources\Assets\AssetResource;
+use App\Filament\Agent\Resources\People\PeopleResource;
+use App\Filament\Agent\Resources\Queues\QueueResource;
+use App\Filament\Agent\Resources\WorkItems\WorkItemResource;
 use App\Filament\GlobalAdmin\Resources\Tenants\Pages\EditTenant;
 use App\Filament\GlobalAdmin\Resources\Tenants\RelationManagers\TenantAdminsRelationManager;
 use App\Models\Tenant;
 use App\Models\TenantRole;
 use App\Models\User;
 use App\Services\TenantAdminAssignmentService;
+use App\Support\HelixdeskWorkItemAuthorization;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Panel;
@@ -322,6 +327,84 @@ class GlobalAdminTenantAdminAssignmentTest extends TestCase
         $this->assertFalse($globalAdmin->canAccessTenant($otherTenant));
         $this->assertTrue($globalAdmin->getTenants($agentPanel)->contains(fn (Tenant $t): bool => (int) $t->getKey() === (int) $tenant->getKey()));
         $this->assertFalse($globalAdmin->getTenants($agentPanel)->contains(fn (Tenant $t): bool => (int) $t->getKey() === (int) $otherTenant->getKey()));
+    }
+
+    public function test_global_admin_tenant_admin_is_tenant_staff_with_team_context(): void
+    {
+        $tenant = Tenant::factory()->create();
+
+        $globalAdmin = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+
+        app(TenantAdminAssignmentService::class)->assign($tenant, $globalAdmin);
+
+        $this->assertFalse($globalAdmin->isTenantStaff());
+
+        setPermissionsTeamId($tenant->id);
+
+        try {
+            $this->assertTrue($globalAdmin->fresh()->isTenantStaff());
+            $this->assertTrue($globalAdmin->hasPermissionTo('tenant.admin'));
+            $this->assertTrue($globalAdmin->hasPermissionTo('asset.read'));
+        } finally {
+            setPermissionsTeamId(null);
+        }
+    }
+
+    public function test_global_admin_tenant_admin_can_access_agent_resources_with_tenant_context(): void
+    {
+        $tenant = Tenant::factory()->create();
+
+        $globalAdmin = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+
+        app(TenantAdminAssignmentService::class)->assign($tenant, $globalAdmin);
+
+        $this->actingAs($globalAdmin);
+
+        Filament::setCurrentPanel('agent');
+        Filament::setTenant($tenant);
+        setPermissionsTeamId($tenant->id);
+
+        try {
+            $this->assertTrue(AssetResource::canAccess());
+            $this->assertTrue(QueueResource::canAccess());
+            $this->assertTrue(PeopleResource::canAccess());
+            $this->assertTrue(WorkItemResource::canAccess());
+            $this->assertTrue(HelixdeskWorkItemAuthorization::canAccessWorkItemWorkspace($globalAdmin));
+        } finally {
+            setPermissionsTeamId(null);
+        }
+    }
+
+    public function test_global_admin_without_tenant_admin_assignment_is_not_tenant_staff_with_team_context(): void
+    {
+        $tenant = Tenant::factory()->create();
+
+        $globalAdmin = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+
+        $this->actingAs($globalAdmin);
+
+        Filament::setCurrentPanel('agent');
+        Filament::setTenant($tenant);
+        setPermissionsTeamId($tenant->id);
+
+        try {
+            $this->assertFalse($globalAdmin->isTenantStaff());
+            $this->assertFalse(AssetResource::canAccess());
+        } finally {
+            setPermissionsTeamId(null);
+        }
     }
 
     private function tenantAdminRoleFor(Tenant $tenant): TenantRole
