@@ -30,9 +30,11 @@ class ServiceOfferingResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Service offerings';
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static ?int $navigationSort = 31;
 
-    protected static string|UnitEnum|null $navigationGroup = 'CMDB';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBriefcase;
+
+    protected static string|UnitEnum|null $navigationGroup = 'Infrastructure';
 
     public static function canAccess(): bool
     {

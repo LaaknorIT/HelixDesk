@@ -27,11 +27,11 @@ class TenantRoleResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Roles';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 52;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Administration';
 
     public static function canAccess(): bool
     {

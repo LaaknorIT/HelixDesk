@@ -196,7 +196,7 @@ The system uses **RBAC (Role-Based Access Control)**.
 
 Users receive capabilities by **assigning roles**. Each role carries `{module}.{action}` permissions and the **incident queues** that role may work in; there is no separate access-control group entity.
 
-Permissions are named **`{module}.{action}`** (for example `problem.read`, `change.approve`, `tenant.admin`). Modules and their actions are declared in `config/helixdesk_permissions.php`. Tenant admins manage **roles** under **Settings → Roles**: each role has a **global permission matrix** for non-incident modules, and a separate **per-queue incident matrix** (add a queue, then set read/create/update/delete/admin for work_items in that queue only). **`work_item.admin`** remains a global capability for full incident access.
+Permissions are named **`{module}.{action}`** (for example `problem.read`, `change.approve`, `tenant.admin`). Modules and their actions are declared in `config/helixdesk_permissions.php`. Tenant admins manage **roles** under **Administration → Roles**: each role has a **global permission matrix** for non-incident modules, and a separate **per-queue incident matrix** (add a queue, then set read/create/update/delete/admin for work_items in that queue only). **`work_item.admin`** remains a global capability for full incident access.
 
 For incident access, **queue-scoped incident rights** on each role determine what agents can do:
 
@@ -205,7 +205,7 @@ For incident access, **queue-scoped incident rights** on each role determine wha
 
 Example: a role may have read/update in `Support` but only read in `Sales`; agents with that role see both queues in the index, but can only update work_items in `Support`.
 
-Tenant admins manage **queues** in the Agent panel (Settings) and configure **roles** (including queue attachments and matrices) under **Settings → Roles**. Effective incident access is the union of queue-specific rights from all roles assigned to the user.
+Tenant admins manage **queues** in the Agent panel (**Administration**) and configure **roles** (including queue attachments and matrices) under **Administration → Roles**. Effective incident access is the union of queue-specific rights from all roles assigned to the user.
 
 Role capabilities remain **`{module}.{action}`** strings stored on the **`role_permissions`** pivot (no separate global `permissions` catalog table).
 

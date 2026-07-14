@@ -24,9 +24,11 @@ class AssetResource extends Resource
 {
     protected static ?string $model = Asset::class;
 
+    protected static ?int $navigationSort = 30;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedServer;
 
-    protected static string|UnitEnum|null $navigationGroup = 'CMDB';
+    protected static string|UnitEnum|null $navigationGroup = 'Infrastructure';
 
     public static function canAccess(): bool
     {

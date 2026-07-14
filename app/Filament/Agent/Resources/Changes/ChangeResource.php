@@ -21,9 +21,11 @@ class ChangeResource extends Resource
 {
     protected static ?string $model = Change::class;
 
+    protected static ?int $navigationSort = 20;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowPath;
 
-    protected static string|UnitEnum|null $navigationGroup = 'ITIL';
+    protected static string|UnitEnum|null $navigationGroup = 'Service management';
 
     public static function canAccess(): bool
     {

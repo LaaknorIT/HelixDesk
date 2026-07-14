@@ -9,10 +9,12 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -40,6 +42,24 @@ class AgentPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Indigo,
             ])
+            ->navigationGroups([
+                'Customers' => NavigationGroup::make('Customers')
+                    ->icon(Heroicon::OutlinedBuildingOffice)
+                    ->collapsed(false),
+                'Service management' => NavigationGroup::make('Service management')
+                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->collapsed(),
+                'Infrastructure' => NavigationGroup::make('Infrastructure')
+                    ->icon(Heroicon::OutlinedServer)
+                    ->collapsed(),
+                'Knowledge' => NavigationGroup::make('Knowledge')
+                    ->icon(Heroicon::OutlinedBookOpen)
+                    ->collapsed(),
+                'Administration' => NavigationGroup::make('Administration')
+                    ->icon(Heroicon::OutlinedCog6Tooth)
+                    ->collapsed(),
+            ])
+            ->sidebarCollapsibleOnDesktop()
             ->discoverResources(in: app_path('Filament/Agent/Resources'), for: 'App\\Filament\\Agent\\Resources')
             ->discoverPages(in: app_path('Filament/Agent/Pages'), for: 'App\\Filament\\Agent\\Pages')
             ->pages([

@@ -22,9 +22,11 @@ class ProblemResource extends Resource
 {
     protected static ?string $model = Problem::class;
 
+    protected static ?int $navigationSort = 21;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedExclamationTriangle;
 
-    protected static string|UnitEnum|null $navigationGroup = 'ITIL';
+    protected static string|UnitEnum|null $navigationGroup = 'Service management';
 
     public static function canAccess(): bool
     {

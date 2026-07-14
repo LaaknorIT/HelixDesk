@@ -23,11 +23,11 @@ class MailAccountResource extends Resource
 
     protected static ?string $navigationLabel = 'Mail accounts';
 
-    protected static ?int $navigationSort = 26;
+    protected static ?int $navigationSort = 51;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedEnvelope;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Administration';
 
     public static function canAccess(): bool
     {

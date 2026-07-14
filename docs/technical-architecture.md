@@ -95,6 +95,14 @@ Foreign key behavior:
 - Tenant-facing UIs are separated by persona:
   - an **Agent panel** where tenant agents/tenant admins manage work_items,
   - an **End-user panel** where end users can only manage their own work_items (create, reply, close).
+- **Agent panel navigation** (`AgentPanelProvider::navigationGroups()` + per-resource `$navigationGroup` / `$navigationSort`):
+  - **Top level (ungrouped):** Dashboard, Tickets, Monitoring events.
+  - **Customers** (expanded by default): Customers (`OrganizationResource`, label configurable via `config/helixdesk.php`), People.
+  - **Service management** (collapsed): Changes, Problems.
+  - **Infrastructure** (collapsed): Assets, Service offerings, Suppliers.
+  - **Knowledge** (collapsed): Documents (formerly “Documentation”).
+  - **Administration** (collapsed): Queues, Mail accounts, Roles, Dashboard layouts.
+  - Group order and default collapsed state are declared on the panel provider; item sort uses explicit `$navigationSort` bands (0–2 top level, 10–11 customers, 20–21 service management, etc.).
 - Tenant scoping inside tenant-facing Filament panels is handled via Filament's built-in `tenant()` feature (panel tenancy), not by exposing tenant identifiers in UI forms/tables.
 - Work item handling in tenant-facing panels uses a dedicated **record view/edit page** (instead of list-row quick actions), so new workflows can be added without overloading list tables.
 - Work item conversation data supports:

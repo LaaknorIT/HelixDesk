@@ -101,8 +101,8 @@ Dedup table: unique `(mail_account_id, message_id)`.
 
 ## UI
 
-- **Settings → Mail accounts**: CRUD, protocol-specific fields, Entra integration picker.
-- **Settings → Queues**: attach mail accounts; select default outbound account (must be linked).
+- **Administration → Mail accounts**: CRUD, protocol-specific fields, Entra integration picker.
+- **Administration → Queues**: attach mail accounts; select default outbound account (must be linked).
 
 ## Provider notes
 

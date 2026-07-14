@@ -29,7 +29,7 @@ class PeopleResource extends Resource
 
     protected static ?string $pluralModelLabel = 'People';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 11;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
 

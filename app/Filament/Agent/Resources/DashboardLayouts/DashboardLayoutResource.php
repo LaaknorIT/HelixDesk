@@ -20,9 +20,13 @@ class DashboardLayoutResource extends Resource
 {
     protected static ?string $model = DashboardLayout::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static ?string $navigationLabel = 'Dashboard layouts';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static ?int $navigationSort = 53;
+
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedViewColumns;
+
+    protected static string|UnitEnum|null $navigationGroup = 'Administration';
 
     public static function canAccess(): bool
     {

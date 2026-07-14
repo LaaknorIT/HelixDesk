@@ -22,9 +22,11 @@ class SupplierResource extends Resource
 {
     protected static ?string $model = Supplier::class;
 
+    protected static ?int $navigationSort = 32;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingStorefront;
 
-    protected static string|UnitEnum|null $navigationGroup = 'CMDB';
+    protected static string|UnitEnum|null $navigationGroup = 'Infrastructure';
 
     public static function canAccess(): bool
     {

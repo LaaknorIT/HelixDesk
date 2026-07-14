@@ -11,7 +11,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
-use UnitEnum;
 
 class MonitoringEventResource extends Resource
 {
@@ -19,9 +18,9 @@ class MonitoringEventResource extends Resource
 
     protected static ?string $navigationLabel = 'Monitoring events';
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSignal;
+    protected static ?int $navigationSort = 2;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Operations';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSignal;
 
     public static function canAccess(): bool
     {

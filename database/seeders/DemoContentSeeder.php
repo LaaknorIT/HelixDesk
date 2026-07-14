@@ -149,7 +149,7 @@ class DemoContentSeeder extends Seeder
             ],
         );
 
-        // Tenant admin: full catalog including tenant.admin and dashboard.admin (Settings navigation).
+        // Tenant admin: full catalog including tenant.admin and dashboard.admin (Administration navigation).
         $tenantAdminUser = User::query()->updateOrCreate(
             ['email' => 'demo-tenantadmin@helixdesk.local'],
             [

@@ -36,7 +36,7 @@ class OrganizationResource extends Resource
 
     protected static ?string $pluralModelLabel = null;
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 10;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice;
 

@@ -23,11 +23,11 @@ class QueueResource extends Resource
 
     protected static ?string $navigationLabel = 'Queues';
 
-    protected static ?int $navigationSort = 25;
+    protected static ?int $navigationSort = 50;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQueueList;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Settings';
+    protected static string|UnitEnum|null $navigationGroup = 'Administration';
 
     public static function canAccess(): bool
     {

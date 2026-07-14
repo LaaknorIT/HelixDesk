@@ -22,7 +22,7 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 - [x] Organizations (customer hierarchy) and user types (agent, end_user, global_admin)
 - [x] Queues for routing and incident scope
 - [x] Spatie **roles** with team scoping (`TenantRole`, `team_id` = tenant)
-- [x] Config-driven `{module}.{action}` permissions and role matrix UI (**Settings → Roles**)
+- [x] Config-driven `{module}.{action}` permissions and role matrix UI (**Administration → Roles**)
 - [x] **Per-queue work item permissions** on `role_queue` (`work_item_permissions` JSON); global **`work_item.admin`** for full bypass
 - [ ] **Teams** as first-class org units (if required beyond current model): CRUD, reporting, optional linkage to queues/workflows
 - [ ] **SSO / Entra** and tenant-level IdP configuration (spec item; not wired in app yet)

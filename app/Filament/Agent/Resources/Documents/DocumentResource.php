@@ -25,11 +25,13 @@ class DocumentResource extends Resource
 {
     protected static ?string $model = Document::class;
 
-    protected static ?string $navigationLabel = 'Documentation';
+    protected static ?string $navigationLabel = 'Documents';
+
+    protected static ?int $navigationSort = 40;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBookOpen;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Documentation';
+    protected static string|UnitEnum|null $navigationGroup = 'Knowledge';
 
     public static function canAccess(): bool
     {
