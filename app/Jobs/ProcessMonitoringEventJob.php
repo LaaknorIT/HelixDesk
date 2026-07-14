@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\IncidentSource;
 use App\Models\Incident;
 use App\Models\MonitoringEvent;
 use App\Models\Tenant;
@@ -73,6 +74,7 @@ class ProcessMonitoringEventJob implements ShouldQueue
                 'priority' => $priority,
                 'category_id' => null,
                 'status' => 'New',
+                'source' => IncidentSource::Monitoring,
                 'opened_at' => Carbon::now(),
                 'resolved_at' => null,
                 'closed_at' => null,

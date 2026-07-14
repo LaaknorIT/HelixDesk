@@ -48,6 +48,13 @@ return [
         'import_interval_hours' => (int) env('ENTRA_IMPORT_INTERVAL_HOURS', 24),
     ],
 
+    'mail' => [
+        'poll_interval_minutes' => (int) env('MAIL_POLL_INTERVAL_MINUTES', 5),
+        'connection_timeout_seconds' => (int) env('MAIL_CONNECTION_TIMEOUT_SECONDS', 15),
+        'attachment_disk' => env('MAIL_ATTACHMENT_DISK', 'local'),
+        'attachment_path' => env('MAIL_ATTACHMENT_PATH', 'incident-mail-attachments'),
+    ],
+
     'monitoring' => [
         'deduplication_window_minutes' => (int) env('MONITORING_DEDUP_WINDOW_MINUTES', 15),
 

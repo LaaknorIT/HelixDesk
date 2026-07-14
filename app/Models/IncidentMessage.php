@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class IncidentMessage extends TenantModel
 {
+    /**
+     * @var list<string>
+     */
     protected $fillable = [
         'tenant_id',
         'incident_id',
@@ -14,6 +17,13 @@ class IncidentMessage extends TenantModel
         'parent_message_id',
         'is_internal',
         'body',
+        'external_message_id',
+        'in_reply_to',
+        'email_references',
+        'from_address',
+        'to_addresses',
+        'mail_account_id',
+        'email_sent_at',
     ];
 
     public function incident(): BelongsTo
@@ -36,10 +46,22 @@ class IncidentMessage extends TenantModel
         return $this->hasMany(self::class, 'parent_message_id');
     }
 
+    public function mailAccount(): BelongsTo
+    {
+        return $this->belongsTo(MailAccount::class);
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(IncidentMessageAttachment::class);
+    }
+
     protected function casts(): array
     {
         return [
             'is_internal' => 'boolean',
+            'to_addresses' => 'array',
+            'email_sent_at' => 'datetime',
         ];
     }
 }

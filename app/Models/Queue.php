@@ -20,7 +20,18 @@ class Queue extends TenantModel
         'tenant_id',
         'name',
         'description',
+        'default_mail_account_id',
     ];
+
+    public function defaultMailAccount(): BelongsTo
+    {
+        return $this->belongsTo(MailAccount::class, 'default_mail_account_id');
+    }
+
+    public function mailAccounts(): BelongsToMany
+    {
+        return $this->belongsToMany(MailAccount::class, 'queue_mail_account');
+    }
 
     public function tenant(): BelongsTo
     {

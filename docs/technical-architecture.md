@@ -200,6 +200,10 @@ Key job categories:
 
 - `ProcessMonitoringEventJob`
   - Deduplicate events, correlate with existing incidents, create or update incidents.
+- `PollMailAccountsJob` / `PollMailAccountJob`
+  - Scheduled mailbox polling (IMAP, POP3, Microsoft Graph shared mailboxes).
+- `SendIncidentReplyMailJob`
+  - Outbound email when agents reply on email-sourced incidents (and portal tickets with a queue default mailbox).
 - `SendMajorIncidentNotificationJob`
   - Send email/SMS/status page/webhook notifications for major incidents.
 - `RunAIInferenceJob`
@@ -248,12 +252,20 @@ Backlog providers use the same abstraction with new provider-specific services.
 
 ### 5.3 Communications (email, SMS, status page, webhooks)
 
-- Abstract communications into a **NotificationService** per tenant:
-  - Email via Laravel mailers.
+**Incident email channel** (implemented — see [`email-handling.md`](email-handling.md)):
+
+- Tenant-scoped **`mail_accounts`** with IMAP, POP3, or Microsoft Graph inbound polling and SMTP/Graph outbound.
+- Many mail accounts per **`queue`**; **`queues.default_mail_account_id`** for portal-created tickets.
+- Inbound ingest via `PollMailAccountJob` → `InboundMailIngestionService` (dedup, threading, requester resolution, attachments).
+- Agent replies dispatch `SendIncidentReplyMailJob` → `OutboundIncidentMailService` (reply-from-same-address).
+- Graph mail reuses organization integrations via `integration_type` + `integration_id` on `mail_accounts`.
+- **Google Workspace mail (planned):** Gmail API + service account domain-wide delegation; see [`docs/google-workspace-mail.md`](google-workspace-mail.md).
+
+**Other communications** (planned):
+
+- Abstract broader notifications into a **NotificationService** per tenant:
   - SMS via pluggable SMS gateway (e.g. Twilio or EU-friendly provider).
-  - Status page via:
-    - first-party status page (own UI), or
-    - integration with external status page services.
+  - Status page via first-party UI or external integrations.
   - Webhooks with configurable endpoints and payload templates.
 
 ---

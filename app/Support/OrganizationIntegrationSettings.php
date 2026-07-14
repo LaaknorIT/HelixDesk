@@ -10,7 +10,31 @@ final class OrganizationIntegrationSettings
 {
     public const TYPE_MICROSOFT_ENTRA = 'microsoft_entra';
 
+    public const TYPE_GOOGLE_WORKSPACE = 'google_workspace';
+
     public const LEGACY_MICROSOFT_ENTRA_ROW_ID = '__legacy_microsoft_entra__';
+
+    /**
+     * @return list<string>
+     */
+    public static function registeredTypes(): array
+    {
+        return [
+            self::TYPE_MICROSOFT_ENTRA,
+            self::TYPE_GOOGLE_WORKSPACE,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function mailTransportTypes(): array
+    {
+        return [
+            self::TYPE_MICROSOFT_ENTRA,
+            self::TYPE_GOOGLE_WORKSPACE,
+        ];
+    }
 
     /**
      * @return list<array{id: string, type: string, config: array<string, mixed>}>
@@ -65,6 +89,7 @@ final class OrganizationIntegrationSettings
     {
         return match ($type) {
             self::TYPE_MICROSOFT_ENTRA => __('Microsoft Entra ID'),
+            self::TYPE_GOOGLE_WORKSPACE => __('Google Workspace'),
             default => $type,
         };
     }
@@ -288,18 +313,100 @@ final class OrganizationIntegrationSettings
      */
     public static function appendMicrosoftEntraIntegration(?array $organizationalSettings, array $formData): array
     {
+        $created = self::createMicrosoftEntraIntegration($organizationalSettings, $formData);
+
+        return $created['organizational_settings'];
+    }
+
+    /**
+     * @param  array<string, mixed>  $formData
+     * @return array{integration_id: string, organizational_settings: array<string, mixed>}
+     */
+    public static function createMicrosoftEntraIntegration(?array $organizationalSettings, array $formData): array
+    {
         $out = is_array($organizationalSettings) ? $organizationalSettings : [];
         $items = self::persistedSettingsItems($out);
         $items = self::ensureLegacyMicrosoftEntraMigratedIntoItems($out, $items);
+        $integrationId = (string) Str::uuid();
         $items[] = [
-            'id' => (string) Str::uuid(),
+            'id' => $integrationId,
             'type' => self::TYPE_MICROSOFT_ENTRA,
             'config' => self::entraFormDataToConfig($formData, null),
         ];
         $out = self::stripLegacyMicrosoftEntraIntegration($out);
         $out['settings'] = array_values($items);
 
-        return $out;
+        return [
+            'integration_id' => $integrationId,
+            'organizational_settings' => $out,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $formData
+     * @return array{integration_id: string, organizational_settings: array<string, mixed>}
+     */
+    public static function createGoogleWorkspaceIntegration(?array $organizationalSettings, array $formData): array
+    {
+        $out = is_array($organizationalSettings) ? $organizationalSettings : [];
+        $items = self::persistedSettingsItems($out);
+        $integrationId = (string) Str::uuid();
+        $items[] = [
+            'id' => $integrationId,
+            'type' => self::TYPE_GOOGLE_WORKSPACE,
+            'config' => self::googleWorkspaceFormDataToConfig($formData, null),
+        ];
+        $out['settings'] = array_values($items);
+
+        return [
+            'integration_id' => $integrationId,
+            'organizational_settings' => $out,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function blankGoogleWorkspaceFormFields(): array
+    {
+        return [
+            'gws_customer_domain' => '',
+            'gws_service_account_client_email' => '',
+            'gws_service_account_private_key' => '',
+            'gws_domain_wide_delegation_client_id' => '',
+            'gws_enabled' => true,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function googleWorkspaceFormDataToConfig(array $data, ?array $previousConfig = null): array
+    {
+        $submittedKey = trim((string) ($data['gws_service_account_private_key'] ?? ''));
+        $privateKey = $submittedKey;
+        if ($privateKey === '' && is_array($previousConfig)) {
+            $previousPrivateKey = $previousConfig['service_account_private_key'] ?? null;
+            if (is_string($previousPrivateKey) && $previousPrivateKey !== '') {
+                $privateKey = $previousPrivateKey;
+            }
+        }
+
+        return [
+            'enabled' => (bool) ($data['gws_enabled'] ?? false),
+            'customer_domain' => (string) ($data['gws_customer_domain'] ?? ''),
+            'service_account_client_email' => (string) ($data['gws_service_account_client_email'] ?? ''),
+            'service_account_private_key' => $privateKey,
+            'domain_wide_delegation_client_id' => (string) ($data['gws_domain_wide_delegation_client_id'] ?? ''),
+            'delegated_scopes' => [
+                'https://www.googleapis.com/auth/gmail.readonly',
+                'https://www.googleapis.com/auth/gmail.send',
+                'https://www.googleapis.com/auth/gmail.modify',
+            ],
+            'setup_verified_at' => is_array($previousConfig) ? ($previousConfig['setup_verified_at'] ?? null) : null,
+            'last_mail_sync_at' => is_array($previousConfig) ? ($previousConfig['last_mail_sync_at'] ?? null) : null,
+        ];
     }
 
     /**

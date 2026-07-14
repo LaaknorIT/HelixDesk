@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Enums\IncidentSource;
+use App\Jobs\SendIncidentReplyMailJob;
 use App\Models\Incident;
 use App\Models\IncidentMessage;
 use App\Models\Tenant;
@@ -170,6 +172,7 @@ class IncidentWorkflowService
             'priority' => $data['priority'] ?? 'normal',
             'category_id' => $data['category_id'] ?? null,
             'status' => 'New',
+            'source' => IncidentSource::Portal,
             'opened_at' => now(),
             'resolved_at' => null,
             'closed_at' => null,
@@ -238,6 +241,10 @@ class IncidentWorkflowService
             'is_internal' => $isInternal,
             'body' => $body,
         ]);
+
+        if (! $isInternal && $user->type !== 'end_user') {
+            SendIncidentReplyMailJob::dispatch($message->getKey());
+        }
 
         return $message;
     }

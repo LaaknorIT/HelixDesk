@@ -40,6 +40,11 @@ class Tenant extends Model
         return $this->hasMany(Queue::class);
     }
 
+    public function mailAccounts(): HasMany
+    {
+        return $this->hasMany(MailAccount::class);
+    }
+
     public function generalQueue(): ?Queue
     {
         return $this->queues()

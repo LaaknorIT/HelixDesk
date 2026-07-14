@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\OrganizationSettingsImport;
+use App\Jobs\PollMailAccountsJob;
 use App\Support\OrganizationIntegrationSettings;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -13,4 +14,8 @@ Artisan::command('inspire', function () {
 Schedule::job(OrganizationSettingsImport::class)
     ->everyFifteenMinutes()
     ->when(fn (): bool => OrganizationIntegrationSettings::hasMicrosoftEntraIntegrationDueForImport())
+    ->withoutOverlapping();
+
+Schedule::job(new PollMailAccountsJob)
+    ->everyFiveMinutes()
     ->withoutOverlapping();

@@ -137,6 +137,21 @@ class ListOrganizationSettings extends Page implements HasTable
             return $parts === [] ? __('Identifiers not set') : implode(' · ', $parts);
         }
 
+        if ($type === OrganizationIntegrationSettings::TYPE_GOOGLE_WORKSPACE) {
+            $domain = trim((string) ($config['customer_domain'] ?? ''));
+            $serviceAccount = trim((string) ($config['service_account_client_email'] ?? ''));
+
+            $parts = [];
+            if ($domain !== '') {
+                $parts[] = __('Domain: :domain', ['domain' => Str::limit($domain, 36)]);
+            }
+            if ($serviceAccount !== '') {
+                $parts[] = __('Service account: :email', ['email' => Str::limit($serviceAccount, 36)]);
+            }
+
+            return $parts === [] ? __('Credentials not set') : implode(' · ', $parts);
+        }
+
         return '';
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\IncidentSource;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -20,6 +21,9 @@ class Incident extends TenantModel
         'priority',
         'category_id',
         'status',
+        'source',
+        'mail_account_id',
+        'inbound_message_id',
         'opened_at',
         'resolved_at',
         'closed_at',
@@ -28,6 +32,7 @@ class Incident extends TenantModel
     protected function casts(): array
     {
         return [
+            'source' => IncidentSource::class,
             'opened_at' => 'datetime',
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
@@ -52,6 +57,11 @@ class Incident extends TenantModel
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function mailAccount(): BelongsTo
+    {
+        return $this->belongsTo(MailAccount::class);
     }
 
     public function queue(): BelongsTo

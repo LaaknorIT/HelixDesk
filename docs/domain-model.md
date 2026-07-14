@@ -115,9 +115,21 @@ Invariants:
 **Queue**
 
 - `id`, `tenant_id`, `name`, `description`
+- `default_mail_account_id` (nullable FK) — outbound address when incidents were not created from email
 - routing unit for incidents/events/requests.
 - has many `Incident`
-- belongs to many `Role` via **`role_queue`**.
+- belongs to many `Role` via **`role_queue`**
+- belongs to many `MailAccount` via **`queue_mail_account`**
+
+**MailAccount**
+
+- `id`, `tenant_id`, `name`, `email_address`
+- `protocol` (`imap`, `pop3`, `microsoft_graph`), `outbound_protocol` (`smtp`, `microsoft_graph`)
+- `organization_id`, `integration_type`, `integration_id` (optional — API mail via organization integrations such as `microsoft_entra` or `google_workspace`)
+- `connection_settings` (encrypted JSON), `is_enabled`, poll/sync state fields
+- belongs to many `Queue` via **`queue_mail_account`**
+
+See [`email-handling.md`](email-handling.md) for inbound/outbound flows.
 
 Queue-scoped authorization invariant:
 
@@ -145,10 +157,13 @@ Key fields:
 - `status` (enum with default workflow; customizable via workflow engine)
 - `sla_policy_id` (nullable)
 - `opened_at`, `resolved_at`, `closed_at`
+- `source` (`portal`, `email`, `api`, `monitoring`, …)
+- `mail_account_id` (nullable — receiving mailbox for reply-from-same-address)
+- `inbound_message_id` (nullable — first RFC `Message-ID`)
 
 Relationships:
 
-- belongs to `Tenant`, `Organization` (optional), `Department` (optional), `Queue`
+- belongs to `Tenant`, `Organization` (optional), `Department` (optional), `Queue`, `MailAccount` (optional)
 - belongs to `User` as `reported_by` and as `assigned_agent`
 - belongs to many `Asset`
 - belongs to many `Problem`

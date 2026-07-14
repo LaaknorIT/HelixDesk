@@ -78,6 +78,81 @@ final class MicrosoftGraphHttpClient
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    public function postJson(string $relativePath, array $payload = []): array
+    {
+        if ($this->token === null) {
+            $this->authenticate();
+        }
+
+        $url = 'https://graph.microsoft.com/v1.0/'.ltrim($relativePath, '/');
+        $response = Http::withToken($this->token)->timeout(60)->retry(2, 500)->post($url, $payload);
+
+        if ($response->status() === 401) {
+            $this->authenticate();
+            $response = Http::withToken($this->token)->timeout(60)->post($url, $payload);
+        }
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Microsoft Graph POST '.$relativePath.' failed: HTTP '.$response->status().' '.$response->body());
+        }
+
+        if ($response->body() === '') {
+            return [];
+        }
+
+        /** @var array<string, mixed> */
+        $json = $response->json();
+
+        return $json;
+    }
+
+    public function getRaw(string $relativePath): string
+    {
+        if ($this->token === null) {
+            $this->authenticate();
+        }
+
+        $url = 'https://graph.microsoft.com/v1.0/'.ltrim($relativePath, '/');
+        $response = Http::withToken($this->token)->timeout(120)->retry(2, 500)->get($url);
+
+        if ($response->status() === 401) {
+            $this->authenticate();
+            $response = Http::withToken($this->token)->timeout(120)->get($url);
+        }
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Microsoft Graph GET raw '.$relativePath.' failed: HTTP '.$response->status().' '.$response->body());
+        }
+
+        return $response->body();
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    public function patchJson(string $relativePath, array $payload): void
+    {
+        if ($this->token === null) {
+            $this->authenticate();
+        }
+
+        $url = 'https://graph.microsoft.com/v1.0/'.ltrim($relativePath, '/');
+        $response = Http::withToken($this->token)->timeout(60)->retry(2, 500)->patch($url, $payload);
+
+        if ($response->status() === 401) {
+            $this->authenticate();
+            $response = Http::withToken($this->token)->timeout(60)->patch($url, $payload);
+        }
+
+        if (! $response->successful()) {
+            throw new RuntimeException('Microsoft Graph PATCH '.$relativePath.' failed: HTTP '.$response->status().' '.$response->body());
+        }
+    }
+
+    /**
      * @param  array<string, string|int>  $query
      * @return \Generator<int, array<string, mixed>>
      */

@@ -26,12 +26,14 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 - [x] **Per-queue incident permissions** on `role_queue` (`incident_permissions` JSON); global **`incident.admin`** for full bypass
 - [ ] **Teams** as first-class org units (if required beyond current model): CRUD, reporting, optional linkage to queues/workflows
 - [ ] **SSO / Entra** and tenant-level IdP configuration (spec item; not wired in app yet)
+- [ ] **Google Workspace Gmail API** mail (service account + domain-wide delegation) — [`docs/google-workspace-mail.md`](google-workspace-mail.md)
 
 ---
 
 ## Phase B — ITIL core (service desk)
 
 - [x] **Incidents**: Filament (agent + end-user), default workflow, API v1, queue-scoped authorization
+- [x] **Email → incidents**: inbound polling, threaded replies, outbound agent replies from queue mailbox
 - [x] **Problems**: Filament resource, permissions, baseline model
 - [x] **Changes**: Filament resource, workflow service, permissions, tests
 - [ ] **Major incidents**: dedicated entity/workflows/UI (vs normal incidents only)
@@ -71,7 +73,8 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 - [~] REST **API v1** for core entities (tenants, incidents, assets, documents, monitoring events)
 - [ ] **OpenAPI** (or equivalent) published and kept in sync with routes
 - [ ] **Laravel Horizon** + **Redis** in deployment and `composer.json` / ops docs (architecture assumes them)
-- [ ] **Queue-heavy jobs**: outbound notifications, imports, reporting, AI tasks
+- [x] **Incident email channel**: mail accounts, IMAP/POP3/Graph inbound polling, SMTP/Graph outbound, queue default address, attachments ([`docs/email-handling.md`](email-handling.md))
+- [ ] **Queue-heavy jobs**: major-incident / status notifications, reporting, AI tasks (incident reply mail uses Horizon)
 - [ ] **S3-compatible storage** for attachments/exports (config + implementation paths)
 
 ---

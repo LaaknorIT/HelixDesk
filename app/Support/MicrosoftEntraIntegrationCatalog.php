@@ -52,6 +52,15 @@ final class MicrosoftEntraIntegrationCatalog
                 ],
                 'setup_notes' => 'Exact API surface evolves with Microsoft Graph security APIs—verify the permission exists for your tenant SKU and that incident export matches your compliance policy.',
             ],
+            'mail' => [
+                'label' => 'Mail (shared mailboxes)',
+                'description' => 'Poll shared mailboxes and send incident replies via Microsoft Graph.',
+                'application_permissions' => [
+                    'Mail.Read',
+                    'Mail.Send',
+                ],
+                'setup_notes' => 'Grant admin consent. Use application permissions with the shared mailbox UPN on each mail account.',
+            ],
         ];
     }
 
