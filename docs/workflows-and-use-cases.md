@@ -48,6 +48,34 @@ SLA integration:
   - Monitor SLA timers (queue jobs) and mark work_items as breached when thresholds are crossed.
   - Trigger notifications/escalations if configured.
 
+### 1.2 Agent ticket view (work-first layout)
+
+The **Agent panel** ticket view (`ViewWorkItem`) uses a **68/32 split layout** so agents work the conversation without scrolling past metadata:
+
+**Primary work zone (left, ~68%)**
+
+- Ticket header: ID, title, status/priority/type/queue badges, assignee summary.
+- **Quick actions** bar (inline, always visible): workflow status transition, priority update, assignee selection — wired to `WorkItemWorkflowService` and direct field updates.
+- **Conversation thread**: threaded external replies and agent internal notes (`is_internal`); internal notes are visually distinct.
+- **Reply composer** (always visible): message body, reply-to selector (`parent_message_id`), internal-note toggle — replaces header modal actions for reply and internal note.
+
+**Metadata sidebar (right, ~32%)**
+
+Tabbed compact key-value panels:
+
+| Tab | Contents |
+|-----|----------|
+| Details | type, priority, status, category, department, opened/resolved/closed dates, assignee, description |
+| Requester | name, email, organization, previous ticket count |
+| Routing | queue, source, organization, tenant |
+| Relations | Assets and Documents relation managers (embedded), linked problems, monitoring events |
+| Email | mail account, inbound message ID, thread subject, last inbound message time |
+| Activity | Message and lifecycle timeline (creation, replies, internal notes, resolved/closed timestamps) |
+
+Header actions are minimized; reply/internal-note flows live in the inline composer. Status and priority changes are surfaced in the quick-actions bar.
+
+The **End-user panel** ticket view is unchanged (single-column infolist).
+
 ---
 
 ## 2. Monitoring events and auto-work_items

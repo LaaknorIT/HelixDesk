@@ -101,6 +101,11 @@ Foreign key behavior:
   - threaded external replies (`work_item_messages.parent_message_id`),
   - agent-only internal notes (`work_item_messages.is_internal = true`),
   - status and priority updates in the record page workflow.
+- **Agent ticket view layout** (`app/Filament/Agent/Resources/WorkItems/`):
+  - `ViewWorkItem` overrides Filament `content()` to render a single infolist (no relation-manager block below the page).
+  - `WorkItemInfolist` schema: `Grid` ~7/3 columns — left work zone (header, `workZoneForm` quick actions + composer, conversation `RepeatableEntry`), right `Tabs` sidebar for metadata.
+  - Relation managers (`AssetsRelationManager`, `DocumentsRelationManager`) are embedded in the Relations tab via `Livewire::make()`; `getRelationManagers()` on the page returns empty to avoid duplicate tables.
+  - Inline forms use a dedicated `workZoneForm` Livewire schema on `ViewWorkItem` (status transition via `WorkItemWorkflowService::transition()`, assignee/priority direct updates, composer via `addMessage()` / `addInternalNote()`).
 - Global admin access to a tenant is recorded in a dedicated table (e.g. `tenant_impersonations` or similar).
 - **Data residency**:
   - All databases and object storage located in EU regions.

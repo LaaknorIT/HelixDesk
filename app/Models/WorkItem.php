@@ -57,6 +57,11 @@ class WorkItem extends TenantModel
         return $this->belongsTo(User::class, 'reported_by_user_id');
     }
 
+    public function assignedAgent(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_agent_id');
+    }
+
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
