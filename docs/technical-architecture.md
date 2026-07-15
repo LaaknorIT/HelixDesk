@@ -251,25 +251,27 @@ Design:
   - stable external IDs (e.g. Entra `oid`)
   - email domain and company mapping, when safe.
 
-### 5.2 Monitoring (Intune, Zabbix, others)
+### 5.2 Device inventory and monitoring (Entra, Action1, Zabbix, others)
 
-Initial integrations:
+**Implemented / in progress:**
 
-- **Intune** for device/asset inventory.
-- **Zabbix** for monitoring events.
+- **Microsoft Entra** (per customer org): directory users, departments, Intune managed devices → `Asset`, Graph security → `MonitoringEvent`. Configuration today lives in `organizations.organizational_settings` via [`OrganizationIntegrationSettings`](../app/Support/OrganizationIntegrationSettings.php); scheduled sync via `OrganizationSettingsImport` → `SyncNextMicrosoftEntraIntegrationJob`.
 
-Design:
+**Designed (see [`integrations.md`](integrations.md)):**
 
-- `integration_connections` table (tenant-scoped) describing:
-  - provider type (`intune`, `zabbix`, `jamf`, etc.)
-  - auth/endpoint configuration
-  - sync settings (frequency, mapping rules).
-- Use **pull** (scheduled sync) and **push** (webhook/event) patterns depending on provider.
-- Normalize:
-  - assets into `assets` and `asset_relationships`
-  - events into `events` with references to assets.
+- **Multi-source asset reconciliation** — canonical `Asset` rows with provider IDs in `asset_external_identifiers`; Action1 for RMM inventory, software, and normalized patch items; identity resolution across Entra + Action1 without duplicate CIs (serial match requires corroborating MAC or hostname).
+- **Organization-scoped integration registry** — **`organization_integrations`** table (`OrganizationIntegration` model) in Phase 1; migrate from `organizational_settings.settings[]` (Entra, Google Workspace, Action1); encrypted `credentials`, per-row `api_base_url` for Action1 regions, optional `action1_group_id` filter.
+- **Provider sync contract** — `OrganizationAssetSyncProvider` interface, shared `AssetReconciliationService`, scheduler dispatches one due integration per tick.
 
-Backlog providers use the same abstraction with new provider-specific services.
+**Planned monitoring feeds:**
+
+- **Zabbix** and others for monitoring events (existing `MonitoringEvent` / `MonitoringEventSource` model).
+- **Push** (webhook/event) patterns where providers support them; initial RMM scope is **pull** (scheduled sync).
+
+Normalize:
+
+- reconciled devices into `assets` (+ `asset_external_identifiers`, `asset_software_installations`, `asset_patch_status`, `asset_patch_items`)
+- alerts into `monitoring_events` with `external_reference` and `deduplication_key`, linked to assets when resolvable.
 
 ### 5.3 Communications (email, SMS, status page, webhooks)
 

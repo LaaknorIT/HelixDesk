@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Agent\Resources\AssetIdentityAmbiguities\AssetIdentityAmbiguityResource;
 use App\Filament\Agent\Resources\Assets\AssetResource;
 use App\Filament\Agent\Resources\Changes\ChangeResource;
 use App\Filament\Agent\Resources\DashboardLayouts\DashboardLayoutResource;
@@ -75,6 +76,9 @@ class AgentPanelNavigationTest extends TestCase
         $this->assertSame('Infrastructure', AssetResource::getNavigationGroup());
         $this->assertSame(30, AssetResource::getNavigationSort());
 
+        $this->assertSame('Infrastructure', AssetIdentityAmbiguityResource::getNavigationGroup());
+        $this->assertSame(33, AssetIdentityAmbiguityResource::getNavigationSort());
+
         $this->assertSame('Infrastructure', ServiceOfferingResource::getNavigationGroup());
         $this->assertSame(31, ServiceOfferingResource::getNavigationSort());
         $this->assertSame(Heroicon::OutlinedBriefcase, ServiceOfferingResource::getNavigationIcon());
@@ -138,7 +142,7 @@ class AgentPanelNavigationTest extends TestCase
             );
 
             $this->assertSame(
-                ['Assets', 'Service offerings', 'Suppliers'],
+                ['Assets', 'Service offerings', 'Suppliers', 'Identity ambiguities'],
                 $this->navigationItemLabelsForGroup($navigation, 'Infrastructure'),
             );
 
@@ -148,7 +152,7 @@ class AgentPanelNavigationTest extends TestCase
             );
 
             $this->assertSame(
-                ['Queues', 'Mail accounts', 'Roles', 'Dashboard layouts'],
+                ['Queues', 'Mail accounts', 'Roles', 'Integration settings', 'Dashboard layouts'],
                 $this->navigationItemLabelsForGroup($navigation, 'Administration'),
             );
         } finally {

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Organization;
+use App\Models\OrganizationIntegration;
 use App\Models\Tenant;
 use App\Support\OrganizationIntegrationProvisioner;
 use App\Support\OrganizationIntegrationSettings;
@@ -32,8 +33,8 @@ class OrganizationIntegrationProvisionerTest extends TestCase
         );
 
         $organization->refresh();
-        $entry = OrganizationIntegrationSettings::findEntry(
-            is_array($organization->organizational_settings) ? $organization->organizational_settings : [],
+        $entry = OrganizationIntegrationSettings::findEntryForOrganization(
+            $organization,
             $result['integration_id'],
         );
 
@@ -41,6 +42,10 @@ class OrganizationIntegrationProvisionerTest extends TestCase
         $this->assertSame(OrganizationIntegrationSettings::TYPE_GOOGLE_WORKSPACE, $entry['type'] ?? null);
         $this->assertSame('acme.example', $entry['config']['customer_domain'] ?? null);
         $this->assertTrue((bool) ($entry['config']['enabled'] ?? false));
+
+        $this->assertNotNull(
+            OrganizationIntegration::query()->withoutGlobalScopes()->find($result['integration_id'])
+        );
     }
 
     public function test_creates_microsoft_entra_integration_on_organization(): void
@@ -64,13 +69,17 @@ class OrganizationIntegrationProvisionerTest extends TestCase
         );
 
         $organization->refresh();
-        $entry = OrganizationIntegrationSettings::findEntry(
-            is_array($organization->organizational_settings) ? $organization->organizational_settings : [],
+        $entry = OrganizationIntegrationSettings::findEntryForOrganization(
+            $organization,
             $result['integration_id'],
         );
 
         $this->assertSame(OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA, $entry['type'] ?? null);
         $this->assertSame('tenant-guid', $entry['config']['azure_tenant_id'] ?? null);
+
+        $this->assertNotNull(
+            OrganizationIntegration::query()->withoutGlobalScopes()->find($result['integration_id'])
+        );
     }
 
     public function test_provisioner_rejects_enabled_microsoft_entra_without_scopes(): void

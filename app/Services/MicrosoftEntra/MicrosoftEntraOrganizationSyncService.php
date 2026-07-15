@@ -2,15 +2,22 @@
 
 namespace App\Services\MicrosoftEntra;
 
+use App\Data\AssetProviderSnapshot;
+use App\Enums\AssetExternalIdentifierType;
 use App\Enums\OrganizationType;
-use App\Models\Asset;
 use App\Models\AssetType;
 use App\Models\MonitoringEvent;
 use App\Models\MonitoringEventSource;
 use App\Models\Organization;
+use App\Models\Tenant;
 use App\Models\User;
+use App\Services\AssetReconciliationService;
+use App\Services\AssetRetirementService;
+use App\Services\MonitoringEventAssetLinker;
 use App\Services\TenantContext;
+use App\Support\AssetIdentityNormalizer;
 use App\Support\EntraSyncTarget;
+use App\Support\IntegrationType;
 use App\Support\OrganizationIntegrationSettings;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Hash;
@@ -22,6 +29,9 @@ final class MicrosoftEntraOrganizationSyncService
 {
     public function __construct(
         private readonly TenantContext $tenantContext,
+        private readonly AssetReconciliationService $assetReconciliationService,
+        private readonly AssetRetirementService $assetRetirementService,
+        private readonly MonitoringEventAssetLinker $monitoringEventAssetLinker,
     ) {}
 
     public function sync(EntraSyncTarget $target): void
@@ -67,6 +77,11 @@ final class MicrosoftEntraOrganizationSyncService
                     'last_entra_sync_error' => null,
                 ]
             );
+
+            $tenant = Tenant::query()->find($target->tenantId);
+            if ($tenant !== null) {
+                $this->assetRetirementService->evaluateTenant($tenant);
+            }
         } finally {
             $this->tenantContext->setTenantId(null);
             setPermissionsTeamId(null);
@@ -245,11 +260,9 @@ final class MicrosoftEntraOrganizationSyncService
             '$select' => 'id,deviceName,serialNumber,emailAddress,userPrincipalName,azureADDeviceId,operatingSystem',
             '$top' => 100,
         ]) as $device) {
-            $identifier = trim((string) ($device['azureADDeviceId'] ?? ''));
-            if ($identifier === '') {
-                $identifier = (string) ($device['id'] ?? '');
-            }
-            if ($identifier === '') {
+            $azureAdDeviceId = trim((string) ($device['azureADDeviceId'] ?? ''));
+            $intuneManagedDeviceId = trim((string) ($device['id'] ?? ''));
+            if ($azureAdDeviceId === '' && $intuneManagedDeviceId === '') {
                 continue;
             }
 
@@ -263,36 +276,59 @@ final class MicrosoftEntraOrganizationSyncService
                 $owner = User::query()->where('tenant_id', $target->tenantId)->where('email', $mail)->first();
             }
 
-            $name = trim((string) ($device['deviceName'] ?? ''));
-            if ($name === '') {
-                $name = $identifier;
+            $deviceName = trim((string) ($device['deviceName'] ?? ''));
+            $name = $deviceName !== ''
+                ? $deviceName
+                : ($azureAdDeviceId !== '' ? $azureAdDeviceId : $intuneManagedDeviceId);
+
+            $identifiers = [];
+            if ($azureAdDeviceId !== '') {
+                $identifiers[] = [
+                    'type' => AssetExternalIdentifierType::EntraAzureAdDeviceId,
+                    'value' => $azureAdDeviceId,
+                ];
+            }
+            if ($intuneManagedDeviceId !== '') {
+                $identifiers[] = [
+                    'type' => AssetExternalIdentifierType::EntraIntuneManagedDeviceId,
+                    'value' => $intuneManagedDeviceId,
+                ];
             }
 
-            $asset = Asset::query()
-                ->where('tenant_id', $target->tenantId)
-                ->where('organization_id', $organization->getKey())
-                ->where('asset_identifier', $identifier)
-                ->first();
+            $normalizedHostname = AssetIdentityNormalizer::normalizeHostname($deviceName);
+            if ($normalizedHostname !== null) {
+                $identifiers[] = [
+                    'type' => AssetExternalIdentifierType::Hostname,
+                    'value' => $deviceName,
+                ];
+            }
 
-            if ($asset === null) {
-                Asset::query()->create([
-                    'tenant_id' => $target->tenantId,
-                    'organization_id' => $organization->getKey(),
-                    'asset_type_id' => $assetType->getKey(),
+            $serial = AssetIdentityNormalizer::normalizeSerial(trim((string) ($device['serialNumber'] ?? '')) ?: null);
+            if ($serial !== null) {
+                $identifiers[] = [
+                    'type' => AssetExternalIdentifierType::SerialNumber,
+                    'value' => $serial,
+                ];
+            }
+
+            $snapshot = new AssetProviderSnapshot(
+                tenantId: $target->tenantId,
+                organizationId: (int) $organization->getKey(),
+                organizationIntegrationId: $target->integrationId,
+                provider: IntegrationType::MICROSOFT_ENTRA,
+                identifiers: $identifiers,
+                attributes: array_filter([
                     'name' => $name,
-                    'asset_identifier' => $identifier,
-                    'serial_number' => trim((string) ($device['serialNumber'] ?? '')) ?: null,
+                    'serial_number' => $serial,
+                    'primary_hostname' => $normalizedHostname !== null ? $deviceName : null,
+                    'operating_system' => trim((string) ($device['operatingSystem'] ?? '')) ?: null,
+                    'owner_user_id' => $owner?->getKey(),
                     'lifecycle_status' => 'in_use',
-                    'owner_user_id' => $owner?->getKey(),
-                ]);
-            } else {
-                $asset->update([
                     'asset_type_id' => $assetType->getKey(),
-                    'name' => $name,
-                    'serial_number' => trim((string) ($device['serialNumber'] ?? '')) ?: null,
-                    'owner_user_id' => $owner?->getKey(),
-                ]);
-            }
+                ], fn (mixed $value): bool => $value !== null && $value !== ''),
+            );
+
+            $this->assetReconciliationService->reconcile($snapshot);
         }
     }
 
@@ -317,6 +353,8 @@ final class MicrosoftEntraOrganizationSyncService
 
             $severity = $this->normalizeSeverity($workItem['severity'] ?? 'medium');
             $title = (string) ($workItem['displayName'] ?? 'Security incident');
+            $azureAdDeviceIds = $this->monitoringEventAssetLinker->extractEntraAzureAdDeviceIds($workItem);
+            $primaryAzureAdDeviceId = $azureAdDeviceIds[0] ?? '';
 
             $existing = MonitoringEvent::query()
                 ->where('tenant_id', $target->tenantId)
@@ -325,8 +363,14 @@ final class MicrosoftEntraOrganizationSyncService
                 ->first();
 
             $now = now();
+            $configurationJson = array_filter([
+                'azure_ad_device_id' => $primaryAzureAdDeviceId !== '' ? $primaryAzureAdDeviceId : null,
+                'azure_ad_device_ids' => $azureAdDeviceIds !== [] ? $azureAdDeviceIds : null,
+                'organization_integration_id' => $target->integrationId,
+            ]);
+
             if ($existing === null) {
-                MonitoringEvent::query()->create([
+                $event = MonitoringEvent::query()->create([
                     'tenant_id' => $target->tenantId,
                     'monitoring_event_source_id' => $source->getKey(),
                     'external_reference' => $extId,
@@ -338,21 +382,24 @@ final class MicrosoftEntraOrganizationSyncService
                     'first_seen_at' => $now,
                     'last_seen_at' => $now,
                     'resolved_at' => $closed ? $now : null,
+                    'configuration_json' => $configurationJson,
                 ]);
-
-                continue;
-            }
-
-            $existing->severity = $severity;
-            $existing->message = $title;
-            $existing->status = $ourStatus;
-            $existing->last_seen_at = $now;
-            if ($closed) {
-                $existing->resolved_at = $existing->resolved_at ?? $now;
             } else {
-                $existing->resolved_at = null;
+                $existing->severity = $severity;
+                $existing->message = $title;
+                $existing->status = $ourStatus;
+                $existing->last_seen_at = $now;
+                $existing->configuration_json = $configurationJson;
+                if ($closed) {
+                    $existing->resolved_at = $existing->resolved_at ?? $now;
+                } else {
+                    $existing->resolved_at = null;
+                }
+                $existing->save();
+                $event = $existing;
             }
-            $existing->save();
+
+            $this->monitoringEventAssetLinker->linkEntraSecurityWorkItem($event, $workItem);
         }
     }
 

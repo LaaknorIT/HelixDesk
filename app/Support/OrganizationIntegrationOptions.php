@@ -37,7 +37,7 @@ final class OrganizationIntegrationOptions
         }
 
         $options = [];
-        foreach (OrganizationIntegrationSettings::listEntries($organization->organizational_settings) as $entry) {
+        foreach (OrganizationIntegrationSettings::listEntriesForOrganization($organization) as $entry) {
             $type = (string) ($entry['type'] ?? '');
             if (! in_array($type, $allowedTypes, true)) {
                 continue;
@@ -65,6 +65,7 @@ final class OrganizationIntegrationOptions
         $detail = match ($entry['type'] ?? '') {
             OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA => trim((string) ($config['azure_tenant_id'] ?? '')),
             OrganizationIntegrationSettings::TYPE_GOOGLE_WORKSPACE => trim((string) ($config['customer_domain'] ?? '')),
+            OrganizationIntegrationSettings::TYPE_ACTION1 => trim((string) ($config['action1_organization_id'] ?? '')),
             default => '',
         };
 
@@ -103,10 +104,7 @@ final class OrganizationIntegrationOptions
             return null;
         }
 
-        $entry = OrganizationIntegrationSettings::findEntry(
-            is_array($organization->organizational_settings) ? $organization->organizational_settings : [],
-            $integrationId,
-        );
+        $entry = OrganizationIntegrationSettings::findEntryForOrganization($organization, $integrationId);
 
         $type = is_array($entry) ? (string) ($entry['type'] ?? '') : '';
 

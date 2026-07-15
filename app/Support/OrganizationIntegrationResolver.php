@@ -41,8 +41,8 @@ final class OrganizationIntegrationResolver
             throw new RuntimeException('Organization not found for integration reference.');
         }
 
-        $entry = OrganizationIntegrationSettings::findEntry(
-            is_array($organization->organizational_settings) ? $organization->organizational_settings : [],
+        $entry = OrganizationIntegrationSettings::findEntryForOrganization(
+            $organization,
             $integrationId,
         );
 

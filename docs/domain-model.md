@@ -20,13 +20,15 @@ Key fields:
 - `slug` or `subdomain` (optional, for routing)
 - `status` (`active`, `readonly`, `disabled`)
 - `region` (EU region identifier, if multi-region introduced later)
+- `integration_settings` (planned JSON) — tenant-wide integration behaviour, e.g. `auto_retire_assets_when_all_providers_drop` (see [`integrations.md`](integrations.md) §3.8)
 
 Relationships:
 
 - has many `Organization`
 - has many `User`
 - has many `Role`, `Team`, `Queue`
-- has many `IntegrationConnection`, `IdpConnection`
+- has many `OrganizationIntegration` (through `Organization`, or direct `tenant_id` scope)
+- has many `IdpConnection`
 
 Invariants:
 
@@ -46,7 +48,7 @@ Key fields:
 - `name`, optional `code`, optional `external_reference`
 - `is_billable` (typically true for `customer` nodes used in invoicing)
 - `order` (sibling sort order in the tree UI)
-- `organizational_settings` (nullable JSON) — per-organization configuration (e.g. Microsoft Entra integration)
+- `organizational_settings` (nullable JSON) — legacy/non-integration org configuration; **integrations migrate to `organization_integrations`** (see §1.2.1)
 
 Nesting rules:
 
@@ -63,8 +65,37 @@ Relationships:
 - belongs to `Organization` as parent (optional)
 - has many `Organization` as children
 - has many `User`, `Asset`, `ServiceOffering` (service offerings **only** on `customer` nodes)
+- has many `OrganizationIntegration` (planned — [`integrations.md`](integrations.md))
 
 Scoped records (`User`, `Asset`, `WorkItem`, etc.) reference a **single** `organization_id` pointing at the tree node they belong to. Use `organization_id = null` for tenant-wide records (e.g. unassigned CIs).
+
+### 1.2.1 OrganizationIntegration (planned)
+
+Per-customer connection to an external provider (Entra, Google Workspace mail, Action1, future RMM). Replaces integration entries in `organizations.organizational_settings.settings[]`.
+
+**Table:** `organization_integrations`  
+**Model:** `App\Models\OrganizationIntegration`
+
+Key fields:
+
+- `id` (uuid PK)
+- `tenant_id`, `organization_id`
+- `type` (`microsoft_entra`, `google_workspace`, `action1`, …)
+- `enabled`
+- `config` (JSON — scopes, provider org IDs, `action1_group_id`, non-secrets)
+- `credentials` (encrypted JSON — client secrets, API keys, private keys)
+- `api_base_url` (nullable — Action1 region endpoint, e.g. US vs EU)
+- `last_sync_at`, `last_sync_error`, `sync_interval_hours`
+
+Relationships:
+
+- belongs to `Tenant`, `Organization`
+- referenced by `asset_external_identifiers.organization_integration_id`, satellite CMDB tables, and `mail_accounts.integration_id` (same UUID preserved on migration)
+
+Invariants:
+
+- All rows scoped by `tenant_id`; `organization.tenant_id` must match.
+- Secrets only in `credentials`; never in plain `config`.
 
 UI:
 
@@ -330,12 +361,16 @@ Key fields:
 - `organization_id` (nullable — tree scope node; null = tenant-wide)
 - `asset_type_id`
 - `name`
-- `asset_identifier` (e.g. asset tag)
+- `asset_identifier` (internal asset tag; **not** provider GUIDs after multi-source migration — see [`integrations.md`](integrations.md))
 - `serial_number`
+- `primary_hostname` (planned — canonical hostname for search/matching)
+- `operating_system` (planned — normalized OS string)
 - `purchase_date`
 - `warranty_date`
 - `lifecycle_status` (e.g. `in_use`, `in_stock`, `retired`)
 - `owner_user_id` (nullable)
+- `identity_resolution_status` (planned — `resolved`, `ambiguous`, `manual`, `unlinked`)
+- `last_inventory_sync_at` (planned)
 
 Relationships:
 
@@ -345,7 +380,24 @@ Relationships:
 - belongs to many `WorkItem`, `Change`, `Event`
 - belongs to many `ServiceOffering` (technical realization pivot **`service_offering_asset`**)
 - has many `AssetRelationship` as parent/child
+- has many `AssetExternalIdentifier`, `AssetSoftwareInstallation`, `AssetPatchStatus`, `AssetPatchItem` (planned — [`integrations.md`](integrations.md))
 - documents via **`document_links`** (morph)
+
+### 4.2.1 AssetExternalIdentifier (planned)
+
+Maps a canonical `Asset` to provider-specific IDs (Entra `azureADDeviceId`, Action1 endpoint id, etc.). Scoped by `tenant_id`, `organization_id`, and `organization_integration_id` (UUID FK → `organization_integrations.id`).
+
+### 4.2.2 AssetSoftwareInstallation (planned)
+
+Installed software per asset, primarily from RMM providers (Action1). Upserted on sync; stale rows removed after TTL.
+
+### 4.2.3 AssetPatchStatus (planned)
+
+Patch compliance **summary** per asset per provider (`missing_critical_count`, `missing_other_count`, `compliance_status`). Child **`AssetPatchItem`** rows hold normalized KB/CVE detail (v1, not deferred).
+
+### 4.2.4 AssetPatchItem (planned)
+
+Per-KB/CVE missing update row linked to `AssetPatchStatus`. Unique on `(tenant_id, asset_id, provider, organization_integration_id, kb_id)`.
 
 ### 4.3 AssetRelationship
 

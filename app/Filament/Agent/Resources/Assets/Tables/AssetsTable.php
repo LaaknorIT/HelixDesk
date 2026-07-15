@@ -5,6 +5,7 @@ namespace App\Filament\Agent\Resources\Assets\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -28,6 +29,17 @@ class AssetsTable
                     ->label('Lifecycle')
                     ->badge()
                     ->sortable(),
+                TextColumn::make('identity_resolution_status')
+                    ->label('Identity')
+                    ->badge()
+                    ->toggleable(),
+                TextColumn::make('primary_hostname')
+                    ->label('Hostname')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('operating_system')
+                    ->label('OS')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('organization.name')
                     ->label('Organization')
                     ->placeholder('—'),
@@ -41,6 +53,7 @@ class AssetsTable
                 //
             ])
             ->recordActions([
+                ViewAction::make(),
                 EditAction::make(),
             ])
             ->toolbarActions([

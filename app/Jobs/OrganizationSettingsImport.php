@@ -2,13 +2,14 @@
 
 namespace App\Jobs;
 
+use App\Support\IntegrationType;
 use App\Support\OrganizationIntegrationSettings;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Dispatched on a schedule when at least one Microsoft Entra integration is due for import.
+ * Dispatched on a schedule when at least one asset-sync integration is due for import.
  * Queues a targeted sync for one organization/integration pair.
  */
 class OrganizationSettingsImport implements ShouldQueue
@@ -19,18 +20,27 @@ class OrganizationSettingsImport implements ShouldQueue
 
     public function handle(): void
     {
-        $target = OrganizationIntegrationSettings::firstMicrosoftEntraIntegrationDueForImport();
-        if ($target === null) {
-            Log::debug('Microsoft Entra import scheduler: no integration due for import.');
+        $due = OrganizationIntegrationSettings::firstAssetSyncIntegrationDueForImport();
+        if ($due === null) {
+            Log::debug('Integration import scheduler: no asset-sync integration due for import.');
 
             return;
         }
 
-        Log::info('Microsoft Entra import scheduler: queuing sync job.', [
+        $target = $due['target'];
+
+        Log::info('Integration import scheduler: queuing sync job.', [
+            'integration_type' => $due['type'],
             'organization_id' => $target->organizationId,
             'integration_id' => $target->integrationId,
             'tenant_id' => $target->tenantId,
         ]);
+
+        if ($due['type'] === IntegrationType::ACTION1) {
+            SyncNextAction1IntegrationJob::dispatch($target->organizationId, $target->integrationId);
+
+            return;
+        }
 
         SyncNextMicrosoftEntraIntegrationJob::dispatch($target->organizationId, $target->integrationId);
     }

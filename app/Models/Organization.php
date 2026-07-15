@@ -86,4 +86,9 @@ class Organization extends TenantModel
     {
         return $this->type->acceptsServiceOfferings();
     }
+
+    public function organizationIntegrations(): HasMany
+    {
+        return $this->hasMany(OrganizationIntegration::class);
+    }
 }

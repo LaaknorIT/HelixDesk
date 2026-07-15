@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AssetIdentityResolutionStatus;
 use App\Models\Pivots\ServiceOfferingAsset;
 use Database\Factories\AssetFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -25,9 +26,13 @@ class Asset extends TenantModel
         'name',
         'asset_identifier',
         'serial_number',
+        'primary_hostname',
+        'operating_system',
         'purchase_date',
         'warranty_date',
         'lifecycle_status',
+        'identity_resolution_status',
+        'last_inventory_sync_at',
         'owner_user_id',
     ];
 
@@ -36,6 +41,8 @@ class Asset extends TenantModel
         return [
             'purchase_date' => 'date',
             'warranty_date' => 'date',
+            'identity_resolution_status' => AssetIdentityResolutionStatus::class,
+            'last_inventory_sync_at' => 'datetime',
         ];
     }
 
@@ -86,6 +93,42 @@ class Asset extends TenantModel
     {
         return $this->morphToMany(Document::class, 'linkable', 'document_links')
             ->using(DocumentLink::class)
+            ->withTimestamps();
+    }
+
+    public function externalIdentifiers(): HasMany
+    {
+        return $this->hasMany(AssetExternalIdentifier::class);
+    }
+
+    public function softwareInstallations(): HasMany
+    {
+        return $this->hasMany(AssetSoftwareInstallation::class);
+    }
+
+    public function patchStatuses(): HasMany
+    {
+        return $this->hasMany(AssetPatchStatus::class);
+    }
+
+    public function patchItems(): HasMany
+    {
+        return $this->hasMany(AssetPatchItem::class);
+    }
+
+    public function attributeProvenance(): HasMany
+    {
+        return $this->hasMany(AssetAttributeProvenance::class);
+    }
+
+    public function identityAmbiguities(): HasMany
+    {
+        return $this->hasMany(AssetIdentityAmbiguity::class, 'resolved_asset_id');
+    }
+
+    public function monitoringEvents(): BelongsToMany
+    {
+        return $this->belongsToMany(MonitoringEvent::class, 'monitoring_event_asset')
             ->withTimestamps();
     }
 }

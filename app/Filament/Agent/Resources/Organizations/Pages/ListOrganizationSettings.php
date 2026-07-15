@@ -4,8 +4,11 @@ namespace App\Filament\Agent\Resources\Organizations\Pages;
 
 use App\Filament\Agent\Resources\Organizations\OrganizationResource;
 use App\Support\OrganizationIntegrationSettings;
+use App\Support\OrganizationIntegrationSyncQueue;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -73,14 +76,61 @@ class ListOrganizationSettings extends Page implements HasTable
                     ->wrap(),
             ])
             ->headerActions([
-                Action::make('new')
-                    ->label(__('New'))
-                    ->icon(Heroicon::OutlinedPlus)
-                    ->url(static::getResource()::getUrl('settings.integrations.create', [
-                        'record' => $this->getRecord(),
-                    ])),
+                $this->makeNewIntegrationActionGroup(),
             ])
             ->recordActions([
+                Action::make('run')
+                    ->label(__('Run'))
+                    ->icon(Heroicon::OutlinedPlay)
+                    ->visible(fn (array $record): bool => in_array(
+                        (string) ($record['type'] ?? ''),
+                        OrganizationIntegrationSettings::assetSyncTypes(),
+                        true,
+                    ))
+                    ->action(function (array $record): void {
+                        $integrationId = (string) ($record['id'] ?? '');
+                        if ($integrationId === '') {
+                            return;
+                        }
+
+                        $entry = OrganizationIntegrationSettings::findEntryForOrganization(
+                            $this->getRecord(),
+                            $integrationId,
+                        );
+
+                        if ($entry === null) {
+                            Notification::make()
+                                ->title(__('Integration not found'))
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        $config = is_array($entry['config'] ?? null) ? $entry['config'] : [];
+                        $result = OrganizationIntegrationSyncQueue::dispatch(
+                            $this->getRecord(),
+                            $integrationId,
+                            (string) ($entry['type'] ?? ''),
+                            $config,
+                        );
+
+                        if ($result['queued']) {
+                            Notification::make()
+                                ->title(__('Sync queued'))
+                                ->body(__('The integration sync has been queued and will run shortly.'))
+                                ->success()
+                                ->send();
+
+                            return;
+                        }
+
+                        Notification::make()
+                            ->title(__('Sync not started'))
+                            ->body(OrganizationIntegrationSyncQueue::skipReasonMessage((string) $result['skip_reason']))
+                            ->warning()
+                            ->send();
+                    }),
                 Action::make('edit')
                     ->label(__('Edit'))
                     ->icon(Heroicon::OutlinedPencilSquare)
@@ -92,7 +142,28 @@ class ListOrganizationSettings extends Page implements HasTable
             ->emptyStateHeading(__('No integrations configured'))
             ->emptyStateDescription(__('Create an integration to connect external services to this organization.'))
             ->emptyStateIcon(Heroicon::OutlinedCog6Tooth)
+            ->emptyStateActions([
+                $this->makeNewIntegrationActionGroup(),
+            ])
             ->paginated(false);
+    }
+
+    private function makeNewIntegrationActionGroup(): ActionGroup
+    {
+        $actions = [];
+
+        foreach (OrganizationIntegrationSettings::creatableTypeLabels() as $type => $label) {
+            $actions[] = Action::make('new_'.$type)
+                ->label($label)
+                ->url(static::getResource()::getUrl('settings.integrations.create', [
+                    'record' => $this->getRecord(),
+                    'type' => $type,
+                ]));
+        }
+
+        return ActionGroup::make($actions)
+            ->label(__('New'))
+            ->icon(Heroicon::OutlinedPlus);
     }
 
     /**
@@ -101,7 +172,7 @@ class ListOrganizationSettings extends Page implements HasTable
     private function integrationTableRecords(): array
     {
         $rows = [];
-        foreach (OrganizationIntegrationSettings::listEntries($this->getRecord()->organizational_settings) as $entry) {
+        foreach (OrganizationIntegrationSettings::listEntriesForOrganization($this->getRecord()) as $entry) {
             $id = $entry['id'];
             $config = $entry['config'];
             $rows[] = [
@@ -150,6 +221,21 @@ class ListOrganizationSettings extends Page implements HasTable
             }
 
             return $parts === [] ? __('Credentials not set') : implode(' · ', $parts);
+        }
+
+        if ($type === OrganizationIntegrationSettings::TYPE_ACTION1) {
+            $orgId = trim((string) ($config['action1_organization_id'] ?? ''));
+            $groupId = trim((string) ($config['action1_group_id'] ?? ''));
+
+            $parts = [];
+            if ($orgId !== '') {
+                $parts[] = __('Org: :id', ['id' => Str::limit($orgId, 36)]);
+            }
+            if ($groupId !== '') {
+                $parts[] = __('Group: :id', ['id' => Str::limit($groupId, 36)]);
+            }
+
+            return $parts === [] ? __('Organization not set') : implode(' · ', $parts);
         }
 
         return '';

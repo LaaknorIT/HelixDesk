@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Organization;
 use App\Models\Tenant;
+use App\Repositories\OrganizationIntegrationRepository;
 use App\Support\MicrosoftEntraIntegrationCatalog;
 use App\Support\OrganizationIntegrationSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,31 +15,26 @@ class OrganizationEntraSettingsTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_organization_persists_microsoft_entra_integration_payload(): void
+    public function test_repository_persists_microsoft_entra_integration(): void
     {
         $tenant = Tenant::factory()->create();
         $organization = Organization::factory()->create(['tenant_id' => $tenant->id]);
 
-        $organization->organizational_settings = [
-            'integrations' => [
-                'microsoft_entra' => [
-                    'enabled' => true,
-                    'azure_tenant_id' => 'tenant-uuid',
-                    'application_client_id' => 'client-uuid',
-                    'scopes' => [
-                        'users' => true,
-                        'departments' => false,
-                        'computers' => true,
-                        'security_work_items' => false,
-                    ],
-                ],
-            ],
-        ];
-        $organization->save();
+        $integration = app(OrganizationIntegrationRepository::class)->createMicrosoftEntraFromForm($organization, [
+            'entra_enabled' => true,
+            'entra_azure_tenant_id' => 'tenant-uuid',
+            'entra_application_client_id' => 'client-uuid',
+            'entra_client_secret' => 'secret',
+            'entra_scope_users' => true,
+            'entra_scope_departments' => false,
+            'entra_scope_computers' => true,
+            'entra_scope_security_work_items' => false,
+        ]);
 
-        $organization->refresh();
+        $this->assertTrue($integration->enabled);
+        $this->assertSame('tenant-uuid', $integration->config['azure_tenant_id'] ?? null);
+        $this->assertSame('secret', $integration->credentials['client_secret'] ?? null);
 
-        $this->assertTrue((bool) data_get($organization->organizational_settings, 'integrations.microsoft_entra.enabled'));
         $this->assertEqualsCanonicalizing(
             ['DeviceManagementManagedDevices.Read.All', 'User.Read.All'],
             MicrosoftEntraIntegrationCatalog::collectApplicationPermissions([
@@ -48,104 +44,6 @@ class OrganizationEntraSettingsTest extends TestCase
                 'security_work_items' => false,
             ])
         );
-    }
-
-    public function test_legacy_microsoft_entra_surfaces_as_virtual_list_entry(): void
-    {
-        $raw = [
-            'integrations' => [
-                'microsoft_entra' => [
-                    'enabled' => true,
-                    'azure_tenant_id' => 'tenant-a',
-                    'application_client_id' => 'client-a',
-                    'scopes' => [
-                        'users' => true,
-                        'departments' => false,
-                        'computers' => false,
-                        'security_work_items' => false,
-                    ],
-                ],
-            ],
-        ];
-
-        $entries = OrganizationIntegrationSettings::listEntries($raw);
-        $this->assertCount(1, $entries);
-        $this->assertSame(OrganizationIntegrationSettings::LEGACY_MICROSOFT_ENTRA_ROW_ID, $entries[0]['id']);
-        $this->assertSame(OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA, $entries[0]['type']);
-        $this->assertTrue($entries[0]['config']['enabled']);
-        $this->assertSame('tenant-a', $entries[0]['config']['azure_tenant_id']);
-    }
-
-    public function test_append_microsoft_entra_migrates_legacy_before_adding_new_row(): void
-    {
-        $legacyOnly = [
-            'integrations' => [
-                'microsoft_entra' => [
-                    'enabled' => true,
-                    'azure_tenant_id' => 'legacy-tenant',
-                    'application_client_id' => 'legacy-client',
-                    'scopes' => [
-                        'users' => true,
-                        'departments' => false,
-                        'computers' => false,
-                        'security_work_items' => false,
-                    ],
-                ],
-            ],
-        ];
-
-        $merged = OrganizationIntegrationSettings::appendMicrosoftEntraIntegration($legacyOnly, [
-            'entra_enabled' => false,
-            'entra_azure_tenant_id' => 'new-tenant',
-            'entra_application_client_id' => 'new-client',
-            'entra_scope_users' => false,
-            'entra_scope_departments' => false,
-            'entra_scope_computers' => false,
-            'entra_scope_security_work_items' => false,
-        ]);
-
-        $this->assertNull(data_get($merged, 'integrations.microsoft_entra'));
-        $this->assertCount(2, $merged['settings']);
-        $this->assertSame('legacy-tenant', $merged['settings'][0]['config']['azure_tenant_id']);
-        $this->assertSame('new-tenant', $merged['settings'][1]['config']['azure_tenant_id']);
-    }
-
-    public function test_replace_legacy_row_writes_settings_and_strips_integrations_key(): void
-    {
-        $legacyOnly = [
-            'integrations' => [
-                'microsoft_entra' => [
-                    'enabled' => false,
-                    'azure_tenant_id' => 'old',
-                    'application_client_id' => '',
-                    'scopes' => [
-                        'users' => false,
-                        'departments' => false,
-                        'computers' => false,
-                        'security_work_items' => false,
-                    ],
-                ],
-            ],
-        ];
-
-        $merged = OrganizationIntegrationSettings::replaceMicrosoftEntraIntegration(
-            $legacyOnly,
-            OrganizationIntegrationSettings::LEGACY_MICROSOFT_ENTRA_ROW_ID,
-            [
-                'entra_enabled' => true,
-                'entra_azure_tenant_id' => 'updated-tenant',
-                'entra_application_client_id' => 'updated-client',
-                'entra_scope_users' => true,
-                'entra_scope_departments' => false,
-                'entra_scope_computers' => false,
-                'entra_scope_security_work_items' => false,
-            ],
-        );
-
-        $this->assertNull(data_get($merged, 'integrations.microsoft_entra'));
-        $this->assertCount(1, $merged['settings']);
-        $this->assertTrue($merged['settings'][0]['config']['enabled']);
-        $this->assertSame('updated-tenant', $merged['settings'][0]['config']['azure_tenant_id']);
     }
 
     public function test_entra_config_sync_skip_reason_when_no_scopes_enabled(): void
@@ -183,30 +81,25 @@ class OrganizationEntraSettingsTest extends TestCase
         ]);
     }
 
-    public function test_replace_preserves_client_secret_when_secret_field_not_resubmitted(): void
+    public function test_update_preserves_client_secret_when_secret_field_not_resubmitted(): void
     {
-        $out = [
-            'settings' => [[
-                'id' => 'int-secret-test',
-                'type' => OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA,
-                'config' => [
-                    'enabled' => true,
-                    'azure_tenant_id' => 'tenant-x',
-                    'application_client_id' => 'client-x',
-                    'client_secret' => 'stored-secret-value',
-                    'scopes' => [
-                        'users' => true,
-                        'departments' => false,
-                        'computers' => false,
-                        'security_work_items' => false,
-                    ],
-                ],
-            ]],
-        ];
+        $tenant = Tenant::factory()->create();
+        $organization = Organization::factory()->create(['tenant_id' => $tenant->id]);
 
-        $merged = OrganizationIntegrationSettings::replaceMicrosoftEntraIntegration(
-            $out,
-            'int-secret-test',
+        $integration = app(OrganizationIntegrationRepository::class)->createMicrosoftEntraFromForm($organization, [
+            'entra_enabled' => true,
+            'entra_azure_tenant_id' => 'tenant-x',
+            'entra_application_client_id' => 'client-x',
+            'entra_client_secret' => 'stored-secret-value',
+            'entra_scope_users' => true,
+            'entra_scope_departments' => false,
+            'entra_scope_computers' => false,
+            'entra_scope_security_work_items' => false,
+        ]);
+
+        app(OrganizationIntegrationRepository::class)->updateMicrosoftEntraFromForm(
+            $organization,
+            (string) $integration->getKey(),
             [
                 'entra_enabled' => true,
                 'entra_azure_tenant_id' => 'tenant-x',
@@ -219,6 +112,7 @@ class OrganizationEntraSettingsTest extends TestCase
             ],
         );
 
-        $this->assertSame('stored-secret-value', $merged['settings'][0]['config']['client_secret']);
+        $integration->refresh();
+        $this->assertSame('stored-secret-value', $integration->credentials['client_secret'] ?? null);
     }
 }

@@ -22,6 +22,7 @@ class MonitoringEvent extends TenantModel
         'first_seen_at',
         'last_seen_at',
         'resolved_at',
+        'configuration_json',
     ];
 
     protected function casts(): array
@@ -30,6 +31,7 @@ class MonitoringEvent extends TenantModel
             'first_seen_at' => 'datetime',
             'last_seen_at' => 'datetime',
             'resolved_at' => 'datetime',
+            'configuration_json' => 'array',
         ];
     }
 
@@ -46,5 +48,11 @@ class MonitoringEvent extends TenantModel
     public function workItems(): BelongsToMany
     {
         return $this->belongsToMany(WorkItem::class, 'monitoring_event_work_item');
+    }
+
+    public function assets(): BelongsToMany
+    {
+        return $this->belongsToMany(Asset::class, 'monitoring_event_asset')
+            ->withTimestamps();
     }
 }

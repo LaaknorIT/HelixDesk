@@ -17,10 +17,17 @@ class SyncNextMicrosoftEntraIntegrationJob implements ShouldQueue
 
     public int $tries = 1;
 
+    public int $timeout;
+
     public function __construct(
         public int $organizationId,
         public string $integrationId,
-    ) {}
+    ) {
+        $this->timeout = max(
+            60,
+            (int) config('helixdesk_integrations.entra.sync_job_timeout_seconds', 600),
+        );
+    }
 
     public function handle(MicrosoftEntraOrganizationSyncService $syncService): void
     {
@@ -43,8 +50,8 @@ class SyncNextMicrosoftEntraIntegrationJob implements ShouldQueue
             return;
         }
 
-        $entry = OrganizationIntegrationSettings::findEntry(
-            is_array($organization->organizational_settings) ? $organization->organizational_settings : [],
+        $entry = OrganizationIntegrationSettings::findEntryForOrganization(
+            $organization,
             $this->integrationId,
         );
 
@@ -97,7 +104,9 @@ class SyncNextMicrosoftEntraIntegrationJob implements ShouldQueue
                 'tenant_id' => $target->tenantId,
                 'organization_id' => $target->organizationId,
                 'integration_id' => $target->integrationId,
+                'exception_class' => $e::class,
                 'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             $syncService->recordFailure($target, $e);
         }

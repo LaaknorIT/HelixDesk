@@ -5,10 +5,17 @@ namespace App\Filament\Agent\Resources\Assets;
 use App\Filament\Agent\Resources\Assets\Pages\CreateAsset;
 use App\Filament\Agent\Resources\Assets\Pages\EditAsset;
 use App\Filament\Agent\Resources\Assets\Pages\ListAssets;
+use App\Filament\Agent\Resources\Assets\Pages\ViewAsset;
+use App\Filament\Agent\Resources\Assets\RelationManagers\AttributeProvenanceRelationManager;
 use App\Filament\Agent\Resources\Assets\RelationManagers\ChildAssetRelationshipsRelationManager;
+use App\Filament\Agent\Resources\Assets\RelationManagers\ExternalIdentifiersRelationManager;
 use App\Filament\Agent\Resources\Assets\RelationManagers\ParentAssetRelationshipsRelationManager;
+use App\Filament\Agent\Resources\Assets\RelationManagers\PatchItemsRelationManager;
+use App\Filament\Agent\Resources\Assets\RelationManagers\PatchStatusesRelationManager;
 use App\Filament\Agent\Resources\Assets\RelationManagers\ServiceOfferingsRelationManager;
+use App\Filament\Agent\Resources\Assets\RelationManagers\SoftwareInstallationsRelationManager;
 use App\Filament\Agent\Resources\Assets\Schemas\AssetForm;
+use App\Filament\Agent\Resources\Assets\Schemas\AssetInfolist;
 use App\Filament\Agent\Resources\Assets\Tables\AssetsTable;
 use App\Models\Asset;
 use BackedEnum;
@@ -75,9 +82,19 @@ class AssetResource extends Resource
         return AssetsTable::configure($table);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return AssetInfolist::configure($schema);
+    }
+
     public static function getRelations(): array
     {
         return [
+            ExternalIdentifiersRelationManager::class,
+            SoftwareInstallationsRelationManager::class,
+            PatchStatusesRelationManager::class,
+            PatchItemsRelationManager::class,
+            AttributeProvenanceRelationManager::class,
             ServiceOfferingsRelationManager::class,
             ChildAssetRelationshipsRelationManager::class,
             ParentAssetRelationshipsRelationManager::class,
@@ -89,6 +106,7 @@ class AssetResource extends Resource
         return [
             'index' => ListAssets::route('/'),
             'create' => CreateAsset::route('/create'),
+            'view' => ViewAsset::route('/{record}'),
             'edit' => EditAsset::route('/{record}/edit'),
         ];
     }

@@ -2,27 +2,37 @@
 
 namespace App\Support;
 
+use App\Enums\Action1ApiRegion;
 use App\Models\Organization;
+use App\Models\OrganizationIntegration;
+use App\Repositories\OrganizationIntegrationRepository;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class OrganizationIntegrationSettings
 {
-    public const TYPE_MICROSOFT_ENTRA = 'microsoft_entra';
+    public const TYPE_MICROSOFT_ENTRA = IntegrationType::MICROSOFT_ENTRA;
 
-    public const TYPE_GOOGLE_WORKSPACE = 'google_workspace';
+    public const TYPE_GOOGLE_WORKSPACE = IntegrationType::GOOGLE_WORKSPACE;
 
-    public const LEGACY_MICROSOFT_ENTRA_ROW_ID = '__legacy_microsoft_entra__';
+    public const TYPE_ACTION1 = IntegrationType::ACTION1;
 
     /**
      * @return list<string>
      */
     public static function registeredTypes(): array
     {
+        return IntegrationType::registered();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function assetSyncTypes(): array
+    {
         return [
             self::TYPE_MICROSOFT_ENTRA,
-            self::TYPE_GOOGLE_WORKSPACE,
+            self::TYPE_ACTION1,
         ];
     }
 
@@ -31,68 +41,39 @@ final class OrganizationIntegrationSettings
      */
     public static function mailTransportTypes(): array
     {
-        return [
-            self::TYPE_MICROSOFT_ENTRA,
-            self::TYPE_GOOGLE_WORKSPACE,
-        ];
+        return IntegrationType::mailTransportTypes();
     }
 
     /**
      * @return list<array{id: string, type: string, config: array<string, mixed>}>
      */
-    public static function listEntries(?array $organizationalSettings): array
+    public static function listEntriesForOrganization(Organization $organization): array
     {
-        $raw = is_array($organizationalSettings) ? $organizationalSettings : [];
-
-        $fromPersisted = self::persistedSettingsItems($raw);
-
-        $hasMicrosoftEntraInPersisted = false;
-        foreach ($fromPersisted as $item) {
-            if (($item['type'] ?? '') === self::TYPE_MICROSOFT_ENTRA) {
-                $hasMicrosoftEntraInPersisted = true;
-
-                break;
-            }
-        }
-
-        $entries = $fromPersisted;
-
-        if (! $hasMicrosoftEntraInPersisted) {
-            $legacy = data_get($raw, 'integrations.microsoft_entra');
-            if (self::legacyMicrosoftEntraIsMeaningful(is_array($legacy) ? $legacy : [])) {
-                $entries[] = [
-                    'id' => self::LEGACY_MICROSOFT_ENTRA_ROW_ID,
-                    'type' => self::TYPE_MICROSOFT_ENTRA,
-                    'config' => self::normalizeLegacyEntraConfig($legacy),
-                ];
-            }
-        }
-
-        return $entries;
+        return app(OrganizationIntegrationRepository::class)->listEntries($organization);
     }
 
-    /**
-     * @param  array<string, mixed>  $organizationalSettings
-     * @return array{id: string, type: string, config: array<string, mixed>}|null
-     */
-    public static function findEntry(array $organizationalSettings, string $integrationId): ?array
+    public static function findEntryForOrganization(Organization $organization, string $integrationId): ?array
     {
-        foreach (self::listEntries($organizationalSettings) as $entry) {
-            if (($entry['id'] ?? '') === $integrationId) {
-                return $entry;
-            }
-        }
-
-        return null;
+        return app(OrganizationIntegrationRepository::class)->findEntry($organization, $integrationId);
     }
 
     public static function typeLabel(string $type): string
     {
-        return match ($type) {
-            self::TYPE_MICROSOFT_ENTRA => __('Microsoft Entra ID'),
-            self::TYPE_GOOGLE_WORKSPACE => __('Google Workspace'),
-            default => $type,
-        };
+        return IntegrationType::label($type);
+    }
+
+    /**
+     * @return array<string, string> integration type => label
+     */
+    public static function creatableTypeLabels(): array
+    {
+        $labels = [];
+
+        foreach (self::registeredTypes() as $type) {
+            $labels[$type] = self::typeLabel($type);
+        }
+
+        return $labels;
     }
 
     /**
@@ -101,40 +82,106 @@ final class OrganizationIntegrationSettings
     public static function collectEntraSyncTargets(): array
     {
         $targets = [];
-        foreach (Organization::query()->withoutGlobalScopes()->cursor() as $organization) {
-            foreach (self::listEntries($organization->organizational_settings) as $entry) {
-                if (($entry['type'] ?? '') !== self::TYPE_MICROSOFT_ENTRA) {
-                    continue;
-                }
-                $config = is_array($entry['config'] ?? null) ? $entry['config'] : [];
-                if (! self::entraConfigReadyForSync($config)) {
-                    continue;
-                }
-                $tenantId = $organization->tenant_id;
-                if ($tenantId === null) {
-                    continue;
-                }
-                $targets[] = new EntraSyncTarget(
-                    tenantId: (int) $tenantId,
-                    organizationId: (int) $organization->getKey(),
-                    integrationId: (string) $entry['id'],
-                    config: $config,
-                );
+
+        foreach (OrganizationIntegration::query()->withoutGlobalScopes()
+            ->where('type', self::TYPE_MICROSOFT_ENTRA)
+            ->orderBy('tenant_id')
+            ->orderBy('organization_id')
+            ->orderBy('id')
+            ->cursor() as $integration) {
+            $target = self::entraSyncTargetFromIntegration($integration);
+            if ($target !== null) {
+                $targets[] = $target;
             }
         }
 
-        usort(
-            $targets,
-            fn (EntraSyncTarget $a, EntraSyncTarget $b): int => [$a->tenantId, $a->organizationId, $a->integrationId] <=> [$b->tenantId, $b->organizationId, $b->integrationId]
-        );
+        return $targets;
+    }
+
+    /**
+     * @return list<Action1SyncTarget>
+     */
+    public static function collectAction1SyncTargets(): array
+    {
+        $targets = [];
+
+        foreach (OrganizationIntegration::query()->withoutGlobalScopes()
+            ->where('type', self::TYPE_ACTION1)
+            ->orderBy('tenant_id')
+            ->orderBy('organization_id')
+            ->orderBy('id')
+            ->cursor() as $integration) {
+            $target = self::action1SyncTargetFromIntegration($integration);
+            if ($target !== null) {
+                $targets[] = $target;
+            }
+        }
 
         return $targets;
+    }
+
+    public static function hasAnyAssetSyncIntegrationDueForImport(): bool
+    {
+        return self::firstAssetSyncIntegrationDueForImport() !== null;
+    }
+
+    /**
+     * @return array{type: string, target: EntraSyncTarget|Action1SyncTarget}|null
+     */
+    public static function firstAssetSyncIntegrationDueForImport(): ?array
+    {
+        $candidates = [];
+
+        foreach (self::collectEntraSyncTargets() as $target) {
+            if (self::microsoftEntraImportIsDue($target->config, $target->integrationId)) {
+                $candidates[] = [
+                    'type' => self::TYPE_MICROSOFT_ENTRA,
+                    'target' => $target,
+                    'due_at' => self::resolveLastSyncTimestamp($target->config, self::TYPE_MICROSOFT_ENTRA),
+                ];
+            }
+        }
+
+        foreach (self::collectAction1SyncTargets() as $target) {
+            if (self::action1ImportIsDue($target->config, $target->integrationId)) {
+                $candidates[] = [
+                    'type' => self::TYPE_ACTION1,
+                    'target' => $target,
+                    'due_at' => self::resolveLastSyncTimestamp($target->config, self::TYPE_ACTION1),
+                ];
+            }
+        }
+
+        if ($candidates === []) {
+            return null;
+        }
+
+        usort($candidates, function (array $a, array $b): int {
+            $aDue = $a['due_at'];
+            $bDue = $b['due_at'];
+            if ($aDue === null && $bDue === null) {
+                return 0;
+            }
+            if ($aDue === null) {
+                return -1;
+            }
+            if ($bDue === null) {
+                return 1;
+            }
+
+            return $aDue <=> $bDue;
+        });
+
+        return [
+            'type' => $candidates[0]['type'],
+            'target' => $candidates[0]['target'],
+        ];
     }
 
     public static function hasMicrosoftEntraIntegrationDueForImport(): bool
     {
         foreach (self::collectEntraSyncTargets() as $target) {
-            if (self::microsoftEntraImportIsDue($target->config)) {
+            if (self::microsoftEntraImportIsDue($target->config, $target->integrationId)) {
                 return true;
             }
         }
@@ -145,7 +192,29 @@ final class OrganizationIntegrationSettings
     public static function firstMicrosoftEntraIntegrationDueForImport(): ?EntraSyncTarget
     {
         foreach (self::collectEntraSyncTargets() as $target) {
-            if (self::microsoftEntraImportIsDue($target->config)) {
+            if (self::microsoftEntraImportIsDue($target->config, $target->integrationId)) {
+                return $target;
+            }
+        }
+
+        return null;
+    }
+
+    public static function hasAction1IntegrationDueForImport(): bool
+    {
+        foreach (self::collectAction1SyncTargets() as $target) {
+            if (self::action1ImportIsDue($target->config, $target->integrationId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function firstAction1IntegrationDueForImport(): ?Action1SyncTarget
+    {
+        foreach (self::collectAction1SyncTargets() as $target) {
+            if (self::action1ImportIsDue($target->config, $target->integrationId)) {
                 return $target;
             }
         }
@@ -156,55 +225,53 @@ final class OrganizationIntegrationSettings
     /**
      * @param  array<string, mixed>  $config
      */
-    public static function microsoftEntraImportIsDue(array $config): bool
+    public static function microsoftEntraImportIsDue(array $config, ?string $integrationId = null): bool
     {
         if (! self::entraConfigReadyForSync($config)) {
             return false;
         }
 
-        $hours = max(1, (int) config('helixdesk.entra.import_interval_hours', 24));
-        $raw = $config['last_entra_sync_at'] ?? null;
-        if (! is_string($raw) || trim($raw) === '') {
-            return true;
-        }
+        $hours = self::resolveImportIntervalHours(self::TYPE_MICROSOFT_ENTRA, $config, $integrationId);
 
-        try {
-            return Carbon::parse($raw)->addHours($hours)->isPast();
-        } catch (\Throwable) {
-            return true;
-        }
+        return self::lastSyncIsStale($config, self::TYPE_MICROSOFT_ENTRA, $hours);
     }
 
     /**
-     * @param  array<string, mixed>  $configPatch  Merged into the integration config (e.g. last sync timestamps).
+     * @param  array<string, mixed>  $config
+     */
+    public static function action1ImportIsDue(array $config, ?string $integrationId = null): bool
+    {
+        if (! self::action1ConfigReadyForSync($config)) {
+            return false;
+        }
+
+        $hours = self::resolveImportIntervalHours(self::TYPE_ACTION1, $config, $integrationId);
+
+        return self::lastSyncIsStale($config, self::TYPE_ACTION1, $hours);
+    }
+
+    /**
+     * @param  array<string, mixed>  $configPatch
      */
     public static function patchMicrosoftEntraIntegrationConfig(Organization $organization, string $integrationId, array $configPatch): void
     {
-        $raw = is_array($organization->organizational_settings) ? $organization->organizational_settings : [];
+        app(OrganizationIntegrationRepository::class)->patchIntegration(
+            $organization,
+            $integrationId,
+            $configPatch,
+        );
+    }
 
-        if ($integrationId === self::LEGACY_MICROSOFT_ENTRA_ROW_ID) {
-            $entra = data_get($raw, 'integrations.microsoft_entra');
-            $raw['integrations']['microsoft_entra'] = array_merge(is_array($entra) ? $entra : [], $configPatch);
-        } else {
-            $items = $raw['settings'] ?? [];
-            if (! is_array($items)) {
-                $items = [];
-            }
-            foreach ($items as $k => $item) {
-                if (! is_array($item)) {
-                    continue;
-                }
-                if (($item['id'] ?? '') === $integrationId) {
-                    $cfg = $item['config'] ?? [];
-                    $items[$k]['config'] = array_merge(is_array($cfg) ? $cfg : [], $configPatch);
-                    break;
-                }
-            }
-            $raw['settings'] = $items;
-        }
-
-        $organization->organizational_settings = $raw;
-        $organization->save();
+    /**
+     * @param  array<string, mixed>  $configPatch
+     */
+    public static function patchAction1IntegrationConfig(Organization $organization, string $integrationId, array $configPatch): void
+    {
+        app(OrganizationIntegrationRepository::class)->patchIntegration(
+            $organization,
+            $integrationId,
+            $configPatch,
+        );
     }
 
     /**
@@ -252,6 +319,52 @@ final class OrganizationIntegrationSettings
     }
 
     /**
+     * @param  array<string, mixed>  $config
+     */
+    public static function action1ConfigReadyForSync(array $config): bool
+    {
+        return self::action1ConfigSyncSkipReason($config) === null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    public static function action1ConfigSyncSkipReason(array $config): ?string
+    {
+        if (! ($config['enabled'] ?? false)) {
+            return 'integration_disabled';
+        }
+
+        $organizationId = trim((string) ($config['action1_organization_id'] ?? ''));
+        if ($organizationId === '') {
+            return 'missing_action1_organization_id';
+        }
+
+        $clientId = trim((string) ($config['client_id'] ?? ''));
+        $clientSecret = trim((string) ($config['client_secret'] ?? ''));
+        $apiKey = trim((string) ($config['api_key'] ?? ''));
+        if ($clientId === '') {
+            return 'missing_client_id';
+        }
+        if ($clientSecret === '' && $apiKey === '') {
+            return 'missing_client_secret_or_api_key';
+        }
+
+        $scopes = $config['scopes'] ?? [];
+        if (! is_array($scopes)) {
+            return 'invalid_scopes';
+        }
+
+        foreach ($scopes as $on) {
+            if ($on) {
+                return null;
+            }
+        }
+
+        return 'no_sync_scopes_enabled';
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     public static function entraFormHasSyncScope(array $data): bool
@@ -260,6 +373,17 @@ final class OrganizationIntegrationSettings
             || ($data['entra_scope_departments'] ?? false)
             || ($data['entra_scope_computers'] ?? false)
             || ($data['entra_scope_security_work_items'] ?? false);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function action1FormHasSyncScope(array $data): bool
+    {
+        return ($data['action1_scope_endpoints'] ?? false)
+            || ($data['action1_scope_software'] ?? false)
+            || ($data['action1_scope_patches'] ?? false)
+            || ($data['action1_scope_alerts'] ?? false);
     }
 
     /**
@@ -281,6 +405,24 @@ final class OrganizationIntegrationSettings
     }
 
     /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function validateAction1FormDataForSave(array $data): void
+    {
+        if (! ($data['action1_enabled'] ?? false)) {
+            return;
+        }
+
+        if (self::action1FormHasSyncScope($data)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'action1_scope_endpoints' => __('Select at least one capability to sync when the integration is enabled.'),
+        ]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public static function blankEntraFormFields(): array
@@ -295,6 +437,29 @@ final class OrganizationIntegrationSettings
                 'departments' => false,
                 'computers' => false,
                 'security_work_items' => false,
+            ],
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function blankAction1FormFields(): array
+    {
+        return self::action1ConfigToFormFields([
+            'enabled' => false,
+            'client_id' => '',
+            'client_secret' => '',
+            'api_key' => '',
+            'action1_organization_id' => '',
+            'action1_organization_name' => '',
+            'action1_group_id' => '',
+            'api_base_url' => config('helixdesk_integrations.action1.default_api_base_url'),
+            'scopes' => [
+                'endpoints' => true,
+                'software' => true,
+                'patches' => true,
+                'alerts' => false,
             ],
         ]);
     }
@@ -320,11 +485,44 @@ final class OrganizationIntegrationSettings
     }
 
     /**
-     * @param  array<string, mixed>  $data  Form state including entra_* keys
+     * @param  array<string, mixed>  $config
      * @return array<string, mixed>
      */
+    public static function action1ConfigToFormFields(array $config): array
+    {
+        $scopes = is_array($config['scopes'] ?? null) ? $config['scopes'] : [];
+        $apiBaseUrl = trim((string) ($config['api_base_url'] ?? ''));
+        $region = Action1ApiRegion::Us->value;
+
+        foreach (Action1ApiRegion::cases() as $case) {
+            if ($case->apiBaseUrl() === $apiBaseUrl) {
+                $region = $case->value;
+
+                break;
+            }
+        }
+
+        return [
+            'action1_enabled' => (bool) ($config['enabled'] ?? false),
+            'action1_region' => $region,
+            'action1_api_base_url' => $apiBaseUrl !== '' ? $apiBaseUrl : config('helixdesk_integrations.action1.default_api_base_url'),
+            'action1_client_id' => (string) ($config['client_id'] ?? ''),
+            'action1_client_secret' => '',
+            'action1_api_key' => '',
+            'action1_organization_id' => (string) ($config['action1_organization_id'] ?? ''),
+            'action1_organization_name' => (string) ($config['action1_organization_name'] ?? ''),
+            'action1_group_id' => (string) ($config['action1_group_id'] ?? ''),
+            'action1_scope_endpoints' => (bool) ($scopes['endpoints'] ?? true),
+            'action1_scope_software' => (bool) ($scopes['software'] ?? true),
+            'action1_scope_patches' => (bool) ($scopes['patches'] ?? true),
+            'action1_scope_alerts' => (bool) ($scopes['alerts'] ?? false),
+        ];
+    }
+
     /**
-     * @param  array<string, mixed>|null  $previousConfig  When the client secret field is left blank on edit, the previous value is kept.
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>|null  $previousConfig
+     * @return array<string, mixed>
      */
     public static function entraFormDataToConfig(array $data, ?array $previousConfig = null): array
     {
@@ -352,63 +550,6 @@ final class OrganizationIntegrationSettings
     }
 
     /**
-     * @param  array<string, mixed>  $formData
-     * @return array<string, mixed>
-     */
-    public static function appendMicrosoftEntraIntegration(?array $organizationalSettings, array $formData): array
-    {
-        $created = self::createMicrosoftEntraIntegration($organizationalSettings, $formData);
-
-        return $created['organizational_settings'];
-    }
-
-    /**
-     * @param  array<string, mixed>  $formData
-     * @return array{integration_id: string, organizational_settings: array<string, mixed>}
-     */
-    public static function createMicrosoftEntraIntegration(?array $organizationalSettings, array $formData): array
-    {
-        $out = is_array($organizationalSettings) ? $organizationalSettings : [];
-        $items = self::persistedSettingsItems($out);
-        $items = self::ensureLegacyMicrosoftEntraMigratedIntoItems($out, $items);
-        $integrationId = (string) Str::uuid();
-        $items[] = [
-            'id' => $integrationId,
-            'type' => self::TYPE_MICROSOFT_ENTRA,
-            'config' => self::entraFormDataToConfig($formData, null),
-        ];
-        $out = self::stripLegacyMicrosoftEntraIntegration($out);
-        $out['settings'] = array_values($items);
-
-        return [
-            'integration_id' => $integrationId,
-            'organizational_settings' => $out,
-        ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $formData
-     * @return array{integration_id: string, organizational_settings: array<string, mixed>}
-     */
-    public static function createGoogleWorkspaceIntegration(?array $organizationalSettings, array $formData): array
-    {
-        $out = is_array($organizationalSettings) ? $organizationalSettings : [];
-        $items = self::persistedSettingsItems($out);
-        $integrationId = (string) Str::uuid();
-        $items[] = [
-            'id' => $integrationId,
-            'type' => self::TYPE_GOOGLE_WORKSPACE,
-            'config' => self::googleWorkspaceFormDataToConfig($formData, null),
-        ];
-        $out['settings'] = array_values($items);
-
-        return [
-            'integration_id' => $integrationId,
-            'organizational_settings' => $out,
-        ];
-    }
-
-    /**
      * @return array<string, mixed>
      */
     public static function blankGoogleWorkspaceFormFields(): array
@@ -420,6 +561,53 @@ final class OrganizationIntegrationSettings
             'gws_domain_wide_delegation_client_id' => '',
             'gws_enabled' => true,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>
+     */
+    public static function googleWorkspaceConfigToFormFields(array $config): array
+    {
+        return [
+            'gws_customer_domain' => (string) ($config['customer_domain'] ?? ''),
+            'gws_service_account_client_email' => (string) ($config['service_account_client_email'] ?? ''),
+            'gws_service_account_private_key' => '',
+            'gws_domain_wide_delegation_client_id' => (string) ($config['domain_wide_delegation_client_id'] ?? ''),
+            'gws_enabled' => (bool) ($config['enabled'] ?? false),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>|null  $previousConfig
+     */
+    public static function validateGoogleWorkspaceFormDataForSave(array $data, ?array $previousConfig = null): void
+    {
+        $errors = [];
+
+        if (trim((string) ($data['gws_customer_domain'] ?? '')) === '') {
+            $errors['gws_customer_domain'] = __('The workspace domain is required.');
+        }
+
+        if (trim((string) ($data['gws_service_account_client_email'] ?? '')) === '') {
+            $errors['gws_service_account_client_email'] = __('The service account email is required.');
+        }
+
+        $privateKey = trim((string) ($data['gws_service_account_private_key'] ?? ''));
+        $hasPreviousKey = is_array($previousConfig)
+            && trim((string) ($previousConfig['service_account_private_key'] ?? '')) !== '';
+        if ($privateKey === '' && ! $hasPreviousKey) {
+            $errors['gws_service_account_private_key'] = __('The service account private key is required.');
+        }
+
+        if (trim((string) ($data['gws_domain_wide_delegation_client_id'] ?? '')) === '') {
+            $errors['gws_domain_wide_delegation_client_id'] = __('The domain-wide delegation client ID is required.');
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 
     /**
@@ -454,195 +642,182 @@ final class OrganizationIntegrationSettings
     }
 
     /**
-     * @param  array<string, mixed>  $formData
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>|null  $previousConfig
      * @return array<string, mixed>
      */
-    public static function replaceMicrosoftEntraIntegration(?array $organizationalSettings, string $integrationId, array $formData): array
+    public static function action1FormDataToConfig(array $data, ?array $previousConfig = null): array
     {
-        $out = is_array($organizationalSettings) ? $organizationalSettings : [];
-        $items = self::persistedSettingsItems($out);
-        $previousConfig = self::resolvePreviousEntraConfigForReplace($out, $integrationId);
-        $config = self::entraFormDataToConfig($formData, $previousConfig);
-
-        if ($integrationId === self::LEGACY_MICROSOFT_ENTRA_ROW_ID) {
-            $items[] = [
-                'id' => (string) Str::uuid(),
-                'type' => self::TYPE_MICROSOFT_ENTRA,
-                'config' => $config,
-            ];
-        } else {
-            $found = false;
-            foreach ($items as $index => $item) {
-                if (($item['id'] ?? '') === $integrationId) {
-                    $items[$index]['config'] = $config;
-                    $found = true;
-
-                    break;
-                }
-            }
-            if (! $found) {
-                abort(404);
+        $submittedSecret = trim((string) ($data['action1_client_secret'] ?? ''));
+        $clientSecret = $submittedSecret;
+        if ($clientSecret === '' && is_array($previousConfig)) {
+            $previousSecret = $previousConfig['client_secret'] ?? null;
+            if (is_string($previousSecret) && $previousSecret !== '') {
+                $clientSecret = $previousSecret;
             }
         }
 
-        $out = self::stripLegacyMicrosoftEntraIntegration($out);
-        $out['settings'] = array_values($items);
-
-        return $out;
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private static function resolvePreviousEntraConfigForReplace(array $out, string $integrationId): ?array
-    {
-        if ($integrationId === self::LEGACY_MICROSOFT_ENTRA_ROW_ID) {
-            $legacy = data_get($out, 'integrations.microsoft_entra');
-
-            return is_array($legacy) ? self::normalizeLegacyEntraConfig($legacy) : null;
-        }
-
-        foreach (self::persistedSettingsItems($out) as $item) {
-            if (($item['id'] ?? '') === $integrationId && ($item['type'] ?? '') === self::TYPE_MICROSOFT_ENTRA) {
-                return $item['config'];
+        $submittedApiKey = trim((string) ($data['action1_api_key'] ?? ''));
+        $apiKey = $submittedApiKey;
+        if ($apiKey === '' && is_array($previousConfig)) {
+            $previousApiKey = $previousConfig['api_key'] ?? null;
+            if (is_string($previousApiKey) && $previousApiKey !== '') {
+                $apiKey = $previousApiKey;
             }
         }
 
-        return null;
-    }
-
-    /**
-     * When only `integrations.microsoft_entra` exists, migrating it into `settings` before appending
-     * avoids dropping the prior configuration.
-     *
-     * @param  list<array{id: string, type: string, config: array<string, mixed>}>  $items
-     * @return list<array{id: string, type: string, config: array<string, mixed>}>
-     */
-    private static function ensureLegacyMicrosoftEntraMigratedIntoItems(array $raw, array $items): array
-    {
-        foreach ($items as $item) {
-            if (($item['type'] ?? '') === self::TYPE_MICROSOFT_ENTRA) {
-                return $items;
-            }
+        $region = Action1ApiRegion::tryFrom((string) ($data['action1_region'] ?? ''));
+        $apiBaseUrl = trim((string) ($data['action1_api_base_url'] ?? ''));
+        if ($region !== null) {
+            $apiBaseUrl = $region->apiBaseUrl();
         }
-
-        $legacy = data_get($raw, 'integrations.microsoft_entra');
-        if (! self::legacyMicrosoftEntraIsMeaningful(is_array($legacy) ? $legacy : [])) {
-            return $items;
+        if ($apiBaseUrl === '') {
+            $apiBaseUrl = config('helixdesk_integrations.action1.default_api_base_url');
         }
-
-        $items[] = [
-            'id' => (string) Str::uuid(),
-            'type' => self::TYPE_MICROSOFT_ENTRA,
-            'config' => self::normalizeLegacyEntraConfig($legacy),
-        ];
-
-        return $items;
-    }
-
-    /**
-     * @return list<array{id: string, type: string, config: array<string, mixed>}>
-     */
-    private static function persistedSettingsItems(array $raw): array
-    {
-        $settings = $raw['settings'] ?? null;
-        if (! is_array($settings)) {
-            return [];
-        }
-
-        $items = [];
-        foreach ($settings as $item) {
-            if (! is_array($item)) {
-                continue;
-            }
-            $id = $item['id'] ?? null;
-            $type = $item['type'] ?? null;
-            if (! is_string($id) || $id === '' || ! is_string($type) || $type === '') {
-                continue;
-            }
-            $config = $item['config'] ?? [];
-            $items[] = [
-                'id' => $id,
-                'type' => $type,
-                'config' => is_array($config) ? $config : [],
-            ];
-        }
-
-        return $items;
-    }
-
-    /**
-     * @param  array<string, mixed>  $legacy
-     */
-    private static function legacyMicrosoftEntraIsMeaningful(array $legacy): bool
-    {
-        if ($legacy === []) {
-            return false;
-        }
-
-        if (! empty($legacy['azure_tenant_id']) || ! empty($legacy['application_client_id'])) {
-            return true;
-        }
-
-        if (! empty($legacy['client_secret']) || ! empty($legacy['application_client_secret'])) {
-            return true;
-        }
-
-        if (! empty($legacy['enabled'])) {
-            return true;
-        }
-
-        $scopes = $legacy['scopes'] ?? [];
-        if (! is_array($scopes)) {
-            return false;
-        }
-
-        foreach ($scopes as $enabled) {
-            if ($enabled) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param  array<string, mixed>  $legacy
-     * @return array<string, mixed>
-     */
-    private static function normalizeLegacyEntraConfig(array $legacy): array
-    {
-        $scopes = is_array($legacy['scopes'] ?? null) ? $legacy['scopes'] : [];
-
-        $secret = (string) ($legacy['client_secret'] ?? $legacy['application_client_secret'] ?? '');
 
         return [
-            'enabled' => (bool) ($legacy['enabled'] ?? false),
-            'azure_tenant_id' => (string) ($legacy['azure_tenant_id'] ?? ''),
-            'application_client_id' => (string) ($legacy['application_client_id'] ?? ''),
-            'client_secret' => $secret,
+            'enabled' => (bool) ($data['action1_enabled'] ?? false),
+            'client_id' => (string) ($data['action1_client_id'] ?? ''),
+            'client_secret' => $clientSecret,
+            'api_key' => $apiKey,
+            'action1_organization_id' => (string) ($data['action1_organization_id'] ?? ''),
+            'action1_organization_name' => (string) ($data['action1_organization_name'] ?? ''),
+            'action1_group_id' => (string) ($data['action1_group_id'] ?? ''),
+            'api_base_url' => $apiBaseUrl,
             'scopes' => [
-                'users' => (bool) ($scopes['users'] ?? false),
-                'departments' => (bool) ($scopes['departments'] ?? false),
-                'computers' => (bool) ($scopes['computers'] ?? false),
-                'security_work_items' => (bool) ($scopes['security_work_items'] ?? false),
+                'endpoints' => (bool) ($data['action1_scope_endpoints'] ?? false),
+                'software' => (bool) ($data['action1_scope_software'] ?? false),
+                'patches' => (bool) ($data['action1_scope_patches'] ?? false),
+                'alerts' => (bool) ($data['action1_scope_alerts'] ?? false),
             ],
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $out
-     * @return array<string, mixed>
-     */
-    private static function stripLegacyMicrosoftEntraIntegration(array $out): array
+    private static function entraSyncTargetFromIntegration(OrganizationIntegration $integration): ?EntraSyncTarget
     {
-        if (isset($out['integrations']['microsoft_entra'])) {
-            unset($out['integrations']['microsoft_entra']);
-        }
-        if (isset($out['integrations']) && $out['integrations'] === []) {
-            unset($out['integrations']);
+        $tenantId = $integration->tenant_id;
+        if ($tenantId === null) {
+            return null;
         }
 
-        return $out;
+        $config = self::mergedConfigForIntegration($integration);
+        if (! self::entraConfigReadyForSync($config)) {
+            return null;
+        }
+
+        return new EntraSyncTarget(
+            tenantId: (int) $tenantId,
+            organizationId: (int) $integration->organization_id,
+            integrationId: (string) $integration->getKey(),
+            config: $config,
+        );
+    }
+
+    private static function action1SyncTargetFromIntegration(OrganizationIntegration $integration): ?Action1SyncTarget
+    {
+        $tenantId = $integration->tenant_id;
+        if ($tenantId === null) {
+            return null;
+        }
+
+        $config = self::mergedConfigForIntegration($integration);
+        if (! self::action1ConfigReadyForSync($config)) {
+            return null;
+        }
+
+        $credentials = $integration->mergedCredentials();
+
+        return new Action1SyncTarget(
+            tenantId: (int) $tenantId,
+            organizationId: (int) $integration->organization_id,
+            integrationId: (string) $integration->getKey(),
+            config: $config,
+            credentials: $credentials,
+            apiBaseUrl: $integration->api_base_url ?? ($config['api_base_url'] ?? null),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function mergedConfigForIntegration(OrganizationIntegration $integration): array
+    {
+        $repository = app(OrganizationIntegrationRepository::class);
+        $organization = Organization::query()->withoutGlobalScopes()->find($integration->organization_id);
+        if ($organization === null) {
+            return [];
+        }
+
+        $entry = $repository->findEntry($organization, (string) $integration->getKey());
+
+        return is_array($entry['config'] ?? null) ? $entry['config'] : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private static function resolveImportIntervalHours(string $type, array $config, ?string $integrationId): int
+    {
+        if (isset($config['sync_interval_hours'])) {
+            return max(1, (int) $config['sync_interval_hours']);
+        }
+
+        if ($integrationId !== null) {
+            $integration = OrganizationIntegration::query()->withoutGlobalScopes()->find($integrationId);
+            if ($integration !== null && $integration->sync_interval_hours !== null) {
+                return max(1, (int) $integration->sync_interval_hours);
+            }
+        }
+
+        $default = match ($type) {
+            self::TYPE_ACTION1 => config('helixdesk_integrations.action1.import_interval_hours', 6),
+            default => config('helixdesk_integrations.entra.import_interval_hours', 24),
+        };
+
+        return max(1, (int) $default);
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private static function lastSyncIsStale(array $config, string $type, int $hours): bool
+    {
+        $raw = match ($type) {
+            self::TYPE_MICROSOFT_ENTRA => $config['last_entra_sync_at'] ?? $config['last_sync_at'] ?? null,
+            self::TYPE_ACTION1 => $config['last_sync_at'] ?? $config['last_action1_sync_at'] ?? null,
+            default => $config['last_sync_at'] ?? null,
+        };
+
+        if (! is_string($raw) || trim($raw) === '') {
+            return true;
+        }
+
+        try {
+            return Carbon::parse($raw)->addHours($hours)->isPast();
+        } catch (\Throwable) {
+            return true;
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private static function resolveLastSyncTimestamp(array $config, string $type): ?Carbon
+    {
+        $raw = match ($type) {
+            self::TYPE_MICROSOFT_ENTRA => $config['last_entra_sync_at'] ?? $config['last_sync_at'] ?? null,
+            self::TYPE_ACTION1 => $config['last_sync_at'] ?? $config['last_action1_sync_at'] ?? null,
+            default => $config['last_sync_at'] ?? null,
+        };
+
+        if (! is_string($raw) || trim($raw) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($raw);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

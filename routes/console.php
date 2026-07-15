@@ -13,7 +13,7 @@ Artisan::command('inspire', function () {
 
 Schedule::job(OrganizationSettingsImport::class)
     ->everyFifteenMinutes()
-    ->when(fn (): bool => OrganizationIntegrationSettings::hasMicrosoftEntraIntegrationDueForImport())
+    ->when(fn (): bool => OrganizationIntegrationSettings::hasAnyAssetSyncIntegrationDueForImport())
     ->withoutOverlapping();
 
 Schedule::job(new PollMailAccountsJob)

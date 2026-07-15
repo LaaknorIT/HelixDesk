@@ -19,7 +19,15 @@ class Tenant extends Model
         'slug',
         'status',
         'region',
+        'integration_settings',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'integration_settings' => 'array',
+        ];
+    }
 
     public function users(): HasMany
     {
@@ -117,5 +125,10 @@ class Tenant extends Model
         return $this->queues()
             ->where('name', 'Monitoring')
             ->first();
+    }
+
+    public function organizationIntegrations(): HasMany
+    {
+        return $this->hasMany(OrganizationIntegration::class);
     }
 }

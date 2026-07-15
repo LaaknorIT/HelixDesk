@@ -44,10 +44,16 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 
 ## Phase C — CMDB & documentation
 
-- [~] **Assets** / CMDB: models, relationships, Filament, API v1
+- [~] **Assets** / CMDB: models, relationships, Filament, API v1; multi-source identity, patch/software satellites, ambiguity resolution
 - [x] **Service catalog**: `Supplier`, `ServiceOffering`, pivots to assets/suppliers, config-driven kinds/roles ([`docs/service-catalog.md`](service-catalog.md))
 - [~] **Documents**: Filament, API v1, links to work_items, **assets, suppliers, service offerings**
-- [ ] **Deeper CMDB**: discovery feeds, lifecycle policies, compliance views
+- [x] **Microsoft Entra sync**: users, departments, Intune devices → `Asset`, security → `MonitoringEvent` (via `organization_integrations`)
+- [x] **Multi-source asset integration** (design: [`docs/integrations.md`](integrations.md)):
+  - [x] Phase 1: `organization_integrations` table + migrate from org JSON; CMDB satellite tables; identity resolution (serial + MAC/hostname); tenant auto-retire setting; retirement activity logging
+  - [x] Phase 2: Entra refactor (dual IDs, stop overloading `asset_identifier`)
+  - [x] Phase 3: Action1 (US/EU endpoints, group scoping, endpoints, software, normalized patch items, alert poll)
+  - [x] Phase 4: Filament UI + API includes + `monitoring_event_asset` pivot
+- [ ] **Deeper CMDB**: lifecycle policies, compliance views beyond patch snapshot
 - [ ] **Documentation approval workflows** (draft → review → publish) per product spec
 
 ---
@@ -74,6 +80,7 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 - [ ] **OpenAPI** (or equivalent) published and kept in sync with routes
 - [ ] **Laravel Horizon** + **Redis** in deployment and `composer.json` / ops docs (architecture assumes them)
 - [x] **Ticket email channel**: mail accounts, IMAP/POP3/Graph inbound polling, SMTP/Graph outbound, queue default address, attachments ([`docs/email-handling.md`](email-handling.md))
+- [x] **Organization integrations**: Entra + Google Workspace + Action1 in `organization_integrations`; multi-source CMDB per [`docs/integrations.md`](integrations.md)
 - [ ] **Queue-heavy jobs**: major-incident / status notifications, reporting, AI tasks (work item reply mail uses Horizon)
 - [ ] **S3-compatible storage** for attachments/exports (config + implementation paths)
 
@@ -105,4 +112,4 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 
 ---
 
-*Last updated: 2026-04-12 — revise this line when you edit the roadmap.*
+*Last updated: 2026-07-14 — multi-source integration Phases 1–4 marked complete.*

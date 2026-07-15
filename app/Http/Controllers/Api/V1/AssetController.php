@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreAssetRequest;
 use App\Models\Asset;
+use App\Support\AssetApiIncludes;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -25,10 +26,14 @@ class AssetController extends Controller
             setPermissionsTeamId(null);
         }
 
+        $includes = AssetApiIncludes::parse($request->query('include'));
+
         $assets = Asset::query()
             ->with(['assetType', 'organization'])
             ->orderBy('name')
             ->get();
+
+        AssetApiIncludes::apply($assets, $includes);
 
         return response()->json([
             'data' => $assets,
@@ -65,8 +70,13 @@ class AssetController extends Controller
             setPermissionsTeamId(null);
         }
 
+        $includes = AssetApiIncludes::parse($request->query('include'));
+
+        $asset->load(['assetType', 'organization', 'owner']);
+        AssetApiIncludes::apply($asset, $includes);
+
         return response()->json([
-            'data' => $asset->load(['assetType', 'organization', 'owner']),
+            'data' => $asset,
         ]);
     }
 }

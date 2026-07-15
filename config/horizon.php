@@ -207,7 +207,10 @@ return [
             'maxJobs' => 0,
             'memory' => 128,
             'tries' => 1,
-            'timeout' => 60,
+            'timeout' => max(
+                60,
+                (int) config('helixdesk_integrations.action1.sync_job_timeout_seconds', 600) + 30,
+            ),
             'nice' => 0,
         ],
     ],
