@@ -263,6 +263,7 @@ class WorkItemInfolist
     {
         return [
             TextEntry::make('mailAccount.email_address')->label('Mail account')->placeholder('—'),
+            TextEntry::make('public_id')->label('Mail reference')->placeholder('—'),
             TextEntry::make('inbound_message_id')->label('Inbound message ID')->placeholder('—'),
             TextEntry::make('title')->label('Thread subject'),
             TextEntry::make('last_inbound_at')

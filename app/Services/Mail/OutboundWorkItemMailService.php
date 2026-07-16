@@ -94,7 +94,11 @@ class OutboundWorkItemMailService
         $fromAddress = $mailAccount->email_address;
         $inReplyTo = $workItem->inbound_message_id;
         $references = $this->buildReferencesChain($workItem, $inReplyTo);
-        $subject = 'Re: '.$workItem->title;
+        $publicId = app(WorkItemPublicIdGenerator::class)->ensure($workItem);
+        $subject = WorkItemMailReference::appendSubjectToken('Re: '.$workItem->title, $publicId);
+        $replyTo = $mailAccount->supports_plus_addressing
+            ? WorkItemMailReference::plusAddress($fromAddress, $publicId)
+            : null;
         $fromName = $author->name;
         $outboundProtocol = $mailAccount->outbound_protocol?->value;
 
@@ -103,10 +107,13 @@ class OutboundWorkItemMailService
             'work_item_message_id' => $message->getKey(),
             'to' => $recipient->email,
             'from' => $fromAddress,
+            'reply_to' => $replyTo,
             'subject' => $subject,
+            'public_id' => $publicId,
             'outbound_protocol' => $outboundProtocol,
             'in_reply_to' => $inReplyTo,
             'has_references' => $references !== null,
+            'supports_plus_addressing' => (bool) $mailAccount->supports_plus_addressing,
         ]);
 
         try {
@@ -120,6 +127,7 @@ class OutboundWorkItemMailService
                     body: $message->body,
                     inReplyTo: $inReplyTo,
                     references: $references,
+                    replyTo: $replyTo,
                 );
             } elseif ($mailAccount->outbound_protocol === MailOutboundProtocol::GoogleGmailApi) {
                 $this->mailLogger->warning($mailAccount, 'Google Workspace Gmail API outbound mail is not implemented yet.', [
@@ -140,6 +148,7 @@ class OutboundWorkItemMailService
                     references: $references,
                     messageId: $messageId,
                     message: $message,
+                    replyTo: $replyTo,
                 );
             }
         } catch (Throwable $e) {
@@ -167,7 +176,9 @@ class OutboundWorkItemMailService
             'work_item_id' => $workItem->getKey(),
             'work_item_message_id' => $message->getKey(),
             'to' => $recipient->email,
+            'reply_to' => $replyTo,
             'external_message_id' => $messageId,
+            'public_id' => $publicId,
             'outbound_protocol' => $outboundProtocol,
         ]);
     }
@@ -225,6 +236,7 @@ class OutboundWorkItemMailService
         ?string $references,
         string $messageId,
         WorkItemMessage $message,
+        ?string $replyTo = null,
     ): void {
         $settings = is_array($mailAccount->connection_settings) ? $mailAccount->connection_settings : [];
         $mailerName = 'mail_account_'.$mailAccount->getKey();
@@ -251,6 +263,7 @@ class OutboundWorkItemMailService
             $references,
             $messageId,
             $message,
+            $replyTo,
         ): void {
             $symfony = $laravelMessage->getSymfonyMessage();
             if ($symfony instanceof Email) {
@@ -259,6 +272,9 @@ class OutboundWorkItemMailService
                 $symfony->subject($subject);
                 $symfony->text($body);
                 $symfony->getHeaders()->addIdHeader('Message-ID', trim($messageId, '<>'));
+                if ($replyTo !== null && trim($replyTo) !== '') {
+                    $symfony->replyTo($replyTo);
+                }
                 if ($inReplyTo !== null) {
                     $symfony->getHeaders()->addTextHeader('In-Reply-To', $inReplyTo);
                 }
@@ -284,6 +300,7 @@ class OutboundWorkItemMailService
         string $body,
         ?string $inReplyTo,
         ?string $references,
+        ?string $replyTo = null,
     ): void {
         $creds = $this->entraResolver->resolve($mailAccount);
         $client = new MicrosoftGraphHttpClient(
@@ -334,6 +351,16 @@ class OutboundWorkItemMailService
             'saveToSentItems' => true,
         ];
 
+        if ($replyTo !== null && trim($replyTo) !== '') {
+            $payload['message']['replyTo'] = [
+                [
+                    'emailAddress' => [
+                        'address' => $replyTo,
+                    ],
+                ],
+            ];
+        }
+
         if ($extendedProperties !== []) {
             $payload['message']['singleValueExtendedProperties'] = $extendedProperties;
         }
@@ -342,6 +369,7 @@ class OutboundWorkItemMailService
             'mailbox_upn' => $creds['mailbox_upn'],
             'has_in_reply_to_extended_property' => $inReplyTo !== null && trim($inReplyTo) !== '',
             'has_references_extended_property' => $references !== null && trim($references) !== '',
+            'reply_to' => $replyTo,
         ]);
 
         try {

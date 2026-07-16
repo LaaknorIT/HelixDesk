@@ -53,6 +53,15 @@ return [
         'connection_timeout_seconds' => (int) env('MAIL_CONNECTION_TIMEOUT_SECONDS', 15),
         'attachment_disk' => env('MAIL_ATTACHMENT_DISK', 'local'),
         'attachment_path' => env('MAIL_ATTACHMENT_PATH', 'work-item-mail-attachments'),
+        'work_item_public_id_length' => (int) env('MAIL_WORK_ITEM_PUBLIC_ID_LENGTH', 5),
+        /**
+         * Lowercase YouTube-like alphabet (no ambiguous 0/o/1/l). Lowercase-only
+         * so plus-address tokens remain stable when addresses are normalized.
+         */
+        'work_item_public_id_alphabet' => env(
+            'MAIL_WORK_ITEM_PUBLIC_ID_ALPHABET',
+            'abcdefghijkmnpqrstuvwxyz23456789'
+        ),
     ],
 
     'monitoring' => [

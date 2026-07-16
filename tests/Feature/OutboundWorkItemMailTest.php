@@ -267,7 +267,7 @@ class OutboundWorkItemMailTest extends TestCase
         $this->assertSame($account->id, $message->mail_account_id);
         $this->assertSame($inboundMessageId, $message->in_reply_to);
 
-        Http::assertSent(function ($request) use ($inboundMessageId): bool {
+        Http::assertSent(function ($request) use ($inboundMessageId, $workItem): bool {
             if (! str_contains($request->url(), '/sendMail')) {
                 return false;
             }
@@ -276,6 +276,14 @@ class OutboundWorkItemMailTest extends TestCase
             $messagePayload = $payload['message'] ?? [];
 
             if (array_key_exists('internetMessageHeaders', $messagePayload)) {
+                return false;
+            }
+
+            if (array_key_exists('replyTo', $messagePayload)) {
+                return false;
+            }
+
+            if (! str_contains((string) ($messagePayload['subject'] ?? ''), '[#'.$workItem->public_id.']')) {
                 return false;
             }
 

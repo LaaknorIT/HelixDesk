@@ -40,6 +40,7 @@ class MailAccountFactory extends Factory
                 'smtp_encryption' => 'tls',
             ],
             'is_enabled' => true,
+            'supports_plus_addressing' => false,
             'last_polled_at' => null,
             'last_poll_error' => null,
             'sync_state' => null,

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\WorkItemSource;
 use App\Enums\WorkItemType;
+use App\Services\Mail\WorkItemPublicIdGenerator;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -26,6 +27,7 @@ class WorkItem extends TenantModel
         'source',
         'mail_account_id',
         'inbound_message_id',
+        'public_id',
         'opened_at',
         'resolved_at',
         'closed_at',
@@ -40,6 +42,24 @@ class WorkItem extends TenantModel
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        parent::booted();
+
+        static::creating(function (WorkItem $workItem): void {
+            if (is_string($workItem->public_id) && trim($workItem->public_id) !== '') {
+                return;
+            }
+
+            $tenantId = (int) ($workItem->tenant_id ?? 0);
+            if ($tenantId <= 0) {
+                return;
+            }
+
+            $workItem->public_id = app(WorkItemPublicIdGenerator::class)->generate($tenantId);
+        });
     }
 
     public function tenant(): BelongsTo

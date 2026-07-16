@@ -211,6 +211,7 @@ Key fields:
 - `source`
 - `mail_account_id` (nullable — receiving mailbox for reply-from-same-address)
 - `inbound_message_id` (nullable — first RFC `Message-ID`)
+- `public_id` (tenant-unique random mail/UI reference; not the autoincrement id)
 
 Relationships:
 

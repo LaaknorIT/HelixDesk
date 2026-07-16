@@ -29,6 +29,7 @@ class MailAccount extends TenantModel
         'integration_id',
         'connection_settings',
         'is_enabled',
+        'supports_plus_addressing',
         'last_polled_at',
         'last_poll_error',
         'sync_state',
@@ -41,6 +42,7 @@ class MailAccount extends TenantModel
             'outbound_protocol' => MailOutboundProtocol::class,
             'connection_settings' => 'encrypted:array',
             'is_enabled' => 'boolean',
+            'supports_plus_addressing' => 'boolean',
             'last_polled_at' => 'datetime',
             'sync_state' => 'array',
         ];

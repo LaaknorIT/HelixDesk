@@ -50,19 +50,24 @@ class InboundMailIngestionService
             return InboundMailIngestOutcome::Duplicate;
         }
 
-        $existing = $this->findWorkItemForReply($account, $parsed);
+        $threadMatch = $this->resolveWorkItemForInbound($account, $parsed);
+        $existing = $threadMatch['work_item'];
+
         if ($existing === null && $this->resolveQueueForAccount($account) === null) {
             $this->logger->warning($account, 'Skipping inbound message: no queue linked to mail account', [
                 'transport_uid' => $transportUid,
                 'message_id' => $parsed->messageId,
                 'from' => $parsed->fromAddress,
                 'subject' => $parsed->subject,
+                ...$this->threadingDiagnosticContext($parsed, $account, $threadMatch),
             ]);
 
             return InboundMailIngestOutcome::SkippedNoQueue;
         }
 
-        DB::transaction(function () use ($account, $parsed, $existing): void {
+        $ingestedWorkItemId = null;
+
+        DB::transaction(function () use ($account, $parsed, $existing, &$ingestedWorkItemId): void {
             ProcessedInboundEmail::query()->create([
                 'tenant_id' => $account->tenant_id,
                 'mail_account_id' => $account->getKey(),
@@ -71,6 +76,7 @@ class InboundMailIngestionService
             ]);
 
             $workItem = $existing ?? $this->createWorkItem($account, $parsed);
+            $ingestedWorkItemId = $workItem->getKey();
 
             $requester = $this->requesterResolver->resolveOrCreate(
                 tenantId: (int) $account->tenant_id,
@@ -111,6 +117,8 @@ class InboundMailIngestionService
             'from' => $parsed->fromAddress,
             'subject' => $parsed->subject,
             'threaded' => $existing !== null,
+            'work_item_id' => $ingestedWorkItemId,
+            ...$this->threadingDiagnosticContext($parsed, $account, $threadMatch),
         ]);
 
         return InboundMailIngestOutcome::Ingested;
@@ -151,9 +159,69 @@ class InboundMailIngestionService
         ]);
     }
 
-    private function findWorkItemForReply(MailAccount $account, ParsedInboundEmail $parsed): ?WorkItem
+    /**
+     * @return array{work_item: ?WorkItem, match_method: string, reference_candidates: list<string>, plus_token: ?string, subject_token: ?string}
+     */
+    private function resolveWorkItemForInbound(MailAccount $account, ParsedInboundEmail $parsed): array
     {
-        $candidateIds = $this->collectThreadMessageIds($parsed);
+        $referenceCandidates = $this->collectThreadMessageIds($parsed);
+        $plusToken = WorkItemMailReference::extractPlusTokenFromAddresses(
+            $parsed->toAddresses,
+            $account->email_address,
+        );
+        $subjectToken = WorkItemMailReference::extractSubjectToken($parsed->subject);
+
+        $byMessageId = $this->findWorkItemByMessageIds($account, $referenceCandidates);
+        if ($byMessageId !== null) {
+            return [
+                'work_item' => $byMessageId,
+                'match_method' => 'message_id',
+                'reference_candidates' => $referenceCandidates,
+                'plus_token' => $plusToken,
+                'subject_token' => $subjectToken,
+            ];
+        }
+
+        if ($plusToken !== null) {
+            $byPlus = $this->findWorkItemByPublicId($account, $plusToken);
+            if ($byPlus !== null) {
+                return [
+                    'work_item' => $byPlus,
+                    'match_method' => 'plus_address',
+                    'reference_candidates' => $referenceCandidates,
+                    'plus_token' => $plusToken,
+                    'subject_token' => $subjectToken,
+                ];
+            }
+        }
+
+        if ($subjectToken !== null) {
+            $bySubject = $this->findWorkItemByPublicId($account, $subjectToken);
+            if ($bySubject !== null) {
+                return [
+                    'work_item' => $bySubject,
+                    'match_method' => 'subject_token',
+                    'reference_candidates' => $referenceCandidates,
+                    'plus_token' => $plusToken,
+                    'subject_token' => $subjectToken,
+                ];
+            }
+        }
+
+        return [
+            'work_item' => null,
+            'match_method' => 'none',
+            'reference_candidates' => $referenceCandidates,
+            'plus_token' => $plusToken,
+            'subject_token' => $subjectToken,
+        ];
+    }
+
+    /**
+     * @param  list<string>  $candidateIds
+     */
+    private function findWorkItemByMessageIds(MailAccount $account, array $candidateIds): ?WorkItem
+    {
         if ($candidateIds === []) {
             return null;
         }
@@ -171,6 +239,32 @@ class InboundMailIngestionService
         }
 
         return $message->workItem;
+    }
+
+    private function findWorkItemByPublicId(MailAccount $account, string $publicId): ?WorkItem
+    {
+        return WorkItem::query()
+            ->where('tenant_id', $account->tenant_id)
+            ->whereRaw('LOWER(public_id) = ?', [Str::lower($publicId)])
+            ->first();
+    }
+
+    /**
+     * @param  array{work_item: ?WorkItem, match_method: string, reference_candidates: list<string>, plus_token: ?string, subject_token: ?string}  $threadMatch
+     * @return array<string, mixed>
+     */
+    private function threadingDiagnosticContext(ParsedInboundEmail $parsed, MailAccount $account, array $threadMatch): array
+    {
+        return [
+            'in_reply_to' => $parsed->inReplyTo,
+            'reference_candidates' => $threadMatch['reference_candidates'],
+            'plus_token' => $threadMatch['plus_token'],
+            'subject_token' => $threadMatch['subject_token'],
+            'match_method' => $threadMatch['match_method'],
+            'mail_account_supports_plus_addressing' => (bool) $account->supports_plus_addressing,
+            'matched_work_item_id' => $threadMatch['work_item']?->getKey(),
+            'matched_public_id' => $threadMatch['work_item']?->public_id,
+        ];
     }
 
     /**

@@ -7,7 +7,7 @@ HelixDesk uses email as a first-class ticket channel: inbound mail creates or up
 - **Inbound**: scheduled polling via IMAP, POP3, Microsoft Graph (Microsoft 365), or **Gmail API** (Google Workspace — [planned](google-workspace-mail.md)).
 - **Outbound**: SMTP, Microsoft Graph, or **Gmail API**, using the work item’s receiving mailbox or the queue default.
 - **Multi-account queues**: many `mail_accounts` linked to one `queue` via `queue_mail_account`.
-- **Threading**: RFC `Message-ID`, `In-Reply-To`, and `References` for reply correlation.
+- **Threading**: RFC `Message-ID`, `In-Reply-To`, and `References` for reply correlation, with fallbacks via subject token and (when enabled) plus-addressing.
 - **Requesters**: match `From` to an existing `User` by email, or auto-create an `end_user`.
 - **Attachments**: stored on disk (local/S3-compatible) and linked to `work_item_messages`.
 - **Internal notes**: never sent by email.
@@ -28,6 +28,7 @@ Tenant-scoped mailbox configuration.
 | `integration_type` | Optional; organization integration type (e.g. `microsoft_entra`, `google_workspace`) |
 | `integration_id` | Optional; `settings[].id` from `organizational_settings` |
 | `connection_settings` | Encrypted JSON (hosts, ports, credentials, `mailbox_upn` / `mailbox_address`) |
+| `supports_plus_addressing` | When true, outbound replies set `Reply-To` to `local+{public_id}@domain` (default **false** — not all providers deliver plus-addressed mail to the same mailbox) |
 | `is_enabled` | Polling and outbound enabled |
 | `last_polled_at`, `last_poll_error` | Operational state |
 | `sync_state` | JSON cursor (Graph delta link, POP3 UIDL map, IMAP UID) |
@@ -53,6 +54,7 @@ Optional FK to `mail_accounts`. Used for outbound mail when the incident was **n
 | `source` | `portal`, `email`, `api`, `monitoring`, … |
 | `mail_account_id` | Mailbox that received the original email (reply-from-same-address) |
 | `inbound_message_id` | First RFC `Message-ID` for the thread |
+| `public_id` | Tenant-unique random reference (YouTube-style; not the DB id). Used in subject tokens and optional plus-addresses |
 
 ### `work_item_messages` email fields
 
@@ -86,9 +88,13 @@ Dedup table: unique `(mail_account_id, message_id)`.
    - Skips if `Message-ID` already in `processed_inbound_emails`.
    - Skips (and does **not** mark processed) when a new ticket cannot be routed because no queue is linked to the mail account and no tenant fallback queue exists — so a later poll can retry after queue linking.
    - Resolves requester (`RequesterResolutionService`: find or create `end_user`). For new users, the display name comes from the `From` header’s person name (`AddressHeader::getPersonName()`), not the header field name; if absent, the email address is used.
-   - If `In-Reply-To` / `References` match an existing incident message → `addMessage` on that incident.
-   - Else → create incident on a queue linked to the mail account (`source=email`, `mail_account_id` set).
+   - Resolves the target work item in this order:
+     1. RFC `In-Reply-To` / `References` → existing message / `inbound_message_id`
+     2. Plus-address token in `To` (e.g. `support+a7Kx2@example.com`) when it matches the mail account’s base address and a tenant `public_id` (only relied on for accounts with `supports_plus_addressing`; still matched if present)
+     3. Subject token `[#a7Kx2]` → tenant `public_id`
+     4. Else → create incident on a queue linked to the mail account (`source=email`, `mail_account_id` set; assigns a new `public_id`)
    - Stores attachments.
+   - Logs threading diagnostics (`in_reply_to`, reference candidates, plus/subject tokens, match method, work item id).
 5. Acknowledges ingested, duplicate, and empty-From messages (IMAP/Graph mark read; POP3 UIDL already recorded). Graph also records the message id in `sync_state` **before** mark-as-read so a failed `PATCH` cannot cause endless re-fetch. Acknowledge failures after a successful ingest/duplicate are logged as warnings and do not fail the whole poll. Messages skipped for missing queue stay unread so a later poll can retry after queue linking.
 
 **Microsoft Graph note:** Prefer marking messages read (`Mail.ReadWrite`). If a message is already marked read and not in `sync_state`, HelixDesk will not fetch it. **Test connection** reports total vs unread inbox counts so this is visible during setup.
@@ -102,6 +108,8 @@ Dedup table: unique `(mail_account_id, message_id)`.
    - Else → `queue.default_mail_account_id`.
    - If neither → skip send (mail-channel warning).
 4. Builds the outbound message (agent display name, attachments when present):
+   - Subject includes a stable token using `public_id`, e.g. `Re: Printer broken [#a7Kx2]` (token is not the autoincrement id).
+   - When the mail account has `supports_plus_addressing`, sets **Reply-To** to `local+{public_id}@domain` (From stays the normal mailbox address). Leave this off for providers that do not deliver plus-addressed recipients to the same inbox.
    - **SMTP**: sets RFC `In-Reply-To` / `References` on the MIME message.
    - **Microsoft Graph**: Graph rejects standard headers in `internetMessageHeaders` (names must start with `x-` / `X-`). Threading is set via MAPI extended properties instead: `PidTagInReplyToId` (`String 0x1042`) and `PidTagInternetReferences` (`String 0x1039`).
 5. Sends via SMTP (dynamic Laravel mailer) or Graph `sendMail`.
@@ -109,7 +117,7 @@ Dedup table: unique `(mail_account_id, message_id)`.
 
 ## UI
 
-- **Administration → Mail accounts**: CRUD, protocol-specific fields, Entra integration picker.
+- **Administration → Mail accounts**: CRUD, protocol-specific fields, Entra integration picker, **Supports plus-addressing** toggle (off by default).
   - **Test connection**: verifies credentials / Graph app permissions and mailbox access (IMAP login, POP3 login, or Graph token + inbox read). Run after creating or editing an account; also offered automatically after create. For Graph, the result includes inbox total/unread counts.
   - **Check email**: runs inbound poll for that account immediately (same as `PollMailAccountJob`) and reports how many messages were fetched / ingested / skipped, or the error stored in `last_poll_error`.
   - `last_poll_error` is shown on the list (toggleable) and on the edit page when set.
@@ -119,7 +127,7 @@ Dedup table: unique `(mail_account_id, message_id)`.
 
 Mail uses a dedicated Monolog channel `mail` (`storage/logs/mail-YYYY-MM-DD.log`) with **daily rotation and 7-day retention** (`LOG_MAIL_DAYS`, default `7`) so verbose poll/ingest/outbound diagnostics do not grow forever.
 
-**Inbound** events include: poll start/finish (fetched/ingested/skipped counts), fetch failures, ingest skips (empty From, duplicate Message-ID, no resolvable queue), and connection verify results.
+**Inbound** events include: poll start/finish (fetched/ingested/skipped counts), fetch failures, ingest skips (empty From, duplicate Message-ID, no resolvable queue), connection verify results, and **threading diagnostics** on each ingest (`match_method`: `message_id` | `plus_address` | `subject_token` | `none`, plus candidates / tokens).
 
 **Outbound** events (agent reply mail) include:
 - attempt start (work item / message / protocol / recipient),
@@ -162,8 +170,15 @@ HelixDesk does not implement Gmail OAuth for personal IMAP yet; App Passwords ar
 ```php
 'mail' => [
     'poll_interval_minutes' => (int) env('MAIL_POLL_INTERVAL_MINUTES', 5),
+    'work_item_public_id_length' => (int) env('MAIL_WORK_ITEM_PUBLIC_ID_LENGTH', 5),
+    'work_item_public_id_alphabet' => env('MAIL_WORK_ITEM_PUBLIC_ID_ALPHABET', /* lowercase YouTube-like, no 0/o/1/l */),
 ],
 ```
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `MAIL_WORK_ITEM_PUBLIC_ID_LENGTH` | Length of `work_items.public_id` | `5` |
+| `MAIL_WORK_ITEM_PUBLIC_ID_ALPHABET` | Characters used when generating `public_id` | Lowercase YouTube-like alphabet (no ambiguous 0/o/1/l) |
 
 Logging (`.env` / `config/logging.php`):
 

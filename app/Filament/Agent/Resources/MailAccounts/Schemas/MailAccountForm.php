@@ -46,6 +46,10 @@ class MailAccountForm
                             ->maxLength(255),
                         Toggle::make('is_enabled')
                             ->default(true),
+                        Toggle::make('supports_plus_addressing')
+                            ->label('Supports plus-addressing')
+                            ->helperText('Enable only if this mailbox receives mail addressed to local+tag@domain (e.g. support+a7Kx2@…). When on, outbound replies set Reply-To with the work item public id. Subject tokens still work either way.')
+                            ->default(false),
                         Placeholder::make('last_polled_at_display')
                             ->label('Last polled')
                             ->content(fn (?MailAccount $record): string => $record?->last_polled_at?->toDateTimeString() ?? '—')
