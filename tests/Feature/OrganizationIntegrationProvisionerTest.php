@@ -100,4 +100,30 @@ class OrganizationIntegrationProvisionerTest extends TestCase
             ],
         );
     }
+
+    public function test_creates_mail_only_microsoft_entra_integration(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $organization = Organization::factory()->create(['tenant_id' => $tenant->id]);
+
+        $result = OrganizationIntegrationProvisioner::create(
+            $organization,
+            OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA,
+            [
+                'entra_azure_tenant_id' => 'tenant-guid',
+                'entra_application_client_id' => 'client-guid',
+                'entra_client_secret' => 'secret',
+                'entra_enabled' => true,
+                'entra_scope_mail' => true,
+            ],
+        );
+
+        $entry = OrganizationIntegrationSettings::findEntryForOrganization(
+            $organization,
+            $result['integration_id'],
+        );
+
+        $this->assertTrue($entry['config']['scopes']['mail'] ?? false);
+        $this->assertFalse($entry['config']['scopes']['users'] ?? true);
+    }
 }

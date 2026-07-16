@@ -34,7 +34,7 @@ Tenant-scoped mailbox configuration.
 
 **Organization integration reference**: API mail accounts (`microsoft_graph`, `google_gmail_api`, …) reference an organization integration via `organization_id` + `integration_type` + `integration_id`. The `integration_type` value matches entries in `organizations.organizational_settings` (e.g. `microsoft_entra`, `google_workspace`). Different customers can use different integrations per organization.
 
-**Microsoft Graph:** requires `Mail.Read` and `Mail.Send` application permissions (admin consent).
+**Microsoft Graph:** requires `Mail.Read` and `Mail.Send` application permissions (admin consent) on the linked Entra app registration. Enable the **Mail (shared mailboxes)** capability on the organization Entra integration (or create the integration from the mail account form) so the wizard shows these permissions. A Graph `403 ErrorAccessDenied` on **Test connection** almost always means those permissions are missing or not admin-consented.
 
 **Google Workspace (planned):** see [`google-workspace-mail.md`](google-workspace-mail.md).
 

@@ -122,7 +122,7 @@ Centralize in `App\Support\IntegrationType` (or retain on `OrganizationIntegrati
 
 | Constant                | Value              | Purpose                                              |
 | ----------------------- | ------------------ | ---------------------------------------------------- |
-| `TYPE_MICROSOFT_ENTRA`  | `microsoft_entra`  | Directory, Intune devices, Graph security (existing) |
+| `TYPE_MICROSOFT_ENTRA`  | `microsoft_entra`  | Directory, Intune devices, Graph security, shared-mailbox mail |
 | `TYPE_GOOGLE_WORKSPACE` | `google_workspace` | Mail (existing)                                      |
 | `TYPE_ACTION1`          | `action1`          | RMM endpoints, software, patches, alerts             |
 
@@ -139,7 +139,7 @@ Provider-specific non-secret keys (examples):
 
 | Provider          | Config keys                                                                 |
 | ----------------- | --------------------------------------------------------------------------- |
-| `microsoft_entra` | `azure_tenant_id`, `scopes.users`, `scopes.computers`, …                  |
+| `microsoft_entra` | `azure_tenant_id`, `scopes.users`, `scopes.computers`, `scopes.mail`, … |
 | `google_workspace`| `customer_domain`, `delegated_scopes`, `setup_verified_at`, …               |
 | `action1`         | `action1_organization_id`, `action1_organization_name`, `action1_group_id` |
 
@@ -661,7 +661,7 @@ No change: continue `users.entra_object_id` for directory users.
 
 Continue writing `MonitoringEvent` via org-scoped `MonitoringEventSource` (`provider = microsoft_entra`). Link events to assets when Graph provides device IDs in `azureADDeviceId`, `deviceState`, `affectedDevice`, `deviceDetails`, `devices[]`, or `impactedAssets[]` (via `MonitoringEventAssetLinker`).
 
-### 9.4 Config scopes (unchanged keys)
+### 9.4 Config scopes
 
 ```php
 'scopes' => [
@@ -669,8 +669,21 @@ Continue writing `MonitoringEvent` via org-scoped `MonitoringEventSource` (`prov
     'departments' => bool,
     'computers' => bool,  // feeds Asset reconciliation
     'security_work_items' => bool,
+    'mail' => bool,       // shared-mailbox Graph mail (not a directory sync job)
 ],
 ```
+
+| Scope | Graph application permissions (admin consent) | Used by |
+|-------|-----------------------------------------------|---------|
+| `users` | `User.Read.All` | Directory user sync |
+| `departments` | `Group.Read.All`, `Directory.Read.All` | Department mapping |
+| `computers` | `DeviceManagementManagedDevices.Read.All` | Intune → assets |
+| `security_work_items` | `SecurityIncident.Read.All` | Security monitoring events |
+| `mail` | `Mail.Read`, `Mail.Send` | Mail accounts (poll + send) |
+
+The Entra integration wizard **Capabilities** step toggles these scopes and the **API permissions** step lists the matching Graph application permissions. Mail accounts that create an Entra integration inline default `scopes.mail` to on and show the same `Mail.Read` / `Mail.Send` checklist.
+
+`scopes.mail` counts as a valid capability when enabling the integration, but it does **not** make the integration eligible for directory/Intune/security sync jobs (`entraConfigSyncSkipReason` ignores `mail`).
 
 ---
 

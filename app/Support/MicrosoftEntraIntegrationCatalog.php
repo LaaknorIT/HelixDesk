@@ -59,13 +59,23 @@ final class MicrosoftEntraIntegrationCatalog
                     'Mail.Read',
                     'Mail.Send',
                 ],
-                'setup_notes' => 'Grant admin consent. Use application permissions with the shared mailbox UPN on each mail account.',
+                'setup_notes' => 'In Entra: App registration → API permissions → Microsoft Graph → Application permissions → add Mail.Read and Mail.Send → Grant admin consent. Then set each HelixDesk mail account mailbox UPN to the shared mailbox address. A 403 ErrorAccessDenied usually means these permissions are missing or not consented.',
             ],
         ];
     }
 
     /**
-     * @param  array<string, bool>  $scopesEnabled  keys: users, departments, computers, security_work_items
+     * Scope keys that drive directory / Intune / security sync jobs (not mail).
+     *
+     * @return list<string>
+     */
+    public static function directorySyncScopeKeys(): array
+    {
+        return ['users', 'departments', 'computers', 'security_work_items'];
+    }
+
+    /**
+     * @param  array<string, bool>  $scopesEnabled  keys: users, departments, computers, security_work_items, mail
      */
     public static function collectApplicationPermissions(array $scopesEnabled): array
     {
@@ -146,6 +156,14 @@ final class MicrosoftEntraIntegrationCatalog
             'departments' => (bool) $get('entra_scope_departments'),
             'computers' => (bool) $get('entra_scope_computers'),
             'security_work_items' => (bool) $get('entra_scope_security_work_items'),
+            'mail' => (bool) $get('entra_scope_mail'),
         ];
+    }
+
+    public static function mailPermissionsSummaryHtml(): HtmlString
+    {
+        return self::summaryHtml([
+            'mail' => true,
+        ]);
     }
 }

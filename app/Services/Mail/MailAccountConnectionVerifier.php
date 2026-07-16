@@ -133,9 +133,19 @@ class MailAccountConnectionVerifier
 
         $mailboxUpn = $creds['mailbox_upn'];
         $encodedUpn = rawurlencode($mailboxUpn);
-        $inbox = $client->getJson("users/{$encodedUpn}/mailFolders/inbox", [
-            '$select' => 'id,displayName,totalItemCount,unreadItemCount',
-        ]);
+
+        try {
+            $inbox = $client->getJson("users/{$encodedUpn}/mailFolders/inbox", [
+                '$select' => 'id,displayName,totalItemCount,unreadItemCount',
+            ]);
+        } catch (Throwable $e) {
+            $message = $e->getMessage();
+            if (str_contains($message, '403') || str_contains($message, 'ErrorAccessDenied')) {
+                $message .= ' Grant Microsoft Graph application permissions Mail.Read and Mail.Send on the Entra app registration, then Grant admin consent for the organization. Enable the Mail (shared mailboxes) capability on the Entra integration in HelixDesk to see the full checklist.';
+            }
+
+            throw new RuntimeException($message, 0, $e);
+        }
 
         $total = (int) ($inbox['totalItemCount'] ?? 0);
         $unread = (int) ($inbox['unreadItemCount'] ?? 0);

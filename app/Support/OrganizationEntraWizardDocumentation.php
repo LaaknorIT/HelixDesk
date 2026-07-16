@@ -31,14 +31,14 @@ final class OrganizationEntraWizardDocumentation
     public static function overviewHtml(): HtmlString
     {
         $body = self::lead(
-            e(__('Connect this organization to Microsoft Entra ID so HelixDesk can read directory data and related cloud services. '))
+            e(__('Connect this organization to Microsoft Entra ID so HelixDesk can read directory data, sync Intune devices, and access shared mailboxes via Microsoft Graph. '))
             .'<span class="text-sky-600 dark:text-sky-400 font-semibold">'.e(__('Application')).'</span>'
             .e(__(' permissions in Entra must match the capabilities you enable below.'))
         )
             .'<ul class="mt-4 space-y-2.5 pl-1">'
             .self::bullet(e(__('Use a separate app registration for each HelixDesk environment (production, staging, test).')))
-            .self::bullet(e(__('Use application permissions for unattended background sync; delegated permissions only if you rely on interactive sign-in.')))
-            .self::bullet(e(__('Sync workers are not live yet—this wizard stores configuration and credentials for when they are enabled.')))
+            .self::bullet(e(__('Use application permissions for unattended jobs (directory sync and mail); delegated permissions are not required for these flows.')))
+            .self::bullet(e(__('After choosing capabilities, the next step lists the exact Graph permissions to add in Entra → API permissions → Grant admin consent.')))
             .'</ul>'
             .self::muted(
                 e(__('Tip: keep the Entra admin center open in another tab while you work through the steps.'))
@@ -108,7 +108,7 @@ final class OrganizationEntraWizardDocumentation
     public static function capabilitiesIntroHtml(): HtmlString
     {
         $body = '<p class="text-sm text-gray-800 dark:text-gray-200">'
-            .e(__('Choose the areas you want to sync. You can change this later; the permissions you grant in Entra should stay aligned with these toggles.'))
+            .e(__('Choose directory sync capabilities and/or Mail (shared mailboxes). You can change this later; the permissions you grant in Entra should stay aligned with these toggles. Enabling Mail alone is valid for ticket email without directory sync.'))
             .'</p>';
 
         return new HtmlString(self::docShell($body));

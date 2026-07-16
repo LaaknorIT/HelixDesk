@@ -36,7 +36,7 @@ class OrganizationEntraSettingsSchema
                                 ->description(OrganizationEntraWizardDocumentation::appRegistrationHtml()),
                         ]),
                     Step::make(__('Capabilities'))
-                        ->description(__('Choose what this organization should sync from Microsoft.'))
+                        ->description(__('Choose directory sync and/or Microsoft 365 mail access for this organization.'))
                         ->schema([
                             Callout::make(__('Provisioning scope'))
                                 ->description(OrganizationEntraWizardDocumentation::capabilitiesIntroHtml()),
@@ -56,9 +56,14 @@ class OrganizationEntraSettingsSchema
                                 ->label(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['security_work_items']['label'])
                                 ->helperText(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['security_work_items']['description'])
                                 ->default(false),
+                            Toggle::make('entra_scope_mail')
+                                ->label(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['mail']['label'])
+                                ->helperText(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['mail']['description'])
+                                ->default(false)
+                                ->live(),
                         ]),
                     Step::make(__('API permissions'))
-                        ->description(__('Suggested Microsoft Graph application permissions based on your choices.'))
+                        ->description(__('Suggested Microsoft Graph application permissions based on your choices. Add these in Entra, then grant admin consent.'))
                         ->schema([
                             Callout::make(__('Permission checklist'))
                                 ->description(fn (Get $get): HtmlString => MicrosoftEntraIntegrationCatalog::summaryHtml(

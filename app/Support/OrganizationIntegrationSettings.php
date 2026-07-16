@@ -309,8 +309,8 @@ final class OrganizationIntegrationSettings
             return 'invalid_scopes';
         }
 
-        foreach ($scopes as $on) {
-            if ($on) {
+        foreach (MicrosoftEntraIntegrationCatalog::directorySyncScopeKeys() as $key) {
+            if ($scopes[$key] ?? false) {
                 return null;
             }
         }
@@ -378,6 +378,15 @@ final class OrganizationIntegrationSettings
     /**
      * @param  array<string, mixed>  $data
      */
+    public static function entraFormHasCapability(array $data): bool
+    {
+        return self::entraFormHasSyncScope($data)
+            || ($data['entra_scope_mail'] ?? false);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public static function action1FormHasSyncScope(array $data): bool
     {
         return ($data['action1_scope_endpoints'] ?? false)
@@ -395,12 +404,12 @@ final class OrganizationIntegrationSettings
             return;
         }
 
-        if (self::entraFormHasSyncScope($data)) {
+        if (self::entraFormHasCapability($data)) {
             return;
         }
 
         throw ValidationException::withMessages([
-            'entra_scope_users' => __('Select at least one capability to sync when the integration is enabled.'),
+            'entra_scope_users' => __('Select at least one capability when the integration is enabled.'),
         ]);
     }
 
@@ -437,6 +446,7 @@ final class OrganizationIntegrationSettings
                 'departments' => false,
                 'computers' => false,
                 'security_work_items' => false,
+                'mail' => false,
             ],
         ]);
     }
@@ -481,6 +491,7 @@ final class OrganizationIntegrationSettings
             'entra_scope_departments' => (bool) ($scopes['departments'] ?? false),
             'entra_scope_computers' => (bool) ($scopes['computers'] ?? false),
             'entra_scope_security_work_items' => (bool) ($scopes['security_work_items'] ?? false),
+            'entra_scope_mail' => (bool) ($scopes['mail'] ?? false),
         ];
     }
 
@@ -545,6 +556,7 @@ final class OrganizationIntegrationSettings
                 'departments' => (bool) ($data['entra_scope_departments'] ?? false),
                 'computers' => (bool) ($data['entra_scope_computers'] ?? false),
                 'security_work_items' => (bool) ($data['entra_scope_security_work_items'] ?? false),
+                'mail' => (bool) ($data['entra_scope_mail'] ?? false),
             ],
         ];
     }

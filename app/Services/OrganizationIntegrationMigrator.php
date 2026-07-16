@@ -283,6 +283,7 @@ final class OrganizationIntegrationMigrator
                 'departments' => (bool) ($scopes['departments'] ?? false),
                 'computers' => (bool) ($scopes['computers'] ?? false),
                 'security_work_items' => (bool) ($scopes['security_work_items'] ?? false),
+                'mail' => (bool) ($scopes['mail'] ?? false),
             ],
         ];
     }

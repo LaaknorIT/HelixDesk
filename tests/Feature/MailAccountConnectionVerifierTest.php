@@ -106,6 +106,9 @@ class MailAccountConnectionVerifierTest extends TestCase
 
         $this->assertFalse($result->ok);
         $this->assertStringContainsString('403', $result->message);
+        $this->assertStringContainsString('Mail.Read', $result->message);
+        $this->assertStringContainsString('Mail.Send', $result->message);
+        $this->assertStringContainsString('admin consent', $result->message);
     }
 
     public function test_google_gmail_api_verify_reports_not_implemented(): void

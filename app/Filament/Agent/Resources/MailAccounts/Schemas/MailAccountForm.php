@@ -9,6 +9,7 @@ use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationGoogleWorkspa
 use App\Models\MailAccount;
 use App\Models\Organization;
 use App\Support\MailProviderPresets;
+use App\Support\MicrosoftEntraIntegrationCatalog;
 use App\Support\OrganizationIntegrationOptions;
 use App\Support\OrganizationIntegrationProvisioner;
 use App\Support\OrganizationIntegrationSettings;
@@ -19,11 +20,13 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use RuntimeException;
 
 class MailAccountForm
@@ -101,6 +104,10 @@ class MailAccountForm
                     ->description('Select which organization integration authenticates API-based mail for this account.')
                     ->visible(fn (Get $get): bool => self::usesApiIntegration($get))
                     ->schema([
+                        Callout::make(__('Microsoft Graph mail permissions'))
+                            ->icon(Heroicon::OutlinedKey)
+                            ->description(MicrosoftEntraIntegrationCatalog::mailPermissionsSummaryHtml())
+                            ->visible(fn (Get $get): bool => self::usesMicrosoftGraph($get)),
                         Select::make('organization_id')
                             ->label('Organization')
                             ->options(fn (): array => OrganizationIntegrationOptions::organizationsForCurrentTenant())
@@ -139,6 +146,10 @@ class MailAccountForm
                                 $allowedTypes = self::allowedIntegrationTypes($get);
                                 if (count($allowedTypes) !== 1) {
                                     throw new RuntimeException('Unable to determine integration type for this mail account.');
+                                }
+
+                                if ($allowedTypes[0] === OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA) {
+                                    $data['entra_scope_mail'] = true;
                                 }
 
                                 $result = OrganizationIntegrationProvisioner::create(
