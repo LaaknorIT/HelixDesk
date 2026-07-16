@@ -2,6 +2,7 @@
 
 namespace App\Filament\Agent\Resources\MailAccounts\Pages;
 
+use App\Filament\Agent\Resources\MailAccounts\Actions\MailAccountOperationalActions;
 use App\Filament\Agent\Resources\MailAccounts\MailAccountResource;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
@@ -31,6 +32,8 @@ class EditMailAccount extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            MailAccountOperationalActions::testConnection(),
+            MailAccountOperationalActions::checkEmail(),
             DeleteAction::make()
                 ->visible(fn (): bool => MailAccountResource::canDelete($this->getRecord())),
         ];

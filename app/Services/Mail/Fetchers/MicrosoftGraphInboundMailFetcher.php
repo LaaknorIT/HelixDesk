@@ -4,12 +4,16 @@ namespace App\Services\Mail\Fetchers;
 
 use App\Models\MailAccount;
 use App\Services\Mail\Contracts\InboundMailFetcher;
+use App\Services\Mail\MailInboundLogger;
 use App\Services\MicrosoftEntra\MicrosoftGraphHttpClient;
 use App\Support\MailAccountEntraResolver;
 
 class MicrosoftGraphInboundMailFetcher implements InboundMailFetcher
 {
-    public function __construct(private readonly MailAccountEntraResolver $entraResolver) {}
+    public function __construct(
+        private readonly MailAccountEntraResolver $entraResolver,
+        private readonly MailInboundLogger $logger,
+    ) {}
 
     /**
      * @return list<array{raw: string, uid: string|null}>
@@ -27,6 +31,7 @@ class MicrosoftGraphInboundMailFetcher implements InboundMailFetcher
         $path = "users/{$mailboxUpn}/mailFolders/inbox/messages";
 
         $messages = [];
+        $skippedEmptyId = 0;
         foreach ($client->paginateCollection($path, [
             '$filter' => 'isRead eq false',
             '$top' => 25,
@@ -34,6 +39,8 @@ class MicrosoftGraphInboundMailFetcher implements InboundMailFetcher
         ]) as $row) {
             $messageId = (string) ($row['id'] ?? '');
             if ($messageId === '') {
+                $skippedEmptyId++;
+
                 continue;
             }
 
@@ -43,6 +50,12 @@ class MicrosoftGraphInboundMailFetcher implements InboundMailFetcher
                 'uid' => $messageId,
             ];
         }
+
+        $this->logger->info($account, 'Microsoft Graph inbox fetch completed', [
+            'mailbox_upn' => $creds['mailbox_upn'],
+            'unread_fetched' => count($messages),
+            'skipped_empty_id' => $skippedEmptyId,
+        ]);
 
         return $messages;
     }

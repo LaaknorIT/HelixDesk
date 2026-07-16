@@ -3,13 +3,10 @@
 namespace App\Jobs;
 
 use App\Models\MailAccount;
-use App\Services\Mail\Fetchers\InboundMailFetcherFactory;
-use App\Services\Mail\InboundMailIngestionService;
-use App\Services\TenantContext;
+use App\Services\Mail\MailAccountPollService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Carbon;
-use Throwable;
+use RuntimeException;
 
 class PollMailAccountJob implements ShouldQueue
 {
@@ -19,11 +16,8 @@ class PollMailAccountJob implements ShouldQueue
 
     public function __construct(public int $mailAccountId) {}
 
-    public function handle(
-        TenantContext $tenantContext,
-        InboundMailFetcherFactory $fetcherFactory,
-        InboundMailIngestionService $ingestionService,
-    ): void {
+    public function handle(MailAccountPollService $pollService): void
+    {
         /** @var MailAccount|null $account */
         $account = MailAccount::query()->withoutGlobalScopes()->find($this->mailAccountId);
 
@@ -31,28 +25,10 @@ class PollMailAccountJob implements ShouldQueue
             return;
         }
 
-        $tenantContext->setTenantId((int) $account->tenant_id);
-        setPermissionsTeamId((int) $account->tenant_id);
+        $result = $pollService->poll($account);
 
-        try {
-            $fetcher = $fetcherFactory->forAccount($account);
-
-            foreach ($fetcher->fetchNewMessages($account) as $item) {
-                $ingestionService->ingest($account, $item['raw'], $item['uid']);
-                $fetcher->acknowledgeMessage($account, $item['uid']);
-            }
-
-            $account->last_polled_at = Carbon::now();
-            $account->last_poll_error = null;
-            $account->save();
-        } catch (Throwable $e) {
-            $account->last_poll_error = $e->getMessage();
-            $account->save();
-
-            throw $e;
-        } finally {
-            $tenantContext->setTenantId(null);
-            setPermissionsTeamId(null);
+        if (! $result->succeeded()) {
+            throw new RuntimeException($result->error ?? 'Mail account poll failed.');
         }
     }
 }

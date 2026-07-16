@@ -6,6 +6,7 @@ use App\Enums\MailInboundProtocol;
 use App\Enums\MailOutboundProtocol;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationEntraIntegrationInlineSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationGoogleWorkspaceIntegrationInlineSchema;
+use App\Models\MailAccount;
 use App\Models\Organization;
 use App\Support\MailProviderPresets;
 use App\Support\OrganizationIntegrationOptions;
@@ -14,6 +15,7 @@ use App\Support\OrganizationIntegrationSettings;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -41,6 +43,14 @@ class MailAccountForm
                             ->maxLength(255),
                         Toggle::make('is_enabled')
                             ->default(true),
+                        Placeholder::make('last_polled_at_display')
+                            ->label('Last polled')
+                            ->content(fn (?MailAccount $record): string => $record?->last_polled_at?->toDateTimeString() ?? '—')
+                            ->visible(fn (?MailAccount $record): bool => $record !== null),
+                        Placeholder::make('last_poll_error_display')
+                            ->label('Last poll error')
+                            ->content(fn (?MailAccount $record): string => filled($record?->last_poll_error) ? (string) $record->last_poll_error : '—')
+                            ->visible(fn (?MailAccount $record): bool => $record !== null && filled($record->last_poll_error)),
                     ]),
                 Section::make('Protocols')
                     ->schema([

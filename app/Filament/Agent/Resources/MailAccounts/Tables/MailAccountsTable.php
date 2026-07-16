@@ -4,6 +4,7 @@ namespace App\Filament\Agent\Resources\MailAccounts\Tables;
 
 use App\Enums\MailInboundProtocol;
 use App\Enums\MailOutboundProtocol;
+use App\Filament\Agent\Resources\MailAccounts\Actions\MailAccountOperationalActions;
 use App\Filament\Agent\Resources\MailAccounts\MailAccountResource;
 use App\Models\MailAccount;
 use Filament\Actions\BulkActionGroup;
@@ -50,10 +51,16 @@ class MailAccountsTable
                     ->sortable()
                     ->placeholder('—'),
                 TextColumn::make('last_poll_error')
+                    ->label('Last error')
                     ->limit(40)
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->tooltip(fn (MailAccount $record): ?string => $record->last_poll_error)
+                    ->color('danger')
+                    ->placeholder('—')
+                    ->toggleable(),
             ])
             ->recordActions([
+                MailAccountOperationalActions::testConnection(),
+                MailAccountOperationalActions::checkEmail(),
                 EditAction::make()
                     ->visible(fn (MailAccount $record): bool => MailAccountResource::canEdit($record)),
                 DeleteAction::make()

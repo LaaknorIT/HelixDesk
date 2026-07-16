@@ -7,7 +7,7 @@ use App\Models\MailAccount;
 use App\Services\Mail\Contracts\InboundMailFetcher;
 use RuntimeException;
 
-final class InboundMailFetcherFactory
+class InboundMailFetcherFactory
 {
     public function __construct(
         private readonly ImapInboundMailFetcher $imap,

@@ -2,6 +2,7 @@
 
 namespace App\Services\Mail;
 
+use App\Enums\InboundMailIngestOutcome;
 use App\Enums\WorkItemSource;
 use App\Enums\WorkItemType;
 use App\Models\MailAccount;
@@ -20,24 +21,48 @@ class InboundMailIngestionService
     public function __construct(
         private readonly InboundMimeParser $mimeParser,
         private readonly RequesterResolutionService $requesterResolver,
+        private readonly MailInboundLogger $logger,
     ) {}
 
-    public function ingest(MailAccount $account, string $rawMime, ?string $transportUid = null): void
+    public function ingest(MailAccount $account, string $rawMime, ?string $transportUid = null): InboundMailIngestOutcome
     {
         $parsed = $this->mimeParser->parse($rawMime, $transportUid);
 
         if ($parsed->fromAddress === '') {
-            return;
+            $this->logger->warning($account, 'Skipping inbound message with empty From', [
+                'transport_uid' => $transportUid,
+                'message_id' => $parsed->messageId,
+                'subject' => $parsed->subject,
+            ]);
+
+            return InboundMailIngestOutcome::SkippedEmptyFrom;
         }
 
         if (ProcessedInboundEmail::query()
             ->where('mail_account_id', $account->getKey())
             ->where('message_id', $parsed->messageId)
             ->exists()) {
-            return;
+            $this->logger->info($account, 'Skipping duplicate inbound message', [
+                'transport_uid' => $transportUid,
+                'message_id' => $parsed->messageId,
+            ]);
+
+            return InboundMailIngestOutcome::Duplicate;
         }
 
-        DB::transaction(function () use ($account, $parsed): void {
+        $existing = $this->findWorkItemForReply($account, $parsed);
+        if ($existing === null && $this->resolveQueueForAccount($account) === null) {
+            $this->logger->warning($account, 'Skipping inbound message: no queue linked to mail account', [
+                'transport_uid' => $transportUid,
+                'message_id' => $parsed->messageId,
+                'from' => $parsed->fromAddress,
+                'subject' => $parsed->subject,
+            ]);
+
+            return InboundMailIngestOutcome::SkippedNoQueue;
+        }
+
+        DB::transaction(function () use ($account, $parsed, $existing): void {
             ProcessedInboundEmail::query()->create([
                 'tenant_id' => $account->tenant_id,
                 'mail_account_id' => $account->getKey(),
@@ -45,11 +70,7 @@ class InboundMailIngestionService
                 'processed_at' => Carbon::now(),
             ]);
 
-            $workItem = $this->resolveWorkItem($account, $parsed);
-
-            if ($workItem === null) {
-                return;
-            }
+            $workItem = $existing ?? $this->createWorkItem($account, $parsed);
 
             $requester = $this->requesterResolver->resolveOrCreate(
                 tenantId: (int) $account->tenant_id,
@@ -83,18 +104,23 @@ class InboundMailIngestionService
 
             $this->storeAttachments($message, $parsed->attachments);
         });
+
+        $this->logger->info($account, 'Ingested inbound message', [
+            'transport_uid' => $transportUid,
+            'message_id' => $parsed->messageId,
+            'from' => $parsed->fromAddress,
+            'subject' => $parsed->subject,
+            'threaded' => $existing !== null,
+        ]);
+
+        return InboundMailIngestOutcome::Ingested;
     }
 
-    private function resolveWorkItem(MailAccount $account, ParsedInboundEmail $parsed): ?WorkItem
+    private function createWorkItem(MailAccount $account, ParsedInboundEmail $parsed): WorkItem
     {
-        $existing = $this->findWorkItemForReply($account, $parsed);
-        if ($existing !== null) {
-            return $existing;
-        }
-
         $queue = $this->resolveQueueForAccount($account);
         if ($queue === null) {
-            return null;
+            throw new \RuntimeException('No queue available for mail account '.$account->getKey());
         }
 
         $requester = $this->requesterResolver->resolveOrCreate(

@@ -76,16 +76,22 @@ Dedup table: unique `(mail_account_id, message_id)`.
 ## Inbound flow
 
 1. Scheduler dispatches `PollMailAccountsJob` every few minutes when any account is due.
-2. `PollMailAccountJob` runs per account inside tenant context.
-3. Transport fetches new messages (IMAP unseen / POP3 UIDL / Graph `messages` with delta).
+2. `PollMailAccountJob` runs per account inside tenant context (same path as the admin **Check email** action).
+3. Transport fetches new messages:
+   - IMAP: unseen (`UNSEEN`) in INBOX
+   - POP3: UIDL not yet in `sync_state`
+   - Microsoft Graph: inbox messages with `isRead eq false` (only **unread** mail)
 4. `InboundMailIngestionService`:
    - Parses MIME (`zbateson/mail-mime-parser`).
    - Skips if `Message-ID` already in `processed_inbound_emails`.
+   - Skips (and does **not** mark processed) when a new ticket cannot be routed because no queue is linked to the mail account and no tenant fallback queue exists — so a later poll can retry after queue linking.
    - Resolves requester (`RequesterResolutionService`: find or create `end_user`).
    - If `In-Reply-To` / `References` match an existing incident message → `addMessage` on that incident.
    - Else → create incident on a queue linked to the mail account (`source=email`, `mail_account_id` set).
    - Stores attachments.
-5. Marks message read / deletes (POP3) / records Graph id in `sync_state`.
+5. Acknowledges ingested, duplicate, and empty-From messages (IMAP/Graph mark read; POP3 UIDL already recorded). Messages skipped for missing queue stay unread so a later poll can retry after queue linking.
+
+**Microsoft Graph note:** If a message in the shared mailbox is already marked read, HelixDesk will not fetch it. **Test connection** reports total vs unread inbox counts so this is visible during setup.
 
 ## Outbound flow
 
@@ -102,7 +108,18 @@ Dedup table: unique `(mail_account_id, message_id)`.
 ## UI
 
 - **Administration → Mail accounts**: CRUD, protocol-specific fields, Entra integration picker.
+  - **Test connection**: verifies credentials / Graph app permissions and mailbox access (IMAP login, POP3 login, or Graph token + inbox read). Run after creating or editing an account; also offered automatically after create. For Graph, the result includes inbox total/unread counts.
+  - **Check email**: runs inbound poll for that account immediately (same as `PollMailAccountJob`) and reports how many messages were fetched / ingested / skipped, or the error stored in `last_poll_error`.
+  - `last_poll_error` is shown on the list (toggleable) and on the edit page when set.
 - **Administration → Queues**: attach mail accounts; select default outbound account (must be linked).
+
+## Logging
+
+Inbound mail uses a dedicated Monolog channel `mail` (`storage/logs/mail-YYYY-MM-DD.log`) with **daily rotation and 7-day retention** (`LOG_MAIL_DAYS`, default `7`) so verbose poll/ingest diagnostics do not grow forever.
+
+Logged events include: poll start/finish (fetched/ingested/skipped counts), fetch failures, ingest skips (empty From, duplicate Message-ID, no resolvable queue), and connection verify results.
+
+Application-wide logs should also use the Laravel `daily` driver in production (`LOG_STACK=daily`, `LOG_DAILY_DAYS=7`) so `laravel-*.log` files are pruned after a week.
 
 ## Provider notes
 
@@ -139,6 +156,14 @@ HelixDesk does not implement Gmail OAuth for personal IMAP yet; App Passwords ar
     'poll_interval_minutes' => (int) env('MAIL_POLL_INTERVAL_MINUTES', 5),
 ],
 ```
+
+Logging (`.env` / `config/logging.php`):
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `LOG_STACK` | Channels in the default stack | `daily` (recommended) |
+| `LOG_DAILY_DAYS` | Days to keep `laravel-*.log` | `7` |
+| `LOG_MAIL_DAYS` | Days to keep `mail-*.log` | `7` |
 
 ## Security
 
