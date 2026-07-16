@@ -87,12 +87,12 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             return true;
         }
 
-        if ($this->is_admin) {
-            $teamId = $this->effectiveTenantId();
+        $teamId = $this->effectiveTenantId();
 
-            if ($teamId !== null && $this->isTenantAdminFor($teamId)) {
-                return true;
-            }
+        // Tenant Admin role for the current team counts as staff even when the user is no
+        // longer a global admin (is_admin=false) or was assigned from the global-admin panel.
+        if ($teamId !== null && $this->isTenantAdminFor($teamId)) {
+            return true;
         }
 
         return false;

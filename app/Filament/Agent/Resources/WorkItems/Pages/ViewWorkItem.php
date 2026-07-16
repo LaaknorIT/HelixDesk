@@ -224,8 +224,9 @@ class ViewWorkItem extends ViewRecord
         } catch (AccessDeniedHttpException) {
             Notification::make()
                 ->title($isInternal ? 'Not allowed to add an internal note' : 'Not allowed to reply on this ticket')
-                ->body('Check that your role can update work items on this queue.')
+                ->body('Your role needs work-item Update (or Admin) on this ticket\'s queue under Administration → Roles → Work item permissions by queue.')
                 ->danger()
+                ->persistent()
                 ->send();
 
             return;

@@ -113,6 +113,11 @@ final class HelixdeskWorkItemAuthorization
             return false;
         }
 
+        // Per-queue "admin" means full work-item access on that queue (read/create/update/delete).
+        if (! empty($decoded['admin'])) {
+            return true;
+        }
+
         return ! empty($decoded[$action]);
     }
 

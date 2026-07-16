@@ -165,7 +165,7 @@ See [`email-handling.md`](email-handling.md) for inbound/outbound flows.
 
 Queue-scoped authorization invariant:
 
-- For agents, **work item** capabilities are evaluated per **`queue_id`** using **`role_queue.work_item_permissions`** (and **`work_item.admin`** on `role_permissions` if present). Legacy data may use global `work_item.*` on `role_permissions` only when the pivot JSON is null.
+- For agents, **work item** capabilities are evaluated per **`queue_id`** using **`role_queue.work_item_permissions`** (and **`work_item.admin`** on `role_permissions` if present). Per-queue **`admin: true`** grants all work-item actions on that queue. Saving a role with **Admin** enabled on every linked queue also persists global **`work_item.admin`**. Legacy data may use global `work_item.*` on `role_permissions` only when the pivot JSON is null.
 - An agent can read a work item only when they have **read** (or **admin**) for that work item’s queue on at least one assigned role; list/index scopes use the union of queue IDs where **read** is granted.
 
 ---

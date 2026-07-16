@@ -179,7 +179,7 @@ class EditTenantRole extends EditRecord
                     ->description('Capabilities for this role. Work item actions are configured per queue below.')
                     ->schema($matrixRows),
                 Section::make('Work item permissions by queue')
-                    ->description('Add a queue, then choose which work item actions apply in that queue. Users with this role only see tickets in queues listed here.')
+                    ->description('Add each queue this role may access, then enable actions. Admin on a queue grants all work-item actions there. Users only see tickets in queues listed here. Enabling Admin on every listed queue restores tenant-wide work_item.admin.')
                     ->schema([
                         Repeater::make('work_item_queue_permissions')
                             ->label('')

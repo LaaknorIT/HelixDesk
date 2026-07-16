@@ -26,10 +26,13 @@ final class RolePermissionMatrixSync
             }
         }
 
-        RolePermissionSync::sync($role, $names, $guardName);
-
+        // The role UI configures work items per queue only. Re-attach work_item.admin when
+        // every linked queue grants Admin so Tenant Admin keeps tenant-wide ticket access
+        // after save (seeded roles store work_item.admin on role_permissions).
         $queueIds = [];
         $sync = [];
+        $queueCount = 0;
+        $adminQueueCount = 0;
 
         foreach ($workItemQueueRows as $row) {
             $queueId = isset($row['queue_id']) ? (int) $row['queue_id'] : 0;
@@ -45,12 +48,23 @@ final class RolePermissionMatrixSync
             }
 
             $queueIds[$queueId] = true;
+            $queueCount++;
 
-            $actions = $row['actions'] ?? [];
+            $actions = self::normalizeWorkItemActions($row['actions'] ?? []);
+            if (! empty($actions['admin'])) {
+                $adminQueueCount++;
+            }
+
             $sync[$queueId] = [
-                'work_item_permissions' => json_encode(self::normalizeWorkItemActions($actions)),
+                'work_item_permissions' => json_encode($actions),
             ];
         }
+
+        if ($queueCount > 0 && $adminQueueCount === $queueCount) {
+            $names[] = 'work_item.admin';
+        }
+
+        RolePermissionSync::sync($role, $names, $guardName);
 
         $role->queues()->sync($sync);
 
