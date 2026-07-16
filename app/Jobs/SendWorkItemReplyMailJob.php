@@ -34,20 +34,30 @@ class SendWorkItemReplyMailJob implements ShouldQueue
         $tenantContext->setTenantId((int) $message->tenant_id);
         setPermissionsTeamId((int) $message->tenant_id);
 
+        $mailLogger->logger()->info('Outbound work item reply mail job started.', [
+            'work_item_id' => $message->work_item_id,
+            'work_item_message_id' => $message->getKey(),
+            'tenant_id' => $message->tenant_id,
+        ]);
+
         try {
             $mailService->sendAgentReply($message);
         } catch (Throwable $e) {
             // Conversation message is already saved; never fail the agent UI / request lifecycle.
+            // OutboundWorkItemMailService already writes a detailed mail-channel error; keep a
+            // job-level breadcrumb so failures are visible even if the service logging path changes.
             report($e);
 
-            $account = $message->workItem?->mailAccount;
+            $account = $message->workItem?->mailAccount
+                ?? $message->workItem?->queue?->defaultMailAccount;
+
             if ($account !== null) {
-                $mailLogger->exception($account, 'Outbound work item reply mail failed', $e, [
+                $mailLogger->exception($account, 'Outbound work item reply mail job failed.', $e, [
                     'work_item_id' => $message->work_item_id,
                     'work_item_message_id' => $message->getKey(),
                 ]);
             } else {
-                $mailLogger->logger()->error('Outbound work item reply mail failed', [
+                $mailLogger->logger()->error('Outbound work item reply mail job failed.', [
                     'work_item_id' => $message->work_item_id,
                     'work_item_message_id' => $message->getKey(),
                     'exception' => $e::class,

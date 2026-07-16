@@ -282,7 +282,7 @@ Normalize:
 - Tenant-scoped **`mail_accounts`** with IMAP, POP3, or Microsoft Graph inbound polling and SMTP/Graph outbound.
 - Many mail accounts per **`queue`**; **`queues.default_mail_account_id`** for portal-created tickets.
 - Inbound ingest via `PollMailAccountJob` → `InboundMailIngestionService` (dedup, threading, requester resolution, attachments).
-- Agent replies dispatch `SendWorkItemReplyMailJob` → `OutboundWorkItemMailService` (reply-from-same-address).
+- Agent replies dispatch `SendWorkItemReplyMailJob` → `OutboundWorkItemMailService` (reply-from-same-address). Graph outbound sets threading via MAPI extended properties (`In-Reply-To` / `References` cannot be sent as `internetMessageHeaders`).
 - Graph mail reuses organization integrations via `integration_type` + `integration_id` on `mail_accounts`.
 - **Google Workspace mail (planned):** Gmail API + service account domain-wide delegation; see [`docs/google-workspace-mail.md`](google-workspace-mail.md).
 

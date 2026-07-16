@@ -100,8 +100,10 @@ Dedup table: unique `(mail_account_id, message_id)`.
 3. `OutboundWorkItemMailService` resolves the sending account:
    - If `incident.mail_account_id` is set → use that account.
    - Else → `queue.default_mail_account_id`.
-   - If neither → skip send (log warning).
-4. Builds MIME with proper `In-Reply-To` / `References`, agent display name, attachments from the message if any.
+   - If neither → skip send (mail-channel warning).
+4. Builds the outbound message (agent display name, attachments when present):
+   - **SMTP**: sets RFC `In-Reply-To` / `References` on the MIME message.
+   - **Microsoft Graph**: Graph rejects standard headers in `internetMessageHeaders` (names must start with `x-` / `X-`). Threading is set via MAPI extended properties instead: `PidTagInReplyToId` (`String 0x1042`) and `PidTagInternetReferences` (`String 0x1039`).
 5. Sends via SMTP (dynamic Laravel mailer) or Graph `sendMail`.
 6. Sets `email_sent_at` and outbound `external_message_id`.
 
@@ -115,9 +117,15 @@ Dedup table: unique `(mail_account_id, message_id)`.
 
 ## Logging
 
-Inbound mail uses a dedicated Monolog channel `mail` (`storage/logs/mail-YYYY-MM-DD.log`) with **daily rotation and 7-day retention** (`LOG_MAIL_DAYS`, default `7`) so verbose poll/ingest diagnostics do not grow forever.
+Mail uses a dedicated Monolog channel `mail` (`storage/logs/mail-YYYY-MM-DD.log`) with **daily rotation and 7-day retention** (`LOG_MAIL_DAYS`, default `7`) so verbose poll/ingest/outbound diagnostics do not grow forever.
 
-Logged events include: poll start/finish (fetched/ingested/skipped counts), fetch failures, ingest skips (empty From, duplicate Message-ID, no resolvable queue), and connection verify results.
+**Inbound** events include: poll start/finish (fetched/ingested/skipped counts), fetch failures, ingest skips (empty From, duplicate Message-ID, no resolvable queue), and connection verify results.
+
+**Outbound** events (agent reply mail) include:
+- attempt start (work item / message / protocol / recipient),
+- skip reasons (already sent, missing author/recipient, no outbound account, Gmail API not implemented),
+- send success (`email_sent_at` set),
+- send failures (exception class + message; also recorded by `SendWorkItemReplyMailJob` so Graph/SMTP errors are visible even when the conversation reply was already saved).
 
 Application-wide logs should also use the Laravel `daily` driver in production (`LOG_STACK=daily`, `LOG_DAILY_DAYS=7`) so `laravel-*.log` files are pruned after a week.
 

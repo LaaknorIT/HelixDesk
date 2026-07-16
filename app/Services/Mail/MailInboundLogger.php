@@ -17,6 +17,14 @@ final class MailInboundLogger
     /**
      * @param  array<string, mixed>  $context
      */
+    public function debug(MailAccount $account, string $message, array $context = []): void
+    {
+        $this->logger()->debug($message, $this->withAccount($account, $context));
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
     public function info(MailAccount $account, string $message, array $context = []): void
     {
         $this->logger()->info($message, $this->withAccount($account, $context));
@@ -61,6 +69,7 @@ final class MailInboundLogger
             'tenant_id' => $account->tenant_id,
             'email_address' => $account->email_address,
             'protocol' => $account->protocol?->value,
+            'outbound_protocol' => $account->outbound_protocol?->value,
             ...$context,
         ];
     }
