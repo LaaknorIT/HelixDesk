@@ -85,7 +85,7 @@ Dedup table: unique `(mail_account_id, message_id)`.
    - Parses MIME (`zbateson/mail-mime-parser`).
    - Skips if `Message-ID` already in `processed_inbound_emails`.
    - Skips (and does **not** mark processed) when a new ticket cannot be routed because no queue is linked to the mail account and no tenant fallback queue exists — so a later poll can retry after queue linking.
-   - Resolves requester (`RequesterResolutionService`: find or create `end_user`).
+   - Resolves requester (`RequesterResolutionService`: find or create `end_user`). For new users, the display name comes from the `From` header’s person name (`AddressHeader::getPersonName()`), not the header field name; if absent, the email address is used.
    - If `In-Reply-To` / `References` match an existing incident message → `addMessage` on that incident.
    - Else → create incident on a queue linked to the mail account (`source=email`, `mail_account_id` set).
    - Stores attachments.

@@ -3,6 +3,7 @@
 namespace App\Services\Mail;
 
 use Illuminate\Support\Str;
+use ZBateson\MailMimeParser\Header\AddressHeader;
 use ZBateson\MailMimeParser\MailMimeParser;
 
 final class InboundMimeParser
@@ -21,9 +22,10 @@ final class InboundMimeParser
         $from = $message->getHeader('From');
         $fromAddress = '';
         $fromName = null;
-        if ($from !== null) {
+        if ($from instanceof AddressHeader) {
             $fromAddress = Str::lower(trim((string) ($from->getEmail() ?? '')));
-            $fromName = $from->getName();
+            $personName = $from->getPersonName();
+            $fromName = is_string($personName) && trim($personName) !== '' ? trim($personName) : null;
         }
 
         $toAddresses = [];

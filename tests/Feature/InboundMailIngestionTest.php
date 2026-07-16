@@ -51,6 +51,7 @@ class InboundMailIngestionTest extends TestCase
         $requester = User::query()->where('email', 'customer@example.com')->first();
         $this->assertNotNull($requester);
         $this->assertSame('end_user', $requester->type);
+        $this->assertSame('customer@example.com', $requester->name);
 
         $this->assertDatabaseHas('work_item_messages', [
             'work_item_id' => $workItem->id,
@@ -62,6 +63,36 @@ class InboundMailIngestionTest extends TestCase
             'mail_account_id' => $account->id,
             'message_id' => '<new-ticket@example.com>',
         ]);
+    }
+
+    public function test_inbound_email_uses_from_display_name_for_new_end_user(): void
+    {
+        Storage::fake('local');
+
+        $tenant = Tenant::factory()->create();
+        $queue = $tenant->generalQueue();
+        $this->assertNotNull($queue);
+
+        $account = MailAccount::factory()->create([
+            'tenant_id' => $tenant->id,
+            'email_address' => 'support@example.com',
+        ]);
+        $queue->mailAccounts()->attach($account->id);
+
+        $raw = $this->sampleMime(
+            messageId: '<named-sender@example.com>',
+            from: 'Lars Age Kamfjord <lars.age@kamfjord.org>',
+            subject: 'Hello',
+            body: 'Please help.',
+        );
+
+        app(InboundMailIngestionService::class)->ingest($account, $raw);
+
+        $requester = User::query()->where('email', 'lars.age@kamfjord.org')->first();
+        $this->assertNotNull($requester);
+        $this->assertSame('end_user', $requester->type);
+        $this->assertSame('Lars Age Kamfjord', $requester->name);
+        $this->assertNotSame('From', $requester->name);
     }
 
     public function test_inbound_reply_threads_on_existing_incident(): void
