@@ -489,6 +489,7 @@ When a soft match hits **multiple** assets:
 
 - Set affected assets' `identity_resolution_status = ambiguous` until resolved.
 - Filament UI (Phase 4): agent picks correct asset or creates new. Ambiguity UI may search tenant-wide for candidates but **matching** stays org-scoped.
+- `AssetIdentityAmbiguity` must expose a `tenant()` relationship (like other Agent-panel resource models). Filament tenancy ownership uses that relationship name by default; a missing `tenant()` relation throws when listing or viewing ambiguities.
 
 ### 5.4 Unlink and retirement
 

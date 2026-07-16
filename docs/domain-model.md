@@ -399,6 +399,21 @@ Patch compliance **summary** per asset per provider (`missing_critical_count`, `
 
 Per-KB/CVE missing update row linked to `AssetPatchStatus`. Unique on `(tenant_id, asset_id, provider, organization_integration_id, kb_id)`.
 
+### 4.2.5 AssetIdentityAmbiguity
+
+Open reconciliation conflict when a provider snapshot soft-matches multiple assets. Agents resolve via Filament (`AssetIdentityAmbiguityResource`).
+
+Key fields:
+
+- `tenant_id`, `organization_id`, `organization_integration_id`, `provider`
+- `candidate_asset_ids` (JSON), `snapshot_json`, `status`, `resolved_asset_id` (nullable)
+
+Relationships:
+
+- belongs to `Tenant` (required for Filament Agent-panel tenancy ownership; relationship name `tenant`)
+- belongs to `Organization`, `OrganizationIntegration`
+- belongs to `Asset` as `resolvedAsset` (optional)
+
 ### 4.3 AssetRelationship
 
 Represents CMDB-style dependencies.
