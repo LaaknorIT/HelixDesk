@@ -34,7 +34,7 @@ Tenant-scoped mailbox configuration.
 
 **Organization integration reference**: API mail accounts (`microsoft_graph`, `google_gmail_api`, …) reference an organization integration via `organization_id` + `integration_type` + `integration_id`. The `integration_type` value matches entries in `organizations.organizational_settings` (e.g. `microsoft_entra`, `google_workspace`). Different customers can use different integrations per organization.
 
-**Microsoft Graph:** requires `Mail.Read` and `Mail.Send` application permissions (admin consent) on the linked Entra app registration. Enable the **Mail (shared mailboxes)** capability on the organization Entra integration (or create the integration from the mail account form) so the wizard shows these permissions. A Graph `403 ErrorAccessDenied` on **Test connection** almost always means those permissions are missing or not admin-consented.
+**Microsoft Graph:** requires `Mail.ReadWrite` and `Mail.Send` application permissions (admin consent) on the linked Entra app registration. `Mail.Read` alone can fetch MIME but **cannot** mark messages read after ingest (`PATCH isRead`); without `Mail.ReadWrite`, polls re-see the same unread message. Enable the **Mail (shared mailboxes)** capability on the organization Entra integration (or create the integration from the mail account form) so the wizard shows these permissions. A Graph `403 ErrorAccessDenied` on **Test connection** or after ingest almost always means those permissions are missing or not admin-consented.
 
 **Google Workspace (planned):** see [`google-workspace-mail.md`](google-workspace-mail.md).
 
@@ -80,7 +80,7 @@ Dedup table: unique `(mail_account_id, message_id)`.
 3. Transport fetches new messages:
    - IMAP: unseen (`UNSEEN`) in INBOX
    - POP3: UIDL not yet in `sync_state`
-   - Microsoft Graph: inbox messages with `isRead eq false` (only **unread** mail)
+   - Microsoft Graph: inbox messages with `isRead eq false`, excluding Graph ids already recorded in `sync_state.graph_processed_message_ids`
 4. `InboundMailIngestionService`:
    - Parses MIME (`zbateson/mail-mime-parser`).
    - Skips if `Message-ID` already in `processed_inbound_emails`.
@@ -89,9 +89,9 @@ Dedup table: unique `(mail_account_id, message_id)`.
    - If `In-Reply-To` / `References` match an existing incident message → `addMessage` on that incident.
    - Else → create incident on a queue linked to the mail account (`source=email`, `mail_account_id` set).
    - Stores attachments.
-5. Acknowledges ingested, duplicate, and empty-From messages (IMAP/Graph mark read; POP3 UIDL already recorded). Messages skipped for missing queue stay unread so a later poll can retry after queue linking.
+5. Acknowledges ingested, duplicate, and empty-From messages (IMAP/Graph mark read; POP3 UIDL already recorded). Graph also records the message id in `sync_state` **before** mark-as-read so a failed `PATCH` cannot cause endless re-fetch. Acknowledge failures after a successful ingest/duplicate are logged as warnings and do not fail the whole poll. Messages skipped for missing queue stay unread so a later poll can retry after queue linking.
 
-**Microsoft Graph note:** If a message in the shared mailbox is already marked read, HelixDesk will not fetch it. **Test connection** reports total vs unread inbox counts so this is visible during setup.
+**Microsoft Graph note:** Prefer marking messages read (`Mail.ReadWrite`). If a message is already marked read and not in `sync_state`, HelixDesk will not fetch it. **Test connection** reports total vs unread inbox counts so this is visible during setup.
 
 ## Outbound flow
 

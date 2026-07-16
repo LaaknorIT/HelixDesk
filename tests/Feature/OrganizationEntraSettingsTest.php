@@ -79,14 +79,14 @@ class OrganizationEntraSettingsTest extends TestCase
         );
 
         $this->assertEqualsCanonicalizing(
-            ['Mail.Read', 'Mail.Send'],
+            ['Mail.ReadWrite', 'Mail.Send'],
             MicrosoftEntraIntegrationCatalog::collectApplicationPermissions([
                 'mail' => true,
             ])
         );
 
         $html = (string) MicrosoftEntraIntegrationCatalog::mailPermissionsSummaryHtml();
-        $this->assertStringContainsString('Mail.Read', $html);
+        $this->assertStringContainsString('Mail.ReadWrite', $html);
         $this->assertStringContainsString('Mail.Send', $html);
         $this->assertStringContainsString('Grant admin consent', $html);
     }

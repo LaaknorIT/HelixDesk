@@ -14,7 +14,7 @@ HelixDesk today supports Google mail only via **IMAP/SMTP + App Passwords**. Tha
 - There is no Exchange-style **shared mailbox**; team mail is a **user mailbox**, **Google Group**, or **Collaborative Inbox**.
 - Service-desk integrations need **stable, admin-consented API access**, not per-user passwords.
 
-**Microsoft 365** already uses application permissions + Graph (`Mail.Read`, `Mail.Send`) with per-organization Entra app registration. **Google Workspace** needs the equivalent: **Gmail API** with a **service account** and **domain-wide delegation**.
+**Microsoft 365** already uses application permissions + Graph (`Mail.ReadWrite`, `Mail.Send`) with per-organization Entra app registration. **Google Workspace** needs the equivalent: **Gmail API** with a **service account** and **domain-wide delegation**.
 
 ---
 
@@ -63,7 +63,7 @@ Mirror the Microsoft stack:
 |--------------|-------------------------------|
 | `OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA` | `TYPE_GOOGLE_WORKSPACE` |
 | Entra app: tenant id, client id, client secret | GCP: service account JSON (encrypted), delegated admin email optional |
-| Graph `Mail.Read` / `Mail.Send` | Gmail API scopes (see §5) |
+| Graph `Mail.ReadWrite` / `Mail.Send` | Gmail API scopes (see §5) |
 | `mail_accounts.protocol = microsoft_graph` | `mail_accounts.protocol = google_gmail_api` |
 | `connection_settings.mailbox_upn` | `connection_settings.mailbox_address` (Workspace user or group address) |
 | `MailAccountEntraResolver` | `MailAccountGoogleWorkspaceResolver` |

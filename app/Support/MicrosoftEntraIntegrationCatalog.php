@@ -54,12 +54,12 @@ final class MicrosoftEntraIntegrationCatalog
             ],
             'mail' => [
                 'label' => 'Mail (shared mailboxes)',
-                'description' => 'Poll shared mailboxes and send incident replies via Microsoft Graph.',
+                'description' => 'Poll shared mailboxes, mark processed messages as read, and send incident replies via Microsoft Graph.',
                 'application_permissions' => [
-                    'Mail.Read',
+                    'Mail.ReadWrite',
                     'Mail.Send',
                 ],
-                'setup_notes' => 'In Entra: App registration → API permissions → Microsoft Graph → Application permissions → add Mail.Read and Mail.Send → Grant admin consent. Then set each HelixDesk mail account mailbox UPN to the shared mailbox address. A 403 ErrorAccessDenied usually means these permissions are missing or not consented.',
+                'setup_notes' => 'In Entra: App registration → API permissions → Microsoft Graph → Application permissions → add Mail.ReadWrite and Mail.Send → Grant admin consent. Mail.Read alone can fetch mail but cannot mark messages read after ingest. Then set each HelixDesk mail account mailbox UPN to the shared mailbox address. A 403 ErrorAccessDenied usually means these permissions are missing or not consented.',
             ],
         ];
     }

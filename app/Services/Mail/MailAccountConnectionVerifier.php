@@ -141,7 +141,7 @@ class MailAccountConnectionVerifier
         } catch (Throwable $e) {
             $message = $e->getMessage();
             if (str_contains($message, '403') || str_contains($message, 'ErrorAccessDenied')) {
-                $message .= ' Grant Microsoft Graph application permissions Mail.Read and Mail.Send on the Entra app registration, then Grant admin consent for the organization. Enable the Mail (shared mailboxes) capability on the Entra integration in HelixDesk to see the full checklist.';
+                $message .= ' Grant Microsoft Graph application permissions Mail.ReadWrite and Mail.Send on the Entra app registration, then Grant admin consent for the organization. Enable the Mail (shared mailboxes) capability on the Entra integration in HelixDesk to see the full checklist.';
             }
 
             throw new RuntimeException($message, 0, $e);

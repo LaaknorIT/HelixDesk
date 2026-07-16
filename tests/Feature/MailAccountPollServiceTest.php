@@ -135,6 +135,41 @@ class MailAccountPollServiceTest extends TestCase
         $this->assertSame(InboundMailIngestOutcome::Duplicate, $outcome);
     }
 
+    public function test_acknowledge_failure_after_ingest_does_not_fail_poll(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $account = MailAccount::factory()->create([
+            'tenant_id' => $tenant->id,
+            'is_enabled' => true,
+        ]);
+        $tenant->generalQueue()?->mailAccounts()->attach($account->id);
+
+        $raw = $this->sampleMime('<ackfail@example.com>', 'customer@example.com', 'Help', 'Body');
+
+        $fetcher = Mockery::mock(InboundMailFetcher::class);
+        $fetcher->shouldReceive('fetchNewMessages')->once()->andReturn([
+            ['raw' => $raw, 'uid' => 'uid-ack-fail'],
+        ]);
+        $fetcher->shouldReceive('acknowledgeMessage')
+            ->once()
+            ->andThrow(new \RuntimeException('HTTP request returned status code 403: ErrorAccessDenied'));
+
+        $factory = Mockery::mock(InboundMailFetcherFactory::class);
+        $factory->shouldReceive('forAccount')->once()->andReturn($fetcher);
+        $this->app->instance(InboundMailFetcherFactory::class, $factory);
+
+        $result = app(MailAccountPollService::class)->poll($account->fresh());
+
+        $this->assertTrue($result->succeeded());
+        $this->assertSame(1, $result->ingested);
+        $this->assertSame(1, WorkItem::query()->where('tenant_id', $tenant->id)->count());
+
+        $account->refresh();
+        $this->assertNotNull($account->last_polled_at);
+        $this->assertStringContainsString('acknowledge failed', (string) $account->last_poll_error);
+        $this->assertStringContainsString('403', (string) $account->last_poll_error);
+    }
+
     private function sampleMime(string $messageId, string $from, string $subject, string $body): string
     {
         return implode("\r\n", [

@@ -679,9 +679,9 @@ Continue writing `MonitoringEvent` via org-scoped `MonitoringEventSource` (`prov
 | `departments` | `Group.Read.All`, `Directory.Read.All` | Department mapping |
 | `computers` | `DeviceManagementManagedDevices.Read.All` | Intune → assets |
 | `security_work_items` | `SecurityIncident.Read.All` | Security monitoring events |
-| `mail` | `Mail.Read`, `Mail.Send` | Mail accounts (poll + send) |
+| `mail` | `Mail.ReadWrite`, `Mail.Send` | Mail accounts (poll, mark read, send) |
 
-The Entra integration wizard **Capabilities** step toggles these scopes and the **API permissions** step lists the matching Graph application permissions. Mail accounts that create an Entra integration inline default `scopes.mail` to on and show the same `Mail.Read` / `Mail.Send` checklist.
+The Entra integration wizard **Capabilities** step toggles these scopes and the **API permissions** step lists the matching Graph application permissions. Mail accounts that create an Entra integration inline default `scopes.mail` to on and show the same `Mail.ReadWrite` / `Mail.Send` checklist. `Mail.Read` is **not** enough: marking inbox messages read after ingest requires `Mail.ReadWrite`.
 
 `scopes.mail` counts as a valid capability when enabling the integration, but it does **not** make the integration eligible for directory/Intune/security sync jobs (`entraConfigSyncSkipReason` ignores `mail`).
 

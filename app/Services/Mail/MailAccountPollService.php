@@ -34,6 +34,7 @@ class MailAccountPollService
         $ingested = 0;
         $skipped = 0;
         $duplicates = 0;
+        $acknowledgeWarnings = [];
 
         try {
             $this->logger->info($account, 'Starting mail account poll');
@@ -52,13 +53,32 @@ class MailAccountPollService
                     InboundMailIngestOutcome::SkippedNoQueue => $skipped++,
                 };
 
-                if ($outcome->shouldAcknowledge()) {
+                if (! $outcome->shouldAcknowledge()) {
+                    continue;
+                }
+
+                try {
                     $fetcher->acknowledgeMessage($account, $item['uid']);
+                } catch (Throwable $e) {
+                    // Ingest/dedup already succeeded; do not fail the poll or re-process forever.
+                    $acknowledgeWarnings[] = $e->getMessage();
+                    $this->logger->warning($account, 'Failed to acknowledge inbound message after processing', [
+                        'transport_uid' => $item['uid'],
+                        'outcome' => $outcome->value,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
             }
 
+            $account->refresh();
             $account->last_polled_at = Carbon::now();
-            $account->last_poll_error = null;
+
+            if ($acknowledgeWarnings !== []) {
+                $account->last_poll_error = 'Processed mail, but acknowledge failed: '.$acknowledgeWarnings[0];
+            } else {
+                $account->last_poll_error = null;
+            }
+
             $account->save();
 
             $result = new MailAccountPollResult(
@@ -73,6 +93,7 @@ class MailAccountPollService
                 'ingested' => $ingested,
                 'duplicates' => $duplicates,
                 'skipped' => $skipped,
+                'acknowledge_warnings' => count($acknowledgeWarnings),
             ]);
 
             return $result;

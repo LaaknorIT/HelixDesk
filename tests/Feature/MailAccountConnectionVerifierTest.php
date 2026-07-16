@@ -106,7 +106,7 @@ class MailAccountConnectionVerifierTest extends TestCase
 
         $this->assertFalse($result->ok);
         $this->assertStringContainsString('403', $result->message);
-        $this->assertStringContainsString('Mail.Read', $result->message);
+        $this->assertStringContainsString('Mail.ReadWrite', $result->message);
         $this->assertStringContainsString('Mail.Send', $result->message);
         $this->assertStringContainsString('admin consent', $result->message);
     }
