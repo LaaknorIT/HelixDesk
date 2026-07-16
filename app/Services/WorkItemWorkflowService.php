@@ -245,7 +245,9 @@ class WorkItemWorkflowService
         ]);
 
         if (! $isInternal && $user->type !== 'end_user') {
-            SendWorkItemReplyMailJob::dispatch($message->getKey());
+            // Run after the HTTP/Livewire response so a sync-queue Graph/SMTP failure
+            // cannot abort saving the conversation message or show a generic page error.
+            SendWorkItemReplyMailJob::dispatch($message->getKey())->afterResponse();
         }
 
         return $message;

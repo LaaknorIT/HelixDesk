@@ -19,6 +19,9 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
 use Livewire\Attributes\Url;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 /**
  * @property-read Schema $workZoneForm
@@ -212,14 +215,44 @@ class ViewWorkItem extends ViewRecord
         $isInternal = (bool) ($data['is_internal'] ?? false);
         $parentMessageId = filled($data['parent_message_id'] ?? null) ? (int) $data['parent_message_id'] : null;
 
-        if ($isInternal) {
-            $workflow->addInternalNote($record, $body, $user);
-        } else {
-            $workflow->addMessage($record, $body, $user, $parentMessageId);
+        try {
+            if ($isInternal) {
+                $workflow->addInternalNote($record, $body, $user);
+            } else {
+                $workflow->addMessage($record, $body, $user, $parentMessageId);
+            }
+        } catch (AccessDeniedHttpException) {
+            Notification::make()
+                ->title($isInternal ? 'Not allowed to add an internal note' : 'Not allowed to reply on this ticket')
+                ->body('Check that your role can update work items on this queue.')
+                ->danger()
+                ->send();
+
+            return;
+        } catch (UnprocessableEntityHttpException|NotFoundHttpException $e) {
+            Notification::make()
+                ->title('Could not save message')
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        } catch (\Throwable $e) {
+            report($e);
+
+            Notification::make()
+                ->title('Could not save message')
+                ->body('An unexpected error occurred. Please try again or check the application log.')
+                ->danger()
+                ->persistent()
+                ->send();
+
+            return;
         }
 
         Notification::make()
-            ->title($isInternal ? 'Internal note added' : 'Reply sent')
+            ->title($isInternal ? 'Internal note added' : 'Reply saved')
+            ->body($isInternal ? null : 'Outbound email will be sent in the background when configured.')
             ->success()
             ->send();
 

@@ -3,10 +3,12 @@
 namespace App\Jobs;
 
 use App\Models\WorkItemMessage;
+use App\Services\Mail\MailInboundLogger;
 use App\Services\Mail\OutboundWorkItemMailService;
 use App\Services\TenantContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Throwable;
 
 class SendWorkItemReplyMailJob implements ShouldQueue
 {
@@ -16,8 +18,11 @@ class SendWorkItemReplyMailJob implements ShouldQueue
 
     public function __construct(public int $workItemMessageId) {}
 
-    public function handle(TenantContext $tenantContext, OutboundWorkItemMailService $mailService): void
-    {
+    public function handle(
+        TenantContext $tenantContext,
+        OutboundWorkItemMailService $mailService,
+        MailInboundLogger $mailLogger,
+    ): void {
         /** @var WorkItemMessage|null $message */
         $message = WorkItemMessage::query()->withoutGlobalScopes()->find($this->workItemMessageId);
 
@@ -25,14 +30,33 @@ class SendWorkItemReplyMailJob implements ShouldQueue
             return;
         }
 
+        $previousTenantId = $tenantContext->tenantId();
         $tenantContext->setTenantId((int) $message->tenant_id);
         setPermissionsTeamId((int) $message->tenant_id);
 
         try {
             $mailService->sendAgentReply($message);
+        } catch (Throwable $e) {
+            // Conversation message is already saved; never fail the agent UI / request lifecycle.
+            report($e);
+
+            $account = $message->workItem?->mailAccount;
+            if ($account !== null) {
+                $mailLogger->exception($account, 'Outbound work item reply mail failed', $e, [
+                    'work_item_id' => $message->work_item_id,
+                    'work_item_message_id' => $message->getKey(),
+                ]);
+            } else {
+                $mailLogger->logger()->error('Outbound work item reply mail failed', [
+                    'work_item_id' => $message->work_item_id,
+                    'work_item_message_id' => $message->getKey(),
+                    'exception' => $e::class,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         } finally {
-            $tenantContext->setTenantId(null);
-            setPermissionsTeamId(null);
+            $tenantContext->setTenantId($previousTenantId);
+            setPermissionsTeamId($previousTenantId);
         }
     }
 }

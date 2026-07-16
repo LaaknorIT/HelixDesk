@@ -233,7 +233,7 @@ class OutboundWorkItemMailService
             $internetHeaders[] = ['name' => 'References', 'value' => $references];
         }
 
-        $client->postJson("users/{$mailboxUpn}/sendMail", [
+        $payload = [
             'message' => [
                 'subject' => $subject,
                 'body' => [
@@ -253,9 +253,27 @@ class OutboundWorkItemMailService
                         ],
                     ],
                 ],
-                'internetMessageHeaders' => $internetHeaders,
             ],
             'saveToSentItems' => true,
-        ]);
+        ];
+
+        if ($internetHeaders !== []) {
+            $payload['message']['internetMessageHeaders'] = $internetHeaders;
+        }
+
+        try {
+            $client->postJson("users/{$mailboxUpn}/sendMail", $payload);
+        } catch (\Throwable $e) {
+            $message = $e->getMessage();
+            if (str_contains($message, '403') || str_contains($message, 'ErrorAccessDenied')) {
+                throw new \RuntimeException(
+                    $message.' Sending mail requires Microsoft Graph application permission Mail.Send (with admin consent) on the Entra app used by this mail account.',
+                    0,
+                    $e,
+                );
+            }
+
+            throw $e;
+        }
     }
 }

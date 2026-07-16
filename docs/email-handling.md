@@ -95,8 +95,8 @@ Dedup table: unique `(mail_account_id, message_id)`.
 
 ## Outbound flow
 
-1. Agent posts a non-internal reply via `WorkItemWorkflowService::addMessage`.
-2. Service dispatches `SendWorkItemReplyMailJob` (not for internal notes or end-user portal replies unless configured later).
+1. Agent posts a non-internal reply via `WorkItemWorkflowService::addMessage` (conversation message is saved first).
+2. Service dispatches `SendWorkItemReplyMailJob` **after the HTTP/Livewire response** (not for internal notes or end-user portal replies), so Graph/SMTP failures cannot abort saving the reply or show a generic Filament page error.
 3. `OutboundWorkItemMailService` resolves the sending account:
    - If `incident.mail_account_id` is set → use that account.
    - Else → `queue.default_mail_account_id`.
