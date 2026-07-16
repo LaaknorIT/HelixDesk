@@ -7,6 +7,7 @@ use App\Models\TenantRole;
 use App\Models\User;
 use App\Models\WorkItem;
 use App\Services\RolePermissionMatrixSync;
+use App\Services\TenantAdminAssignmentService;
 use App\Services\WorkItemWorkflowService;
 use App\Support\HelixdeskWorkItemAuthorization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -157,5 +158,51 @@ class WorkItemQueuePermissionTest extends TestCase
 
         $this->expectException(AccessDeniedHttpException::class);
         app(WorkItemWorkflowService::class)->addInternalNote($workItem, 'Nope', $agent->fresh());
+    }
+
+    public function test_global_admin_with_tenant_admin_assignment_can_add_internal_note_with_null_tenant_id(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $globalAdmin = User::factory()->create([
+            'tenant_id' => null,
+            'type' => 'global_admin',
+            'is_admin' => true,
+        ]);
+
+        app(TenantAdminAssignmentService::class)->assign($tenant, $globalAdmin);
+
+        $general = $tenant->generalQueue();
+        $this->assertNotNull($general);
+
+        $workItem = WorkItem::query()->create([
+            'tenant_id' => $tenant->id,
+            'queue_id' => $general->id,
+            'reported_by_user_id' => User::factory()->create([
+                'tenant_id' => $tenant->id,
+                'type' => 'end_user',
+                'email' => 'req-'.uniqid().'@example.com',
+            ])->id,
+            'title' => 'Needs note from global admin',
+            'priority' => 'normal',
+            'status' => 'New',
+            'opened_at' => now(),
+        ]);
+
+        setPermissionsTeamId($tenant->id);
+
+        try {
+            $globalAdmin = $globalAdmin->fresh();
+            $this->assertNull($globalAdmin->tenant_id);
+            $this->assertTrue($globalAdmin->canOperateInTenant($tenant));
+            $this->assertTrue(HelixdeskWorkItemAuthorization::hasWorkItemPermission($globalAdmin, 'update', (int) $general->id));
+
+            $message = app(WorkItemWorkflowService::class)->addInternalNote($workItem, 'Note from platform admin', $globalAdmin);
+
+            $this->assertSame('Note from platform admin', $message->body);
+            $this->assertSame($tenant->id, $message->tenant_id);
+            $this->assertSame($globalAdmin->id, $message->author_user_id);
+        } finally {
+            setPermissionsTeamId(null);
+        }
     }
 }

@@ -11,12 +11,13 @@ class StoreSupplierRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
+        $tenantId = $user?->operatingTenantId();
 
-        if ($user === null || $user->tenant_id === null) {
+        if ($user === null || $tenantId === null || ! $user->canOperateInTenant($tenantId)) {
             return false;
         }
 
-        setPermissionsTeamId($user->tenant_id);
+        setPermissionsTeamId($tenantId);
 
         try {
             return $user->hasPermissionTo('supplier.create');
@@ -30,7 +31,7 @@ class StoreSupplierRequest extends FormRequest
      */
     public function rules(): array
     {
-        $tenantId = $this->user()?->tenant_id;
+        $tenantId = $this->user()?->operatingTenantId();
 
         return [
             'name' => [

@@ -18,11 +18,7 @@ class ChangeWorkflowService
             throw new NotFoundHttpException('Change not found.');
         }
 
-        if ($user->tenant_id === null) {
-            throw new AccessDeniedHttpException('Forbidden.');
-        }
-
-        if ((int) $user->tenant_id !== (int) $change->tenant_id) {
+        if (! $user->canOperateInTenant((int) $change->tenant_id)) {
             throw new AccessDeniedHttpException('Forbidden.');
         }
 
@@ -68,11 +64,7 @@ class ChangeWorkflowService
      */
     public function allowedTransitions(Change $change, User $user): array
     {
-        if ($user->tenant_id === null || $change->tenant_id === null) {
-            return [];
-        }
-
-        if ((int) $user->tenant_id !== (int) $change->tenant_id) {
+        if ($change->tenant_id === null || ! $user->canOperateInTenant((int) $change->tenant_id)) {
             return [];
         }
 
@@ -116,11 +108,13 @@ class ChangeWorkflowService
      */
     public function createChange(array $data, User $user): Change
     {
-        if ($user->tenant_id === null) {
+        $tenantId = $user->operatingTenantId();
+
+        if ($tenantId === null || ! $user->canOperateInTenant($tenantId)) {
             throw new AccessDeniedHttpException('Forbidden.');
         }
 
-        setPermissionsTeamId($user->tenant_id);
+        setPermissionsTeamId($tenantId);
 
         try {
             if (! $user->hasPermissionTo('change.create')) {
@@ -131,7 +125,7 @@ class ChangeWorkflowService
         }
 
         return Change::query()->create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
             'risk_id' => $data['risk_id'] ?? null,

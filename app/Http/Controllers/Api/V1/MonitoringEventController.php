@@ -16,10 +16,11 @@ class MonitoringEventController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
+        $tenantId = $user?->operatingTenantId();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless($user !== null && $tenantId !== null && $user->canOperateInTenant($tenantId), SymfonyResponse::HTTP_FORBIDDEN);
 
-        setPermissionsTeamId($user->tenant_id);
+        setPermissionsTeamId($tenantId);
 
         try {
             abort_unless($user->hasPermissionTo('monitoring_event.read'), SymfonyResponse::HTTP_FORBIDDEN);
@@ -55,10 +56,12 @@ class MonitoringEventController extends Controller
     {
         $user = $request->user();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
-        abort_unless((int) $monitoring_event->tenant_id === (int) $user->tenant_id, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless(
+            $user !== null && $monitoring_event->tenant_id !== null && $user->canOperateInTenant((int) $monitoring_event->tenant_id),
+            SymfonyResponse::HTTP_FORBIDDEN,
+        );
 
-        setPermissionsTeamId($user->tenant_id);
+        setPermissionsTeamId($monitoring_event->tenant_id);
 
         try {
             abort_unless($user->hasPermissionTo('monitoring_event.read'), SymfonyResponse::HTTP_FORBIDDEN);

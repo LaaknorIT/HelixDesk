@@ -388,20 +388,23 @@ Resolution order at runtime:
 3. Clicks **Add tenant administrator**, selects an eligible user:
    - agents belonging to that tenant (`type = agent`, matching `tenant_id`), or
    - any global admin (`is_admin = true`).
-4. System assigns the **Tenant Admin** role via `assignRole()` with `team_id` set to the tenant (roles stack — existing **Agent** role is retained).
+4. System assigns the **Tenant Admin** role via `assignRole()` with `team_id` set to the tenant (roles stack — existing **Agent** role is retained) and logs a `tenant_access` / `tenant_admin_assigned` activity (who assigned whom, which tenant, whether the assignee is a global admin).
 5. Global admins assigned this way remain hidden from tenant **People**; their `tenant_id`, `type`, and `is_admin` are unchanged.
-6. A global admin with the assignment can open `/agent/{tenant-slug}/` (URL-based tenancy; tenant switcher is off). `SyncFilamentTenantContext` sets `team_id` so Spatie permissions resolve for that tenant. `User::isTenantStaff()` also treats such global admins as back-office staff for resource navigation and work-item authorization.
+6. A global admin with the assignment can open `/agent/{tenant-slug}/` (URL-based tenancy; tenant switcher is off). `SyncFilamentTenantContext` sets `team_id` so Spatie permissions resolve for that tenant, and logs a per-session `tenant_access` / `tenant_accessed` activity the first time that session hits the tenant. `User::isTenantStaff()` and `User::canOperateInTenant()` treat such global admins as back-office operators so tickets, notes, and other tenant writes work despite `users.tenant_id` being null.
 
 **Constraints:**
 
 - Add-only from this UI (no revoke action).
 - Users who already hold **Tenant Admin** for the tenant are excluded from the candidate list.
 - End users and agents from other tenants are not eligible.
-- Global admins **without** the **Tenant Admin** role for a tenant must still be denied that tenant’s agent panel.
+- Global admins **without** the **Tenant Admin** role for a tenant must still be denied that tenant’s agent panel (no automatic access to all tenants).
 - Global admins with the role for tenant A must not access tenant B’s agent panel.
+- Global admins may assign themselves; that assignment and subsequent panel access are audited.
 
 **Implementation:**
 
 - `App\Services\TenantAdminAssignmentService`
+- `App\Services\TenantAccessAudit`
 - `App\Filament\GlobalAdmin\Resources\Tenants\RelationManagers\TenantAdminsRelationManager`
+- `App\Http\Middleware\SyncFilamentTenantContext`
 

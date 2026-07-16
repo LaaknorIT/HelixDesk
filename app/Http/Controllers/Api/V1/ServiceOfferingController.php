@@ -14,10 +14,11 @@ class ServiceOfferingController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
+        $tenantId = $user?->operatingTenantId();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless($user !== null && $tenantId !== null && $user->canOperateInTenant($tenantId), SymfonyResponse::HTTP_FORBIDDEN);
 
-        setPermissionsTeamId($user->tenant_id);
+        setPermissionsTeamId($tenantId);
 
         try {
             abort_unless($user->hasPermissionTo('service_offering.read'), SymfonyResponse::HTTP_FORBIDDEN);
@@ -40,7 +41,7 @@ class ServiceOfferingController extends Controller
         $user = $request->user();
 
         $data = $request->validated();
-        $data['tenant_id'] = $user->tenant_id;
+        $data['tenant_id'] = $user->operatingTenantId();
 
         $offering = ServiceOffering::query()->create($data);
 
@@ -53,10 +54,12 @@ class ServiceOfferingController extends Controller
     {
         $user = $request->user();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
-        abort_unless((int) $serviceOffering->tenant_id === (int) $user->tenant_id, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless(
+            $user !== null && $serviceOffering->tenant_id !== null && $user->canOperateInTenant((int) $serviceOffering->tenant_id),
+            SymfonyResponse::HTTP_FORBIDDEN,
+        );
 
-        setPermissionsTeamId($user->tenant_id);
+        setPermissionsTeamId($serviceOffering->tenant_id);
 
         try {
             abort_unless($user->hasPermissionTo('service_offering.read'), SymfonyResponse::HTTP_FORBIDDEN);

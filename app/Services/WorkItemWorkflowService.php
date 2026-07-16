@@ -26,7 +26,7 @@ class WorkItemWorkflowService
             throw new NotFoundHttpException('Work item not found.');
         }
 
-        if ($user->tenant_id === null) {
+        if (! $user->canOperateInTenant((int) $workItem->tenant_id)) {
             throw new AccessDeniedHttpException('Forbidden.');
         }
 
@@ -91,7 +91,7 @@ class WorkItemWorkflowService
      */
     public function allowedTransitions(WorkItem $workItem, User $user): array
     {
-        if ($user->tenant_id === null || $workItem->tenant_id === null) {
+        if ($workItem->tenant_id === null || ! $user->canOperateInTenant((int) $workItem->tenant_id)) {
             return [];
         }
 
@@ -144,14 +144,16 @@ class WorkItemWorkflowService
      */
     public function createWorkItem(array $data, User $user): WorkItem
     {
-        if ($user->tenant_id === null) {
+        $tenantId = $user->operatingTenantId();
+
+        if ($tenantId === null || ! $user->canOperateInTenant($tenantId)) {
             throw new AccessDeniedHttpException('Forbidden.');
         }
 
         $queueId = $data['queue_id'] ?? null;
 
         if ($queueId === null) {
-            $tenant = Tenant::query()->find($user->tenant_id);
+            $tenant = Tenant::query()->find($tenantId);
             $queueId = $tenant?->generalQueue()?->getKey();
         }
 
@@ -162,7 +164,7 @@ class WorkItemWorkflowService
         }
 
         $workItem = WorkItem::query()->create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'organization_id' => $data['organization_id'] ?? $user->organization_id,
             'reported_by_user_id' => $user->id,
             'assigned_agent_id' => $data['assigned_agent_id'] ?? null,
@@ -190,7 +192,7 @@ class WorkItemWorkflowService
         ?int $parentMessageId = null,
         bool $isInternal = false,
     ): WorkItemMessage {
-        if ($user->tenant_id === null) {
+        if ($workItem->tenant_id === null || ! $user->canOperateInTenant((int) $workItem->tenant_id)) {
             throw new AccessDeniedHttpException('Forbidden.');
         }
 
@@ -236,7 +238,7 @@ class WorkItemWorkflowService
 
         /** @var WorkItemMessage $message */
         $message = WorkItemMessage::query()->create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $workItem->tenant_id,
             'work_item_id' => $workItem->getKey(),
             'author_user_id' => $user->id,
             'parent_message_id' => $parentMessage?->getKey(),

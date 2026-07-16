@@ -222,9 +222,15 @@ class ViewWorkItem extends ViewRecord
                 $workflow->addMessage($record, $body, $user, $parentMessageId);
             }
         } catch (AccessDeniedHttpException) {
+            $queueLabel = $record->queue?->name ?? ('#'.$record->queue_id);
+            $canOperate = $record->tenant_id !== null && $user->canOperateInTenant((int) $record->tenant_id);
+            $body = $canOperate
+                ? "Your role needs work-item Update (or Admin) on queue \"{$queueLabel}\" under Administration → Roles → Work item permissions by queue."
+                : 'You do not have access to operate in this tenant. Global admins need an explicit Tenant Admin assignment for this tenant.';
+
             Notification::make()
                 ->title($isInternal ? 'Not allowed to add an internal note' : 'Not allowed to reply on this ticket')
-                ->body('Your role needs work-item Update (or Admin) on this ticket\'s queue under Administration → Roles → Work item permissions by queue.')
+                ->body($body)
                 ->danger()
                 ->persistent()
                 ->send();

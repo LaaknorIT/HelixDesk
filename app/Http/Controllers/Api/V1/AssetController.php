@@ -15,10 +15,11 @@ class AssetController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
+        $tenantId = $user?->operatingTenantId();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless($user !== null && $tenantId !== null && $user->canOperateInTenant($tenantId), SymfonyResponse::HTTP_FORBIDDEN);
 
-        setPermissionsTeamId($user->tenant_id);
+        setPermissionsTeamId($tenantId);
 
         try {
             abort_unless($user->hasPermissionTo('asset.read'), SymfonyResponse::HTTP_FORBIDDEN);
@@ -45,7 +46,7 @@ class AssetController extends Controller
         $user = $request->user();
 
         $data = $request->validated();
-        $data['tenant_id'] = $user->tenant_id;
+        $data['tenant_id'] = $user->operatingTenantId();
         $data['lifecycle_status'] = $data['lifecycle_status'] ?? 'in_use';
 
         $asset = Asset::query()->create($data);
@@ -59,10 +60,12 @@ class AssetController extends Controller
     {
         $user = $request->user();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
-        abort_unless((int) $asset->tenant_id === (int) $user->tenant_id, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless(
+            $user !== null && $asset->tenant_id !== null && $user->canOperateInTenant((int) $asset->tenant_id),
+            SymfonyResponse::HTTP_FORBIDDEN,
+        );
 
-        setPermissionsTeamId($user->tenant_id);
+        setPermissionsTeamId($asset->tenant_id);
 
         try {
             abort_unless($user->hasPermissionTo('asset.read'), SymfonyResponse::HTTP_FORBIDDEN);

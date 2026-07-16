@@ -20,7 +20,7 @@ class WorkItemController extends Controller
     {
         $user = $request->user();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless($user !== null && $user->canOperateInTenantContext(), SymfonyResponse::HTTP_FORBIDDEN);
 
         $query = WorkItem::query()->orderByDesc('opened_at');
 
@@ -41,7 +41,7 @@ class WorkItemController extends Controller
     {
         $user = $request->user();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless($user !== null && $user->canOperateInTenantContext(), SymfonyResponse::HTTP_FORBIDDEN);
 
         $workItem = app(WorkItemWorkflowService::class)->createWorkItem($request->validated(), $user);
 
@@ -54,7 +54,10 @@ class WorkItemController extends Controller
     {
         $user = request()->user();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless(
+            $user !== null && $workItem->tenant_id !== null && $user->canOperateInTenant((int) $workItem->tenant_id),
+            SymfonyResponse::HTTP_FORBIDDEN,
+        );
 
         if ($user->type === 'end_user') {
             abort_unless((int) $workItem->reported_by_user_id === (int) $user->id, SymfonyResponse::HTTP_FORBIDDEN);
@@ -71,7 +74,10 @@ class WorkItemController extends Controller
     {
         $user = $request->user();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless(
+            $user !== null && $workItem->tenant_id !== null && $user->canOperateInTenant((int) $workItem->tenant_id),
+            SymfonyResponse::HTTP_FORBIDDEN,
+        );
 
         app(WorkItemWorkflowService::class)->transition(
             $workItem,
@@ -88,7 +94,10 @@ class WorkItemController extends Controller
     {
         $user = $request->user();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless(
+            $user !== null && $workItem->tenant_id !== null && $user->canOperateInTenant((int) $workItem->tenant_id),
+            SymfonyResponse::HTTP_FORBIDDEN,
+        );
 
         $message = app(WorkItemWorkflowService::class)->addMessage(
             $workItem,

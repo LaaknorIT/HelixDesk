@@ -167,7 +167,9 @@ Initial major bounded contexts:
      - `isTenantStaff()`: true for tenant agents (`tenant_id` + `type = agent`) and for global admins who hold **Tenant Admin** for `effectiveTenantId()` (from `SyncFilamentTenantContext` / `setPermissionsTeamId`). Filament resource `canAccess()` and `HelixdeskWorkItemAuthorization` rely on this — without it, assigned global admins would only see Dashboard.
      - `canAccessTenant($tenant)`: matching `tenant_id` **or** (`is_admin` && `isTenantAdminFor($tenant)` — explicit `model_has_roles.team_id` check for the **Tenant Admin** role).
      - `getTenants()`: home tenant (if any) **plus** tenants where the user holds **Tenant Admin** (for global admins with assignments). All three methods must agree so Filament does not return 403/404 mismatches.
-     - `SyncFilamentTenantContext` middleware sets `team_id` from the URL tenant; no change required for global-admin tenant-admin access.
+     - `canOperateInTenant($tenant)` / `canOperateInTenantContext()`: same membership/assignment rules for **workflow and API writes**. Services must not deny solely because `users.tenant_id` is null when the user is an assigned global admin for the current team.
+     - `SyncFilamentTenantContext` middleware sets `team_id` from the URL tenant and records a per-session `tenant_access` activity when an assigned global admin enters that tenant’s agent panel.
+     - `TenantAdminAssignmentService` writes a `tenant_access` activity when Tenant Admin is assigned (including self-assignment by a global admin).
      - This is **not** impersonation: `tenant_id` and `type` stay unchanged; global admins remain excluded from tenant People queries.
 2. **ITIL Core**
    - WorkItem, Problem, Change, MajorIncident, SLA, Workflow.

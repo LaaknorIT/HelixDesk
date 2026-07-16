@@ -11,6 +11,7 @@ use App\Filament\GlobalAdmin\Resources\Tenants\RelationManagers\TenantAdminsRela
 use App\Models\Tenant;
 use App\Models\TenantRole;
 use App\Models\User;
+use App\Services\TenantAccessAudit;
 use App\Services\TenantAdminAssignmentService;
 use App\Support\HelixdeskWorkItemAuthorization;
 use Filament\Actions\Testing\TestAction;
@@ -19,6 +20,7 @@ use Filament\Panel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 class GlobalAdminTenantAdminAssignmentTest extends TestCase
@@ -405,6 +407,68 @@ class GlobalAdminTenantAdminAssignmentTest extends TestCase
         } finally {
             setPermissionsTeamId(null);
         }
+    }
+
+    public function test_assigning_tenant_admin_logs_tenant_access_activity(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $actor = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+        $assignee = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+
+        $this->actingAs($actor);
+
+        app(TenantAdminAssignmentService::class)->assign($tenant, $assignee);
+
+        $activity = Activity::query()
+            ->where('log_name', TenantAccessAudit::LOG_NAME)
+            ->where('event', TenantAccessAudit::EVENT_ASSIGNED)
+            ->where('subject_type', $tenant->getMorphClass())
+            ->where('subject_id', $tenant->id)
+            ->first();
+
+        $this->assertNotNull($activity);
+        $this->assertSame($actor->id, $activity->causer_id);
+        $this->assertSame($assignee->id, data_get($activity->properties, 'assigned_user_id'));
+        $this->assertTrue((bool) data_get($activity->properties, 'assignee_is_global_admin'));
+    }
+
+    public function test_agent_panel_access_logs_global_admin_access_once_per_session(): void
+    {
+        $tenant = Tenant::factory()->create([
+            'slug' => 'access-log-tenant',
+        ]);
+        $globalAdmin = User::factory()->create([
+            'is_admin' => true,
+            'tenant_id' => null,
+            'type' => 'global_admin',
+        ]);
+
+        app(TenantAdminAssignmentService::class)->assign($tenant, $globalAdmin);
+
+        $this->actingAs($globalAdmin)
+            ->get(route('filament.agent.pages.dashboard', ['tenant' => $tenant]))
+            ->assertOk();
+
+        $this->actingAs($globalAdmin)
+            ->get(route('filament.agent.pages.dashboard', ['tenant' => $tenant]))
+            ->assertOk();
+
+        $accessLogs = Activity::query()
+            ->where('log_name', TenantAccessAudit::LOG_NAME)
+            ->where('event', TenantAccessAudit::EVENT_ACCESSED)
+            ->where('subject_id', $tenant->id)
+            ->where('causer_id', $globalAdmin->id)
+            ->count();
+
+        $this->assertSame(1, $accessLogs);
     }
 
     private function tenantAdminRoleFor(Tenant $tenant): TenantRole

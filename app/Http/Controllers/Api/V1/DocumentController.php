@@ -14,10 +14,11 @@ class DocumentController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
+        $tenantId = $user?->operatingTenantId();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless($user !== null && $tenantId !== null && $user->canOperateInTenant($tenantId), SymfonyResponse::HTTP_FORBIDDEN);
 
-        setPermissionsTeamId($user->tenant_id);
+        setPermissionsTeamId($tenantId);
 
         try {
             abort_unless($user->hasPermissionTo('document.read'), SymfonyResponse::HTTP_FORBIDDEN);
@@ -53,10 +54,12 @@ class DocumentController extends Controller
     {
         $user = $request->user();
 
-        abort_unless($user !== null && $user->tenant_id !== null, SymfonyResponse::HTTP_FORBIDDEN);
-        abort_unless((int) $document->tenant_id === (int) $user->tenant_id, SymfonyResponse::HTTP_FORBIDDEN);
+        abort_unless(
+            $user !== null && $document->tenant_id !== null && $user->canOperateInTenant((int) $document->tenant_id),
+            SymfonyResponse::HTTP_FORBIDDEN,
+        );
 
-        setPermissionsTeamId($user->tenant_id);
+        setPermissionsTeamId($document->tenant_id);
 
         try {
             abort_unless($user->hasPermissionTo('document.read'), SymfonyResponse::HTTP_FORBIDDEN);

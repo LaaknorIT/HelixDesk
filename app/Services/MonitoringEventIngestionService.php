@@ -15,11 +15,11 @@ class MonitoringEventIngestionService
      */
     public function ingest(array $data, User $user): MonitoringEvent
     {
-        if ($user->tenant_id === null) {
+        $tenantId = $user->operatingTenantId();
+
+        if ($tenantId === null || ! $user->canOperateInTenant($tenantId)) {
             abort(403);
         }
-
-        $tenantId = (int) $user->tenant_id;
 
         $sourceSlug = $data['source_slug'] ?? 'api';
 

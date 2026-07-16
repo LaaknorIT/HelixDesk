@@ -12,12 +12,13 @@ class StoreDocumentRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
+        $tenantId = $user?->operatingTenantId();
 
-        if ($user === null || $user->tenant_id === null) {
+        if ($user === null || $tenantId === null || ! $user->canOperateInTenant($tenantId)) {
             return false;
         }
 
-        setPermissionsTeamId($user->tenant_id);
+        setPermissionsTeamId($tenantId);
 
         try {
             return $user->hasPermissionTo('document.create');
@@ -31,7 +32,7 @@ class StoreDocumentRequest extends FormRequest
      */
     public function rules(): array
     {
-        $tenantId = $this->user()?->tenant_id;
+        $tenantId = $this->user()?->operatingTenantId();
 
         return [
             'doc_type' => ['required', 'string', Rule::in(['kb', 'helpdesk', 'it_doc'])],
@@ -55,7 +56,7 @@ class StoreDocumentRequest extends FormRequest
     {
         $data = $this->validated();
         $user = $this->user();
-        $tenantId = $user->tenant_id;
+        $tenantId = $user->operatingTenantId();
         $title = $data['title'];
         $slugInput = $data['slug'] ?? null;
         $forSlug = ($slugInput !== null && $slugInput !== '') ? (string) $slugInput : $title;

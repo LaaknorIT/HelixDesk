@@ -105,6 +105,43 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return $teamId !== null ? (int) $teamId : null;
     }
 
+    /**
+     * Tenant id for writes in the current request (Filament/Spatie team context, else home tenant).
+     */
+    public function operatingTenantId(): ?int
+    {
+        return $this->effectiveTenantId();
+    }
+
+    /**
+     * Whether the user may perform tenant-scoped operations for the given tenant.
+     * Home-tenant users match by tenant_id; global admins need an explicit Tenant Admin assignment.
+     */
+    public function canOperateInTenant(Tenant|int $tenant): bool
+    {
+        $tenantId = is_int($tenant) ? $tenant : (int) $tenant->getKey();
+
+        if ($tenantId <= 0) {
+            return false;
+        }
+
+        if ($this->tenant_id !== null && (int) $this->tenant_id === $tenantId) {
+            return true;
+        }
+
+        return (bool) $this->is_admin && $this->isTenantAdminFor($tenantId);
+    }
+
+    /**
+     * Whether the user may operate in the current team context (or an explicit tenant id).
+     */
+    public function canOperateInTenantContext(?int $tenantId = null): bool
+    {
+        $tenantId ??= $this->operatingTenantId();
+
+        return $tenantId !== null && $this->canOperateInTenant($tenantId);
+    }
+
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);

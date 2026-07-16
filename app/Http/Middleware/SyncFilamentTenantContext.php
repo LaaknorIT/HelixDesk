@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Tenant;
+use App\Services\TenantAccessAudit;
 use App\Services\TenantContext;
 use Closure;
 use Filament\Facades\Filament;
@@ -17,6 +19,12 @@ class SyncFilamentTenantContext
         if ($tenant !== null) {
             app(TenantContext::class)->setTenantId($tenant->getKey());
             setPermissionsTeamId($tenant->getKey());
+
+            $user = $request->user();
+
+            if ($user !== null && $tenant instanceof Tenant) {
+                app(TenantAccessAudit::class)->logAccessIfNeeded($tenant, $user);
+            }
         }
 
         return $next($request);

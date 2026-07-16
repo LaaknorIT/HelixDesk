@@ -14,8 +14,13 @@ class StoreWorkItemMessageRequest extends FormRequest
     public function authorize(): bool
     {
         $user = $this->user();
+        $workItem = $this->route('work_item');
 
-        if ($user === null || $user->tenant_id === null) {
+        if ($user === null || $workItem === null || $workItem->tenant_id === null) {
+            return false;
+        }
+
+        if (! $user->canOperateInTenant((int) $workItem->tenant_id)) {
             return false;
         }
 
@@ -23,9 +28,7 @@ class StoreWorkItemMessageRequest extends FormRequest
             return true;
         }
 
-        $workItem = $this->route('work_item');
-
-        if ($workItem === null || $workItem->queue_id === null) {
+        if ($workItem->queue_id === null) {
             return false;
         }
 

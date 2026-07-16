@@ -63,6 +63,8 @@ final class TenantAdminAssignmentService
         } finally {
             setPermissionsTeamId(null);
         }
+
+        app(TenantAccessAudit::class)->logAssignment($tenant, $user);
     }
 
     public function isEligibleCandidate(User $user, Tenant $tenant): bool

@@ -17,7 +17,7 @@ class StoreWorkItemRequest extends FormRequest
     {
         $user = $this->user();
 
-        if ($user === null) {
+        if ($user === null || ! $user->canOperateInTenantContext()) {
             return false;
         }
 
@@ -28,7 +28,7 @@ class StoreWorkItemRequest extends FormRequest
         $queueId = $this->input('queue_id');
 
         if ($queueId === null) {
-            $queueId = Tenant::query()->find($user->tenant_id)?->generalQueue()?->getKey();
+            $queueId = Tenant::query()->find($user->operatingTenantId())?->generalQueue()?->getKey();
         }
 
         if ($queueId === null) {
@@ -45,7 +45,7 @@ class StoreWorkItemRequest extends FormRequest
      */
     public function rules(): array
     {
-        $tenantId = $this->user()?->tenant_id;
+        $tenantId = $this->user()?->operatingTenantId();
 
         return [
             'title' => ['required', 'string', 'max:255'],

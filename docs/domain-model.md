@@ -126,6 +126,8 @@ Invariants:
 
 - Back-office staff (`type = agent`) must belong to a tenant; **tenant administration** is a **Spatie role** (default name `Tenant Admin`, configurable in `config/helixdesk_permissions.php`) with full permission assignment via `*` (or explicitly including `tenant.admin`), not a separate `users.type`.
 - **Tenant Admin** may be assigned from the **Global Admin** panel (`TenantAdminsRelationManager` on tenant edit) to tenant agents or global admins via `TenantAdminAssignmentService` (`assignRole()` with `team_id` = tenant id). Global admins receive the role without `tenant_id` or `type` changes; they stay hidden from tenant People. Global admins with the role may access that tenant’s agent panel via extended `User::canAccessPanel` / `canAccessTenant` / `getTenants` gates (role-based, not impersonation).
+- Global admins do **not** automatically access every tenant. Access requires an explicit **Tenant Admin** assignment for that tenant’s `team_id`. Assigned global admins keep `users.tenant_id = null`; tenant-scoped writes (work-item messages, transitions, API creates, etc.) must use **`User::canOperateInTenant()`** / **`effectiveTenantId()`** (from Filament/`SyncFilamentTenantContext`) rather than requiring a non-null `users.tenant_id`. New rows (e.g. `work_item_messages.tenant_id`) take the **resource’s** tenant id, not the user’s home `tenant_id`.
+- Assigning Tenant Admin and each session’s first agent-panel access by an assigned global admin are audited under activity log name `tenant_access`.
 - End users must belong to an `Organization`.
 
 ### 1.4 Role, Team, Queue
