@@ -43,7 +43,7 @@ class UpdateWorkItemStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'to_status' => ['required', 'string', 'in:New,Assigned,In Progress,Waiting for User,Resolved,Closed'],
+            'to_status' => ['required', 'string', 'max:100'],
         ];
     }
 

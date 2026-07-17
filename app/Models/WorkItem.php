@@ -23,12 +23,20 @@ class WorkItem extends TenantModel
         'description',
         'priority',
         'category_id',
+        'sla_policy_id',
         'status',
         'source',
         'mail_account_id',
         'inbound_message_id',
         'public_id',
         'opened_at',
+        'first_response_due_at',
+        'resolution_due_at',
+        'first_responded_at',
+        'sla_paused_at',
+        'sla_paused_seconds',
+        'response_breached_at',
+        'resolution_breached_at',
         'resolved_at',
         'closed_at',
     ];
@@ -39,8 +47,15 @@ class WorkItem extends TenantModel
             'type' => WorkItemType::class,
             'source' => WorkItemSource::class,
             'opened_at' => 'datetime',
+            'first_response_due_at' => 'datetime',
+            'resolution_due_at' => 'datetime',
+            'first_responded_at' => 'datetime',
+            'sla_paused_at' => 'datetime',
+            'response_breached_at' => 'datetime',
+            'resolution_breached_at' => 'datetime',
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
+            'sla_paused_seconds' => 'integer',
         ];
     }
 
@@ -95,6 +110,16 @@ class WorkItem extends TenantModel
     public function queue(): BelongsTo
     {
         return $this->belongsTo(Queue::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(WorkItemCategory::class, 'category_id');
+    }
+
+    public function slaPolicy(): BelongsTo
+    {
+        return $this->belongsTo(SlaPolicy::class, 'sla_policy_id');
     }
 
     public function problems(): BelongsToMany

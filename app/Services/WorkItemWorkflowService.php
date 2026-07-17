@@ -11,6 +11,7 @@ use App\Models\WorkflowDefinition;
 use App\Models\WorkflowTransition;
 use App\Models\WorkItem;
 use App\Models\WorkItemMessage;
+use App\Models\WorkItemStatus;
 use App\Support\HelixdeskWorkItemAuthorization;
 use App\Support\WorkItemQueueScope;
 use Illuminate\Support\Carbon;
@@ -20,6 +21,12 @@ use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
 class WorkItemWorkflowService
 {
+    public function __construct(
+        private readonly SlaPolicyResolver $slaPolicyResolver,
+        private readonly SlaTimerService $slaTimerService,
+        private readonly WorkItemAutomationService $automationService,
+    ) {}
+
     public function transition(WorkItem $workItem, string $toStatus, User $user): WorkItem
     {
         if ($workItem->tenant_id === null) {
@@ -69,19 +76,28 @@ class WorkItemWorkflowService
             throw new AccessDeniedHttpException('Forbidden.');
         }
 
+        $fromStatus = (string) $workItem->status;
         $now = Carbon::now();
 
         $workItem->status = $toStatus;
 
-        if ($toStatus === 'Resolved' && $workItem->resolved_at === null) {
+        $statusMeta = WorkItemStatus::query()
+            ->where('tenant_id', $workItem->tenant_id)
+            ->where('name', $toStatus)
+            ->first();
+
+        if (($statusMeta?->sets_resolved_at || $toStatus === 'Closed (pending)' || $toStatus === 'Closed')
+            && $workItem->resolved_at === null) {
             $workItem->resolved_at = $now;
         }
 
-        if ($toStatus === 'Closed' && $workItem->closed_at === null) {
+        if (($statusMeta?->sets_closed_at || $toStatus === 'Closed') && $workItem->closed_at === null) {
             $workItem->closed_at = $now;
         }
 
         $workItem->save();
+
+        $this->slaTimerService->syncPauseState($workItem, $fromStatus, $toStatus);
 
         return $workItem;
     }
@@ -172,7 +188,6 @@ class WorkItemWorkflowService
             'type' => $data['type'] ?? WorkItemType::Incident,
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
-            // SLA-driven priority will be introduced later; default to "normal" for now.
             'priority' => $data['priority'] ?? 'normal',
             'category_id' => $data['category_id'] ?? null,
             'status' => 'New',
@@ -182,7 +197,10 @@ class WorkItemWorkflowService
             'closed_at' => null,
         ]);
 
-        return $workItem;
+        $this->slaPolicyResolver->attachBestPolicy($workItem);
+        $this->slaTimerService->startTimers($workItem);
+
+        return $workItem->fresh() ?? $workItem;
     }
 
     public function addMessage(
@@ -246,7 +264,12 @@ class WorkItemWorkflowService
             'body' => $body,
         ]);
 
+        if (! $isInternal && $user->type === 'end_user') {
+            $this->automationService->handleCustomerReplied($workItem, $message);
+        }
+
         if (! $isInternal && $user->type !== 'end_user') {
+            $this->automationService->handleAgentReplied($workItem, $message);
             // Run after the HTTP/Livewire response so a sync-queue Graph/SMTP failure
             // cannot abort saving the conversation message or show a generic page error.
             SendWorkItemReplyMailJob::dispatch($message->getKey())->afterResponse();

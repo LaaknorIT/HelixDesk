@@ -203,10 +203,15 @@ Key fields:
 - `type` (see table above; default `incident`)
 - `title`
 - `description`
-- `priority` (enum: Low, Medium, High, Critical)
-- `category_id` (FK to category taxonomy within a type)
-- `status` (enum with default workflow; customizable via workflow engine)
-- `sla_policy_id` (nullable)
+- `priority` (string; common values `normal`, `high`, `urgent`, or tenant-defined labels such as Low/Medium/High/Critical)
+- `category_id` (nullable FK to `WorkItemCategory`)
+- `status` (string matching a tenant `WorkItemStatus.name`; default open status is usually `New`)
+- `sla_policy_id` (nullable FK to matched `SlaPolicy`)
+- `first_response_due_at`, `resolution_due_at` (nullable — computed when an SLA is attached)
+- `first_responded_at` (nullable — first non-internal agent reply)
+- `sla_paused_at` (nullable — set when status pauses SLA)
+- `sla_paused_seconds` (accumulated paused time)
+- `response_breached_at`, `resolution_breached_at` (nullable)
 - `opened_at`, `resolved_at`, `closed_at`
 - `source`
 - `mail_account_id` (nullable — receiving mailbox for reply-from-same-address)
@@ -216,6 +221,7 @@ Key fields:
 Relationships:
 
 - belongs to `Tenant`, `Organization` (optional), `Department` (optional), `Queue`, `MailAccount` (optional)
+- belongs to `WorkItemCategory` (optional), `SlaPolicy` (optional), `WorkItemStatus` conceptually by name
 - belongs to `User` as `reported_by` and as `assigned_agent`
 - belongs to many `Asset`
 - belongs to many `Problem`
@@ -231,9 +237,10 @@ Related entities kept **separate** (not ticket types):
 
 Invariants:
 
-- `tenant_id` matches all related entities (organization, queue).
-- Status transitions must follow tenant-defined workflow rules (per `type` when type-specific workflows are configured).
-- Reclassifying `type` is allowed; audit the change and optionally swap workflow/queue/SLA.
+- `tenant_id` matches all related entities (organization, queue, status, SLA, category).
+- Manual status transitions must follow tenant-defined `WorkflowTransition` rules (allowed from→to graph).
+- Event-driven `AutomationRule`s may change status or spawn tickets without going through the agent transition UI, but should still land on a valid tenant status name.
+- Reclassifying `type` is allowed; audit the change and optionally re-match queue/SLA.
 
 ### 2.2 Problem
 
@@ -306,28 +313,112 @@ Relationships:
 
 ---
 
-## 3. SLAs and workflows
+## 3. Statuses, SLAs, and workflows
 
-### 3.1 SlaPolicy
+### 3.0 WorkItemStatus
+
+Tenant-scoped catalog of ticket statuses. Agents and automations use the `name` string on `work_items.status`.
 
 Key fields:
 
 - `id`
 - `tenant_id`
-- `name`
-- `applies_to_queue_id` (nullable)
-- `applies_to_priority` (nullable)
-- `response_time_target` (e.g. minutes)
-- `resolution_time_target`
+- `name` (unique per tenant; display and stored value, e.g. `Waiting for customer`)
+- `sort_order`
+- `is_system` (seeded defaults; rename allowed carefully, delete blocked while referenced)
+- `is_default_open` (exactly one per tenant — usually `New`)
+- `pauses_sla` (true for `Waiting for customer` and `Closed (pending)`)
+- `sets_resolved_at` (true for terminal-ish states that stop active work, e.g. `Closed (pending)`, `Closed`)
+- `sets_closed_at` (true for `Closed`)
+- `color` (nullable — UI badge hint)
+
+**Default statuses** (seeded by `TenantObserver` on tenant create):
+
+| Name | pauses_sla | sets_resolved_at | sets_closed_at | Notes |
+|------|------------|------------------|----------------|-------|
+| New | no | no | no | Default open |
+| Assigned | no | no | no | |
+| Working | no | no | no | Active agent work |
+| Waiting for customer | **yes** | no | no | SLA clock pauses |
+| Replied | no | no | no | Customer replied; needs agent attention |
+| Closed (pending) | **yes** | **yes** | no | Soft close; awaiting customer confirmation |
+| Closed | no | **yes** | **yes** | Terminal |
 
 Relationships:
 
 - belongs to `Tenant`
+- referenced by name from `work_items.status`, `workflow_transitions`, and automation conditions/actions
+
+Admin UI: **Administration → Ticket statuses** (`tenant.admin`).
+
+### 3.0b WorkItemCategory
+
+Lightweight taxonomy for tickets (used by SLA matching and filtering).
+
+Key fields:
+
+- `id`, `tenant_id`, `name`, `sort_order`, `is_active`
+
+Relationships:
+
+- belongs to `Tenant`
+- has many `WorkItem`
+
+Admin UI: **Administration → Categories** (or embedded with SLA/ticket forms).
+
+### 3.1 SlaPolicy
+
+Defines response and/or resolution targets and which tickets they apply to.
+
+Key fields:
+
+- `id`
+- `tenant_id`
+- `name` (e.g. `Normal`, `Gold`)
+- `is_active`
+- `target_type` (`first_response` | `resolution` | `both`)
+- `first_response_minutes` (nullable)
+- `resolution_minutes` (nullable)
+- `calendar_type` (`working_hours` | `continuous`)
+  - `working_hours`: count only configured business hours (tenant/org calendar; v1 may use a simple Mon–Fri window)
+  - `continuous`: wall-clock time including nights/weekends
+- Matching dimensions (any mix; null = wildcard):
+  - `applies_to_priority` (nullable string)
+  - `applies_to_organization_id` (nullable — customer)
+  - `applies_to_category_id` (nullable)
+  - `applies_to_work_item_type` (nullable — `WorkItemType` value)
+- `match_priority` (integer; higher wins when multiple policies match equally on specificity)
+
+**Matching:** On create (and when priority/org/category/type change), pick the best active policy:
+
+1. Prefer policies whose non-null match fields equal the ticket.
+2. Among candidates, highest count of non-null match fields wins (most specific).
+3. Tie-break with `match_priority`, then lowest `id`.
+
+**Timer behavior:**
+
+- Start when the work item is created (or when an SLA is first attached).
+- **Pause** while the current status has `pauses_sla = true` (defaults: Waiting for customer, Closed (pending)).
+- Resume when leaving a pausing status; due timestamps shift by paused duration (or remaining time is tracked via `sla_paused_seconds`).
+- First-response SLA is satisfied when the first non-internal **agent** message is posted (`first_responded_at`).
+- Resolution SLA is satisfied when status sets `resolved_at` / reaches a status with `sets_resolved_at` (typically Closed (pending) or Closed), per policy `target_type`.
+- Background job marks `response_breached_at` / `resolution_breached_at` when due time passes while not paused.
+
+Examples:
+
+- **Normal**: first response within 8 working hours (`target_type=first_response`, `calendar_type=working_hours`).
+- **Gold**: closed within 8 continuous hours (`target_type=resolution`, `calendar_type=continuous`, `resolution_minutes=480`).
+
+Relationships:
+
+- belongs to `Tenant`, optional `Organization`, optional `WorkItemCategory`
 - used by many `WorkItem`
 
-### 3.2 WorkflowDefinition
+Admin UI: **Administration → SLA policies** (`tenant.admin`).
 
-Generic workflow definition for entities like work items, changes, documents.
+### 3.2 WorkflowDefinition (allowed transitions)
+
+Manual from→to graph for agents (and end-user close). Still used by `WorkItemWorkflowService::transition()`.
 
 Key fields:
 
@@ -335,13 +426,58 @@ Key fields:
 - `tenant_id`
 - `entity_type` (`work_item`, `change`, `document`)
 - `name`
-- `definition_json` (states, transitions, guards)
 - `is_default`
 
 Relationships:
 
 - belongs to `Tenant`
-- used by many entities of `entity_type`
+- has many `WorkflowTransition` (`from_status`, `to_status`, `required_permission`)
+
+**Default work-item transitions** (seeded by `TenantObserver`):
+
+- New → Assigned
+- Assigned → Working
+- Working → Waiting for customer
+- Working → Closed (pending)
+- Waiting for customer → Working
+- Replied → Working
+- Replied → Waiting for customer
+- Closed (pending) → Closed (end users may close; `required_permission` null)
+- Closed (pending) → Working (reopen)
+- Closed → Working (reopen by agent)
+
+Admin UI: transitions are editable alongside **Ticket statuses** or under **Ticket workflows** (allowed-transition editor).
+
+### 3.3 AutomationRule (event-driven workflows)
+
+Rules that fire on ticket events and run an ordered list of **actions** (tasks). Distinct from allowed transitions.
+
+Key fields (`automation_rules`):
+
+- `id`, `tenant_id`, `name`, `is_enabled`, `is_system` (seeded defaults)
+- `trigger` (`customer_replied`, `agent_replied`, `status_changed`, `created`, `sla_breached`, …)
+- `conditions_json` (e.g. `{ "statuses": ["Assigned", "Working", ...] }`)
+- `sort_order`
+
+Key fields (`automation_rule_actions`):
+
+- `id`, `tenant_id`, `automation_rule_id`, `sort_order`
+- `action_type` (`set_status`, `create_work_item`, `send_customer_email`, …)
+- `action_config_json` (type-specific payload)
+
+**Default rules** (seeded by `TenantObserver`):
+
+1. **Customer reply → Replied**: trigger `customer_replied`, when status ∈ {Assigned, Working, Waiting for customer, Closed (pending)} → action `set_status` = `Replied`.
+2. **Customer reply on Closed → new ticket**: trigger `customer_replied`, when status = `Closed` → action `create_work_item` (copy requester/queue/org; link to original; attach the reply to the new ticket).
+
+**Multi-action rules:** A single rule may run several actions in `sort_order` (e.g. set status **and** send a customer email). Email actions use outbound mail (`OutboundWorkItemMailService` / queue mailbox) with configurable subject/body templates.
+
+Relationships:
+
+- belongs to `Tenant`
+- has many `AutomationRuleAction`
+
+Admin UI: **Administration → Ticket automations** (`tenant.admin`) — create/edit/delete rules, reorder actions, including email templates.
 
 ---
 

@@ -8,45 +8,56 @@ This document describes the main business workflows (incident lifecycle, monitor
 
 ### 1.1 Default incident workflow
 
-Default states:
+Default statuses (tenant-scoped catalog; see [`domain-model.md`](domain-model.md) §3.0):
 
 - `New`
 - `Assigned`
-- `In Progress`
-- `Waiting for User`
-- `Resolved`
+- `Working`
+- `Waiting for customer`
+- `Replied`
+- `Closed (pending)`
 - `Closed`
 
-Allowed default transitions (simplified):
+Allowed default **manual** transitions (simplified):
 
 - `New` → `Assigned`
-- `Assigned` → `In Progress`
-- `In Progress` → `Waiting for User`
-- `In Progress` → `Resolved`
-- `Waiting for User` → `In Progress`
-- `Resolved` → `Closed`
-- `Resolved` → `In Progress` (reopened)
+- `Assigned` → `Working`
+- `Working` → `Waiting for customer`
+- `Working` → `Closed (pending)`
+- `Waiting for customer` → `Working`
+- `Replied` → `Working` / `Waiting for customer`
+- `Closed (pending)` → `Closed` (end user may confirm close)
+- `Closed (pending)` → `Working` (reopen)
+- `Closed` → `Working` (agent reopen)
 
 Implementation:
 
-- Represented by a `WorkflowDefinition` for `entity_type = incident`.
-- Each transition can have optional guards:
-  - role/permission checks (e.g. only agents can resolve).
-  - field requirements (e.g. resolution summary before `Resolved`).
+- Statuses: `WorkItemStatus` rows seeded by `TenantObserver`.
+- Allowed transitions: `WorkflowDefinition` + `WorkflowTransition` for `entity_type = work_item`.
+- Each transition can require a permission (usually `work_item.update`); end-user close uses `required_permission = null`.
+
+**Event-driven automations** (`AutomationRule`, also seeded + admin UI):
+
+| Trigger | Condition | Actions |
+|---------|-----------|---------|
+| Customer reply (portal or email) | Status ∈ Assigned, Working, Waiting for customer, Closed (pending) | Set status → `Replied` |
+| Customer reply | Status = Closed | Create new ticket; attach reply to the new ticket |
+
+Tenants can add further rules with multiple ordered actions (set status, create ticket, **send customer email**, …) under **Administration → Ticket automations**.
 
 Queue visibility guard:
 
-- Agent access to incident lists/details is restricted to work_items in queues assigned to that agent.
-- Queue assignment is therefore part of effective authorization, alongside `work_item.read` / `work_item.update`.
+- Agent access to ticket lists/details is restricted to work items in queues assigned to that agent.
+- Queue assignment is therefore part of effective authorization, alongside per-queue work-item permissions.
 
 SLA integration:
 
-- When an incident is created:
-  - Determine SLA policy from queue, priority, and/or customer.
-  - Set target response and resolution times.
-- Background jobs:
-  - Monitor SLA timers (queue jobs) and mark work_items as breached when thresholds are crossed.
-  - Trigger notifications/escalations if configured.
+- When a ticket is created (or match fields change):
+  - Resolve `SlaPolicy` from any mix of priority, customer (`organization_id`), category, and ticket type (most specific match wins).
+  - Set `first_response_due_at` / `resolution_due_at` according to policy targets and calendar (`working_hours` vs `continuous`).
+- While status has `pauses_sla` (defaults: Waiting for customer, Closed (pending)), the SLA clock **pauses**.
+- Background jobs mark breaches and may fire `sla_breached` automation rules.
+- Admin UI: **Administration → SLA policies**.
 
 ### 1.2 Agent ticket view (work-first layout)
 

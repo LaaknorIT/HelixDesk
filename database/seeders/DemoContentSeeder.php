@@ -225,7 +225,7 @@ class DemoContentSeeder extends Seeder
             $endUser1
         );
 
-        // End-user 2: resolved ticket (end-user should be able to close it).
+        // End-user 2: closed-pending ticket (end-user should be able to close it).
         WorkItem::query()->create([
             'tenant_id' => $tenant->getKey(),
             'organization_id' => $organization->getKey(),
@@ -233,29 +233,29 @@ class DemoContentSeeder extends Seeder
             'assigned_agent_id' => null,
             'queue_id' => $generalQueue?->getKey(),
             'type' => WorkItemType::Incident,
-            'title' => 'Demo (End User 2) - Resolved ticket',
-            'description' => 'Demo work item already resolved; End User 2 can close it.',
+            'title' => 'Demo (End User 2) - Closed (pending) ticket',
+            'description' => 'Demo work item pending close; End User 2 can close it.',
             'priority' => 'Medium',
             'category_id' => null,
-            'status' => 'Resolved',
+            'status' => 'Closed (pending)',
             'source' => WorkItemSource::Portal,
             'opened_at' => now(),
             'resolved_at' => now(),
             'closed_at' => null,
         ]);
 
-        // Agent: in-progress ticket to exercise agent transitions.
+        // Agent: working ticket to exercise agent transitions.
         setPermissionsTeamId($tenant->getKey());
 
         $agentWorkItem = $workflow->createWorkItem([
-            'title' => 'Demo (Agent) - In progress ticket',
+            'title' => 'Demo (Agent) - Working ticket',
             'description' => 'Demo work item for agent workflow transitions.',
             'priority' => 'Medium',
             'type' => WorkItemType::ServiceRequest,
         ], $agent);
 
         $workflow->transition($agentWorkItem, 'Assigned', $agent);
-        $workflow->transition($agentWorkItem, 'In Progress', $agent);
+        $workflow->transition($agentWorkItem, 'Working', $agent);
 
         setPermissionsTeamId(null);
     }

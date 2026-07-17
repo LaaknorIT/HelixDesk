@@ -183,6 +183,91 @@ class OutboundWorkItemMailService
         ]);
     }
 
+    /**
+     * Send a customer notification without requiring a saved agent reply message
+     * (used by automation rules when no agent author is available).
+     */
+    public function sendCustomerNotification(WorkItem $workItem, string $body, ?string $subject = null): void
+    {
+        $workItem->loadMissing(['queue.defaultMailAccount', 'reportedBy', 'mailAccount']);
+
+        $recipient = $workItem->reportedBy;
+        if ($recipient === null || $recipient->email === null || trim($recipient->email) === '') {
+            $this->mailLogger->logger()->warning('Skipping automation customer email: requester has no email.', [
+                'work_item_id' => $workItem->getKey(),
+            ]);
+
+            return;
+        }
+
+        $mailAccount = $this->resolveOutboundAccount($workItem);
+        if ($mailAccount === null) {
+            $this->mailLogger->logger()->warning('Skipping automation customer email: no outbound mail account.', [
+                'work_item_id' => $workItem->getKey(),
+            ]);
+
+            return;
+        }
+
+        $publicId = app(WorkItemPublicIdGenerator::class)->ensure($workItem);
+        $mailSubject = WorkItemMailReference::appendSubjectToken(
+            $subject !== null && trim($subject) !== '' ? $subject : 'Re: '.$workItem->title,
+            $publicId
+        );
+        $fromAddress = $mailAccount->email_address;
+        $replyTo = $mailAccount->supports_plus_addressing
+            ? WorkItemMailReference::plusAddress($fromAddress, $publicId)
+            : null;
+        $messageId = '<'.Str::uuid()->toString().'@helixdesk>';
+        $inReplyTo = $workItem->inbound_message_id;
+        $references = $this->buildReferencesChain($workItem, $inReplyTo);
+
+        if ($mailAccount->outbound_protocol === MailOutboundProtocol::MicrosoftGraph) {
+            $this->sendViaGraph(
+                mailAccount: $mailAccount,
+                to: $recipient->email,
+                fromAddress: $fromAddress,
+                fromName: $mailAccount->name ?: 'HelixDesk',
+                subject: $mailSubject,
+                body: $body,
+                inReplyTo: $inReplyTo,
+                references: $references,
+                replyTo: $replyTo,
+            );
+
+            return;
+        }
+
+        if ($mailAccount->outbound_protocol === MailOutboundProtocol::GoogleGmailApi) {
+            $this->mailLogger->warning($mailAccount, 'Google Workspace Gmail API outbound mail is not implemented yet.', [
+                'work_item_id' => $workItem->getKey(),
+            ]);
+
+            return;
+        }
+
+        $placeholder = new WorkItemMessage([
+            'tenant_id' => $workItem->tenant_id,
+            'work_item_id' => $workItem->getKey(),
+            'body' => $body,
+            'is_internal' => false,
+        ]);
+
+        $this->sendViaSmtp(
+            mailAccount: $mailAccount,
+            to: $recipient->email,
+            fromAddress: $fromAddress,
+            fromName: $mailAccount->name ?: 'HelixDesk',
+            subject: $mailSubject,
+            body: $body,
+            inReplyTo: $inReplyTo,
+            references: $references,
+            messageId: $messageId,
+            message: $placeholder,
+            replyTo: $replyTo,
+        );
+    }
+
     private function resolveOutboundAccount(WorkItem $workItem): ?MailAccount
     {
         if ($workItem->mail_account_id !== null) {
@@ -282,7 +367,7 @@ class OutboundWorkItemMailService
                     $symfony->getHeaders()->addTextHeader('References', $references);
                 }
 
-                foreach ($message->attachments as $attachment) {
+                foreach ($message->exists ? $message->attachments : [] as $attachment) {
                     $disk = (string) config('helixdesk.mail.attachment_disk', 'local');
                     $contents = Storage::disk($disk)->get($attachment->storage_path);
                     $symfony->attach($contents, $attachment->filename, $attachment->mime_type);

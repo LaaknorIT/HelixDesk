@@ -82,14 +82,14 @@ class WorkItemWorkflowApiTest extends TestCase
             'title' => 'Server down',
             'description' => 'Core app server is down.',
             'priority' => 'Critical',
-            'status' => 'In Progress',
+            'status' => 'Working',
             'opened_at' => now(),
         ]);
 
         $this->actingAs($viewer);
 
         $this->patchJson("/api/v1/work-items/{$workItem->id}/status", [
-            'to_status' => 'Resolved',
+            'to_status' => 'Closed (pending)',
         ])->assertStatus(Response::HTTP_FORBIDDEN);
     }
 
@@ -296,7 +296,7 @@ class WorkItemWorkflowApiTest extends TestCase
         $this->assertNotSame($workItemOther->id, $indexResponse->json('data.0.id'));
     }
 
-    public function test_end_user_can_close_own_resolved_incident(): void
+    public function test_end_user_can_close_own_pending_closed_incident(): void
     {
         $tenant = Tenant::factory()->create();
 
@@ -312,10 +312,10 @@ class WorkItemWorkflowApiTest extends TestCase
 
         $workItem1 = WorkItem::query()->create([
             'tenant_id' => $tenant->id,
-            'title' => 'Printer resolved',
-            'description' => 'Resolved by support.',
+            'title' => 'Printer pending close',
+            'description' => 'Closed pending by support.',
             'priority' => 'Medium',
-            'status' => 'Resolved',
+            'status' => 'Closed (pending)',
             'reported_by_user_id' => $endUser1->id,
             'opened_at' => now(),
             'resolved_at' => now(),
@@ -323,10 +323,10 @@ class WorkItemWorkflowApiTest extends TestCase
 
         $workItem2 = WorkItem::query()->create([
             'tenant_id' => $tenant->id,
-            'title' => 'Other resolved',
-            'description' => 'Resolved but belongs to other user.',
+            'title' => 'Other pending close',
+            'description' => 'Pending close but belongs to other user.',
             'priority' => 'Medium',
-            'status' => 'Resolved',
+            'status' => 'Closed (pending)',
             'reported_by_user_id' => $endUser2->id,
             'opened_at' => now(),
             'resolved_at' => now(),

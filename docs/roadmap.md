@@ -36,8 +36,10 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 - [x] **Email → work_items**: inbound polling, threaded replies, outbound agent replies from queue mailbox
 - [x] **Problems**: Filament resource, permissions, baseline model
 - [x] **Changes**: Filament resource, workflow service, permissions, tests
+- [x] **Ticket statuses catalog** + admin UI; default statuses via `TenantObserver` (New, Assigned, Working, Waiting for customer, Replied, Closed (pending), Closed)
+- [x] **Ticket automations**: multi-action rules (set status, create ticket, send customer email); seeded customer-reply rules; admin UI
+- [x] **SLA policies** + matching (priority / customer / category / type), pause on waiting statuses, timers/breach jobs, admin UI
 - [ ] **Major work_items**: dedicated entity/workflows/UI (vs normal work_items only)
-- [ ] **SLA / priority automation** (rules, timers, escalation) beyond static priority field
 - [ ] Richer **knowledge base** integration (published docs ↔ work_items) if distinct from current Documentation module
 
 ---

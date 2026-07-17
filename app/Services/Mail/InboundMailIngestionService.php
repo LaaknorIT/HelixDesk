@@ -11,6 +11,9 @@ use App\Models\Queue;
 use App\Models\WorkItem;
 use App\Models\WorkItemMessage;
 use App\Models\WorkItemMessageAttachment;
+use App\Services\SlaPolicyResolver;
+use App\Services\SlaTimerService;
+use App\Services\WorkItemAutomationService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +25,9 @@ class InboundMailIngestionService
         private readonly InboundMimeParser $mimeParser,
         private readonly RequesterResolutionService $requesterResolver,
         private readonly MailInboundLogger $logger,
+        private readonly WorkItemAutomationService $automationService,
+        private readonly SlaPolicyResolver $slaPolicyResolver,
+        private readonly SlaTimerService $slaTimerService,
     ) {}
 
     public function ingest(MailAccount $account, string $rawMime, ?string $transportUid = null): InboundMailIngestOutcome
@@ -109,6 +115,14 @@ class InboundMailIngestionService
             ]);
 
             $this->storeAttachments($message, $parsed->attachments);
+
+            if ($existing !== null) {
+                $target = $this->automationService->handleCustomerReplied($workItem, $message);
+                $ingestedWorkItemId = $target->getKey();
+            } else {
+                $this->slaPolicyResolver->attachBestPolicy($workItem);
+                $this->slaTimerService->startTimers($workItem);
+            }
         });
 
         $this->logger->info($account, 'Ingested inbound message', [

@@ -198,5 +198,12 @@ Logging (`.env` / `config/logging.php`):
 
 - **Google Workspace Gmail API** — designed in [`google-workspace-mail.md`](google-workspace-mail.md); not implemented yet.
 - Inbound SMTP webhook (push instead of poll).
-- End-user notification emails on status change.
 - Major-incident broadcast mail.
+
+## Automations on inbound / portal customer replies
+
+After a non-internal customer message is attached to a work item (email ingest or portal), HelixDesk runs enabled `AutomationRule`s with trigger `customer_replied` (see [`domain-model.md`](domain-model.md) §3.3 and [`workflows-and-use-cases.md`](workflows-and-use-cases.md) §1.1):
+
+- Default: move to `Replied` when the ticket was Assigned / Working / Waiting for customer / Closed (pending).
+- Default: if the ticket is `Closed`, create a **new** work item and attach the reply there instead of reopening the closed ticket.
+- Custom rules may also **send customer email** (and other actions) in the same rule.

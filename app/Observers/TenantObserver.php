@@ -2,14 +2,22 @@
 
 namespace App\Observers;
 
+use App\Enums\AutomationActionType;
+use App\Enums\AutomationTrigger;
+use App\Enums\SlaCalendarType;
+use App\Enums\SlaTargetType;
 use App\Models\AssetType;
+use App\Models\AutomationRule;
+use App\Models\AutomationRuleAction;
 use App\Models\DashboardLayout;
 use App\Models\MonitoringEventSource;
 use App\Models\Queue;
+use App\Models\SlaPolicy;
 use App\Models\Tenant;
 use App\Models\TenantRole;
 use App\Models\WorkflowDefinition;
 use App\Models\WorkflowTransition;
+use App\Models\WorkItemStatus;
 use App\Services\RolePermissionSync;
 use App\Support\HelixdeskPermissionCatalog;
 use Illuminate\Support\Facades\Config;
@@ -21,7 +29,10 @@ class TenantObserver
     {
         $this->seedTenantPermissionsAndRoles($tenant);
 
+        $this->seedDefaultWorkItemStatuses($tenant);
         $this->seedDefaultWorkItemWorkflow($tenant);
+        $this->seedDefaultWorkItemAutomations($tenant);
+        $this->seedDefaultSlaPolicies($tenant);
         $this->seedDefaultQueue($tenant);
         $this->seedDefaultChangeWorkflow($tenant);
         $this->seedDefaultAssetTypes($tenant);
@@ -85,6 +96,84 @@ class TenantObserver
         );
     }
 
+    private function seedDefaultWorkItemStatuses(Tenant $tenant): void
+    {
+        foreach ($this->defaultWorkItemStatuses() as $index => $status) {
+            WorkItemStatus::query()->updateOrCreate(
+                [
+                    'tenant_id' => $tenant->getKey(),
+                    'name' => $status['name'],
+                ],
+                [
+                    'sort_order' => $index,
+                    'is_system' => true,
+                    'is_default_open' => $status['is_default_open'],
+                    'pauses_sla' => $status['pauses_sla'],
+                    'sets_resolved_at' => $status['sets_resolved_at'],
+                    'sets_closed_at' => $status['sets_closed_at'],
+                ]
+            );
+        }
+    }
+
+    /**
+     * @return array<int, array{name: string, is_default_open: bool, pauses_sla: bool, sets_resolved_at: bool, sets_closed_at: bool}>
+     */
+    private function defaultWorkItemStatuses(): array
+    {
+        return [
+            [
+                'name' => 'New',
+                'is_default_open' => true,
+                'pauses_sla' => false,
+                'sets_resolved_at' => false,
+                'sets_closed_at' => false,
+            ],
+            [
+                'name' => 'Assigned',
+                'is_default_open' => false,
+                'pauses_sla' => false,
+                'sets_resolved_at' => false,
+                'sets_closed_at' => false,
+            ],
+            [
+                'name' => 'Working',
+                'is_default_open' => false,
+                'pauses_sla' => false,
+                'sets_resolved_at' => false,
+                'sets_closed_at' => false,
+            ],
+            [
+                'name' => 'Waiting for customer',
+                'is_default_open' => false,
+                'pauses_sla' => true,
+                'sets_resolved_at' => false,
+                'sets_closed_at' => false,
+            ],
+            [
+                'name' => 'Replied',
+                'is_default_open' => false,
+                'pauses_sla' => false,
+                'sets_resolved_at' => false,
+                'sets_closed_at' => false,
+            ],
+            [
+                'name' => 'Closed (pending)',
+                'is_default_open' => false,
+                'pauses_sla' => true,
+                'sets_resolved_at' => true,
+                'sets_closed_at' => false,
+            ],
+            [
+                'name' => 'Closed',
+                'is_default_open' => false,
+                'pauses_sla' => false,
+                'sets_resolved_at' => true,
+                'sets_closed_at' => true,
+            ],
+        ];
+    }
+
     private function seedDefaultWorkItemWorkflow(Tenant $tenant): void
     {
         $workflowDefinition = WorkflowDefinition::query()->firstOrCreate(
@@ -96,7 +185,12 @@ class TenantObserver
             ['name' => 'Default Work Item Workflow']
         );
 
-        foreach ($this->defaultWorkItemTransitions() as $transition) {
+        $desired = $this->defaultWorkItemTransitions();
+        $desiredKeys = [];
+
+        foreach ($desired as $transition) {
+            $desiredKeys[] = $transition['from_status'].'|'.$transition['to_status'];
+
             WorkflowTransition::query()->updateOrCreate([
                 'tenant_id' => $tenant->getKey(),
                 'workflow_definition_id' => $workflowDefinition->getKey(),
@@ -106,6 +200,21 @@ class TenantObserver
                 'required_permission' => $transition['required_permission'],
             ]);
         }
+
+        // Drop legacy default transitions from earlier status names when reseeding.
+        WorkflowTransition::query()
+            ->where('workflow_definition_id', $workflowDefinition->getKey())
+            ->get()
+            ->each(function (WorkflowTransition $transition) use ($desiredKeys): void {
+                $key = $transition->from_status.'|'.$transition->to_status;
+                if (! in_array($key, $desiredKeys, true)) {
+                    $legacyFrom = in_array($transition->from_status, ['In Progress', 'Waiting for User', 'Resolved'], true);
+                    $legacyTo = in_array($transition->to_status, ['In Progress', 'Waiting for User', 'Resolved'], true);
+                    if ($legacyFrom || $legacyTo) {
+                        $transition->delete();
+                    }
+                }
+            });
     }
 
     /**
@@ -123,36 +232,153 @@ class TenantObserver
             ],
             [
                 'from_status' => 'Assigned',
-                'to_status' => 'In Progress',
+                'to_status' => 'Working',
                 'required_permission' => $permission,
             ],
             [
-                'from_status' => 'In Progress',
-                'to_status' => 'Waiting for User',
+                'from_status' => 'Working',
+                'to_status' => 'Waiting for customer',
                 'required_permission' => $permission,
             ],
             [
-                'from_status' => 'In Progress',
-                'to_status' => 'Resolved',
+                'from_status' => 'Working',
+                'to_status' => 'Closed (pending)',
                 'required_permission' => $permission,
             ],
             [
-                'from_status' => 'Waiting for User',
-                'to_status' => 'In Progress',
+                'from_status' => 'Waiting for customer',
+                'to_status' => 'Working',
                 'required_permission' => $permission,
             ],
             [
-                'from_status' => 'Resolved',
+                'from_status' => 'Replied',
+                'to_status' => 'Working',
+                'required_permission' => $permission,
+            ],
+            [
+                'from_status' => 'Replied',
+                'to_status' => 'Waiting for customer',
+                'required_permission' => $permission,
+            ],
+            [
+                'from_status' => 'Closed (pending)',
                 'to_status' => 'Closed',
-                // End users can close their own work_items once they are resolved.
+                // End users can close their own tickets once pending close.
                 'required_permission' => null,
             ],
             [
-                'from_status' => 'Resolved',
-                'to_status' => 'In Progress',
+                'from_status' => 'Closed (pending)',
+                'to_status' => 'Working',
+                'required_permission' => $permission,
+            ],
+            [
+                'from_status' => 'Closed',
+                'to_status' => 'Working',
                 'required_permission' => $permission,
             ],
         ];
+    }
+
+    private function seedDefaultWorkItemAutomations(Tenant $tenant): void
+    {
+        $repliedRule = AutomationRule::query()->updateOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'name' => 'Customer reply → Replied',
+                'is_system' => true,
+            ],
+            [
+                'is_enabled' => true,
+                'trigger' => AutomationTrigger::CustomerReplied->value,
+                'conditions_json' => [
+                    'statuses' => [
+                        'Assigned',
+                        'Working',
+                        'Waiting for customer',
+                        'Closed (pending)',
+                    ],
+                ],
+                'sort_order' => 10,
+            ]
+        );
+
+        AutomationRuleAction::query()->updateOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'automation_rule_id' => $repliedRule->getKey(),
+                'action_type' => AutomationActionType::SetStatus->value,
+                'sort_order' => 0,
+            ],
+            [
+                'action_config_json' => ['status' => 'Replied'],
+            ]
+        );
+
+        $newTicketRule = AutomationRule::query()->updateOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'name' => 'Customer reply on Closed → new ticket',
+                'is_system' => true,
+            ],
+            [
+                'is_enabled' => true,
+                'trigger' => AutomationTrigger::CustomerReplied->value,
+                'conditions_json' => [
+                    'statuses' => ['Closed'],
+                ],
+                'sort_order' => 20,
+            ]
+        );
+
+        AutomationRuleAction::query()->updateOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'automation_rule_id' => $newTicketRule->getKey(),
+                'action_type' => AutomationActionType::CreateWorkItem->value,
+                'sort_order' => 0,
+            ],
+            [
+                'action_config_json' => [
+                    'link_to_original' => true,
+                    'move_reply_message' => true,
+                ],
+            ]
+        );
+    }
+
+    private function seedDefaultSlaPolicies(Tenant $tenant): void
+    {
+        SlaPolicy::query()->firstOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'name' => 'Normal',
+            ],
+            [
+                'is_active' => true,
+                'target_type' => SlaTargetType::FirstResponse->value,
+                'first_response_minutes' => 8 * 60,
+                'resolution_minutes' => null,
+                'calendar_type' => SlaCalendarType::WorkingHours->value,
+                'applies_to_priority' => 'normal',
+                'match_priority' => 0,
+            ]
+        );
+
+        SlaPolicy::query()->firstOrCreate(
+            [
+                'tenant_id' => $tenant->getKey(),
+                'name' => 'Gold',
+            ],
+            [
+                'is_active' => true,
+                'target_type' => SlaTargetType::Resolution->value,
+                'first_response_minutes' => null,
+                'resolution_minutes' => 8 * 60,
+                'calendar_type' => SlaCalendarType::Continuous->value,
+                'applies_to_priority' => 'urgent',
+                'match_priority' => 10,
+            ]
+        );
     }
 
     private function seedDefaultChangeWorkflow(Tenant $tenant): void

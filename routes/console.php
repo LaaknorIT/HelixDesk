@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\EvaluateSlaBreachesJob;
 use App\Jobs\OrganizationSettingsImport;
 use App\Jobs\PollMailAccountsJob;
 use App\Support\OrganizationIntegrationSettings;
@@ -17,5 +18,9 @@ Schedule::job(OrganizationSettingsImport::class)
     ->withoutOverlapping();
 
 Schedule::job(new PollMailAccountsJob)
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
+Schedule::job(new EvaluateSlaBreachesJob)
     ->everyFiveMinutes()
     ->withoutOverlapping();
