@@ -19,6 +19,11 @@ class WorkflowTransition extends TenantModel
         return [];
     }
 
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
     public function workflowDefinition(): BelongsTo
     {
         return $this->belongsTo(WorkflowDefinition::class, 'workflow_definition_id');

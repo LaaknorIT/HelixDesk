@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class WorkflowDefinition extends TenantModel
@@ -18,6 +19,11 @@ class WorkflowDefinition extends TenantModel
         return [
             'is_default' => 'boolean',
         ];
+    }
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
     }
 
     public function transitions(): HasMany

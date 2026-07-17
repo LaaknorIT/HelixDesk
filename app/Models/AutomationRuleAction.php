@@ -26,4 +26,9 @@ class AutomationRuleAction extends TenantModel
     {
         return $this->belongsTo(AutomationRule::class, 'automation_rule_id');
     }
+
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
 }
