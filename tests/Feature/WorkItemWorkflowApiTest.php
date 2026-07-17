@@ -53,6 +53,12 @@ class WorkItemWorkflowApiTest extends TestCase
 
         $this->patchJson("/api/v1/work-items/{$workItemId}/status", [
             'to_status' => 'Closed',
+        ])->assertOk();
+
+        $this->assertSame('Closed', WorkItem::query()->findOrFail($workItemId)->status);
+
+        $this->patchJson("/api/v1/work-items/{$workItemId}/status", [
+            'to_status' => 'Not a real status',
         ])->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
     }
 

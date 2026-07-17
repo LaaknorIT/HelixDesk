@@ -88,7 +88,7 @@ class ViewWorkItem extends ViewRecord
                         Select::make('to_status')
                             ->label('Status')
                             ->placeholder('Select status')
-                            ->options(fn (): array => $this->allowedStatusTransitions()),
+                            ->options(fn (): array => $this->availableStatusOptions()),
                         Select::make('priority')
                             ->label('Priority')
                             ->options([
@@ -292,7 +292,7 @@ class ViewWorkItem extends ViewRecord
     /**
      * @return array<string, string>
      */
-    protected function allowedStatusTransitions(): array
+    protected function availableStatusOptions(): array
     {
         $user = auth()->user();
 
@@ -300,7 +300,7 @@ class ViewWorkItem extends ViewRecord
             return [];
         }
 
-        return app(WorkItemWorkflowService::class)->allowedTransitions($this->getRecord(), $user);
+        return app(WorkItemWorkflowService::class)->availableStatusOptions($this->getRecord(), $user);
     }
 
     /**

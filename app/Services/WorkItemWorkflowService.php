@@ -37,22 +37,34 @@ class WorkItemWorkflowService
             throw new AccessDeniedHttpException('Forbidden.');
         }
 
+        $statusExists = WorkItemStatus::query()
+            ->where('tenant_id', $workItem->tenant_id)
+            ->where('name', $toStatus)
+            ->exists();
+
+        if (! $statusExists) {
+            throw new UnprocessableEntityHttpException('Unknown work item status.');
+        }
+
         $workflowDefinition = WorkflowDefinition::query()
             ->where('entity_type', 'work_item')
             ->where('is_default', true)
-            ->firstOrFail();
-
-        $transition = WorkflowTransition::query()
-            ->where('workflow_definition_id', $workflowDefinition->getKey())
-            ->where('from_status', $workItem->status)
-            ->where('to_status', $toStatus)
             ->first();
 
-        if ($transition === null) {
-            throw new UnprocessableEntityHttpException('Invalid work item status transition.');
+        $transition = null;
+        if ($workflowDefinition !== null) {
+            $transition = WorkflowTransition::query()
+                ->where('workflow_definition_id', $workflowDefinition->getKey())
+                ->where('from_status', $workItem->status)
+                ->where('to_status', $toStatus)
+                ->first();
         }
 
         if ($user->type === 'end_user') {
+            if ($transition === null) {
+                throw new UnprocessableEntityHttpException('Invalid work item status transition.');
+            }
+
             if ($toStatus !== 'Closed') {
                 throw new AccessDeniedHttpException('Forbidden.');
             }
@@ -60,20 +72,21 @@ class WorkItemWorkflowService
             if ((int) $workItem->reported_by_user_id !== (int) $user->id) {
                 throw new AccessDeniedHttpException('Forbidden.');
             }
+
+            if (! HelixdeskWorkItemAuthorization::satisfiesWorkflowPermission($user, $transition->required_permission, $workItem)) {
+                throw new AccessDeniedHttpException('Forbidden.');
+            }
         } else {
             if (! WorkItemQueueScope::canAccess($user, $workItem)) {
                 throw new AccessDeniedHttpException('Forbidden.');
             }
 
-            // Agents/tenant admins must have permission required by the workflow transition.
-            if (! HelixdeskWorkItemAuthorization::satisfiesWorkflowPermission($user, $transition->required_permission, $workItem)) {
+            // Prefer an explicit transition permission when configured; otherwise require update.
+            $requiredPermission = $transition?->required_permission ?? 'work_item.update';
+
+            if (! HelixdeskWorkItemAuthorization::satisfiesWorkflowPermission($user, $requiredPermission, $workItem)) {
                 throw new AccessDeniedHttpException('Forbidden.');
             }
-        }
-
-        // End users can reach a transition only when the workflow allows it.
-        if (! HelixdeskWorkItemAuthorization::satisfiesWorkflowPermission($user, $transition->required_permission, $workItem)) {
-            throw new AccessDeniedHttpException('Forbidden.');
         }
 
         $fromStatus = (string) $workItem->status;
@@ -100,6 +113,38 @@ class WorkItemWorkflowService
         $this->slaTimerService->syncPauseState($workItem, $fromStatus, $toStatus);
 
         return $workItem;
+    }
+
+    /**
+     * Status options for the agent ticket UI: all tenant catalog statuses except the current one.
+     *
+     * @return array<string, string> map of status name => label
+     */
+    public function availableStatusOptions(WorkItem $workItem, User $user): array
+    {
+        if ($workItem->tenant_id === null || ! $user->canOperateInTenant((int) $workItem->tenant_id)) {
+            return [];
+        }
+
+        if ($user->type === 'end_user') {
+            return $this->allowedTransitions($workItem, $user);
+        }
+
+        if (! WorkItemQueueScope::canAccess($user, $workItem)) {
+            return [];
+        }
+
+        if (! HelixdeskWorkItemAuthorization::hasWorkItemPermission($user, 'update', (int) $workItem->queue_id)) {
+            return [];
+        }
+
+        return WorkItemStatus::query()
+            ->where('tenant_id', $workItem->tenant_id)
+            ->where('name', '!=', $workItem->status)
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->pluck('name', 'name')
+            ->all();
     }
 
     /**

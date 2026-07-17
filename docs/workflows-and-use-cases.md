@@ -33,7 +33,8 @@ Allowed default **manual** transitions (simplified):
 Implementation:
 
 - Statuses: `WorkItemStatus` rows seeded by `TenantObserver`.
-- Allowed transitions: `WorkflowDefinition` + `WorkflowTransition` for `entity_type = work_item`.
+- Agent ticket UI lists **all** tenant catalog statuses (not only graph edges).
+- Explicit `WorkflowTransition` rows still control end-user close and optional per-edge permissions; agents with `work_item.update` may set any catalog status even without a matching transition.
 - Each transition can require a permission (usually `work_item.update`); end-user close uses `required_permission = null`.
 
 **Event-driven automations** (`AutomationRule`, also seeded + admin UI):

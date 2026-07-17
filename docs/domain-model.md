@@ -238,7 +238,7 @@ Related entities kept **separate** (not ticket types):
 Invariants:
 
 - `tenant_id` matches all related entities (organization, queue, status, SLA, category).
-- Manual status transitions must follow tenant-defined `WorkflowTransition` rules (allowed from→to graph).
+- Agents may set any `WorkItemStatus` in the tenant catalog (with queue `work_item.update`); explicit `WorkflowTransition` rows optionally tighten per-edge permissions. End users remain limited to allowed transitions (typically Closed (pending) → Closed).
 - Event-driven `AutomationRule`s may change status or spawn tickets without going through the agent transition UI, but should still land on a valid tenant status name.
 - Reclassifying `type` is allowed; audit the change and optionally re-match queue/SLA.
 
