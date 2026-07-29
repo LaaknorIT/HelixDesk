@@ -21,17 +21,28 @@ class ServiceOfferingForm
 
         return $schema
             ->components([
-                Select::make('organization_id')
-                    ->label('Customer')
+                Select::make('organizations')
+                    ->label('Organizations')
                     ->relationship(
-                        name: 'organization',
+                        name: 'organizations',
                         titleAttribute: 'name',
                         modifyQueryUsing: fn (Builder $query): Builder => $query
-                            ->where('type', OrganizationType::Customer->value),
+                            ->whereIn('type', [
+                                OrganizationType::Customer->value,
+                                OrganizationType::Group->value,
+                            ])
+                            ->orderBy('name'),
                     )
+                    ->multiple()
                     ->searchable()
                     ->preload()
-                    ->required(),
+                    ->required()
+                    ->helperText('Explicit assignment only — groups do not inherit to child customers.')
+                    ->default(function (): ?array {
+                        $organizationId = request()->query('organization_id');
+
+                        return filled($organizationId) ? [(int) $organizationId] : null;
+                    }),
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255),

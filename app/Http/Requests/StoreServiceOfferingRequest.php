@@ -29,6 +29,15 @@ class StoreServiceOfferingRequest extends FormRequest
         }
     }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('organization_id') && ! $this->filled('organization_ids')) {
+            $this->merge([
+                'organization_ids' => [(int) $this->input('organization_id')],
+            ]);
+        }
+    }
+
     /**
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -38,16 +47,22 @@ class StoreServiceOfferingRequest extends FormRequest
         $kindKeys = array_keys(config('helixdesk_service_offering.kinds', []));
 
         return [
-            'organization_id' => [
-                'required',
+            'organization_ids' => ['required', 'array', 'min:1'],
+            'organization_ids.*' => [
                 'integer',
                 Rule::exists('organizations', 'id')->where('tenant_id', $tenantId),
             ],
+            'organization_id' => ['sometimes', 'integer'],
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:65535'],
             'code' => ['nullable', 'string', 'max:255'],
             'kind' => ['required', 'string', Rule::in($kindKeys)],
             'attributes_json' => ['nullable', 'array'],
+            'software_deployment_ids' => ['sometimes', 'array'],
+            'software_deployment_ids.*' => [
+                'integer',
+                Rule::exists('software_deployments', 'id')->where('tenant_id', $tenantId),
+            ],
         ];
     }
 
@@ -73,14 +88,18 @@ class StoreServiceOfferingRequest extends FormRequest
                 }
             }
 
-            $organizationId = $this->input('organization_id');
-            if ($organizationId !== null) {
-                $organization = Organization::query()->find($organizationId);
-                if ($organization === null || $organization->type !== OrganizationType::Customer) {
+            /** @var list<int> $organizationIds */
+            $organizationIds = $this->input('organization_ids', []);
+            $organizations = Organization::query()->whereIn('id', $organizationIds)->get();
+
+            foreach ($organizations as $organization) {
+                if (! in_array($organization->type, [OrganizationType::Customer, OrganizationType::Group], true)) {
                     $validator->errors()->add(
-                        'organization_id',
-                        __('Service offerings can only be assigned to customer organizations.'),
+                        'organization_ids',
+                        __('Service offerings can only be assigned to customer or group organizations.'),
                     );
+
+                    break;
                 }
             }
         });

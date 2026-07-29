@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\ServiceOfferings\Pages\EditServiceOffering;
 use App\Filament\Agent\Resources\ServiceOfferings\Pages\ListServiceOfferings;
 use App\Filament\Agent\Resources\ServiceOfferings\RelationManagers\DocumentsRelationManager;
 use App\Filament\Agent\Resources\ServiceOfferings\RelationManagers\RealizationAssetsRelationManager;
+use App\Filament\Agent\Resources\ServiceOfferings\RelationManagers\SoftwareDeploymentsRelationManager;
 use App\Filament\Agent\Resources\ServiceOfferings\RelationManagers\SuppliersRelationManager;
 use App\Filament\Agent\Resources\ServiceOfferings\Schemas\ServiceOfferingForm;
 use App\Filament\Agent\Resources\ServiceOfferings\Tables\ServiceOfferingsTable;
@@ -92,6 +93,7 @@ class ServiceOfferingResource extends Resource
         return [
             SuppliersRelationManager::class,
             RealizationAssetsRelationManager::class,
+            SoftwareDeploymentsRelationManager::class,
             DocumentsRelationManager::class,
         ];
     }

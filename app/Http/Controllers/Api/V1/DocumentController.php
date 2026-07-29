@@ -74,6 +74,9 @@ class DocumentController extends Controller
                 'serviceOfferings',
                 'suppliers',
                 'assets',
+                'softwareProducts',
+                'softwareDeployments',
+                'softwareLicenses',
             ]),
         ]);
     }

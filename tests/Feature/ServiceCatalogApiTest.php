@@ -95,9 +95,9 @@ class ServiceCatalogApiTest extends TestCase
 
         $offering = ServiceOffering::factory()->create([
             'tenant_id' => $tenant->id,
-            'organization_id' => $organization->id,
             'kind' => 'custom',
         ]);
+        $offering->organizations()->sync([$organization->id]);
 
         $offering->suppliers()->attach($supplier->id, ['role' => 'primary', 'notes' => null]);
         $offering->realizationAssets()->attach($asset->id, ['role' => 'primary_access']);
@@ -107,7 +107,8 @@ class ServiceCatalogApiTest extends TestCase
         $this->getJson('/api/v1/service-offerings/'.$offering->id)
             ->assertOk()
             ->assertJsonPath('data.suppliers.0.id', $supplier->id)
-            ->assertJsonPath('data.realization_assets.0.id', $asset->id);
+            ->assertJsonPath('data.realization_assets.0.id', $asset->id)
+            ->assertJsonPath('data.organizations.0.id', $organization->id);
     }
 
     public function test_agent_cannot_view_service_offering_from_other_tenant(): void
@@ -119,8 +120,8 @@ class ServiceCatalogApiTest extends TestCase
 
         $offering = ServiceOffering::factory()->create([
             'tenant_id' => $tenantA->id,
-            'organization_id' => $organizationA->id,
         ]);
+        $offering->organizations()->sync([$organizationA->id]);
 
         $agentB = User::factory()->create([
             'tenant_id' => $tenantB->id,
@@ -154,8 +155,8 @@ class ServiceCatalogApiTest extends TestCase
         $document = Document::factory()->create(['tenant_id' => $tenant->id]);
         $offering = ServiceOffering::factory()->create([
             'tenant_id' => $tenant->id,
-            'organization_id' => $organization->id,
         ]);
+        $offering->organizations()->sync([$organization->id]);
         $asset = Asset::factory()->create(['tenant_id' => $tenant->id, 'organization_id' => $organization->id]);
 
         $document->serviceOfferings()->attach($offering->id);

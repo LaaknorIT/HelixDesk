@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\AssetIdentityResolutionStatus;
 use App\Models\Pivots\ServiceOfferingAsset;
+use App\Models\Pivots\SoftwareDeploymentAsset;
 use Database\Factories\AssetFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -85,6 +86,14 @@ class Asset extends TenantModel
     {
         return $this->belongsToMany(ServiceOffering::class, 'service_offering_asset')
             ->using(ServiceOfferingAsset::class)
+            ->withPivot(['role'])
+            ->withTimestamps();
+    }
+
+    public function softwareDeployments(): BelongsToMany
+    {
+        return $this->belongsToMany(SoftwareDeployment::class, 'software_deployment_asset')
+            ->using(SoftwareDeploymentAsset::class)
             ->withPivot(['role'])
             ->withTimestamps();
     }

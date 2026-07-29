@@ -65,6 +65,27 @@ class Document extends TenantModel
             ->withTimestamps();
     }
 
+    public function softwareProducts(): MorphToMany
+    {
+        return $this->morphedByMany(SoftwareProduct::class, 'linkable', 'document_links')
+            ->using(DocumentLink::class)
+            ->withTimestamps();
+    }
+
+    public function softwareDeployments(): MorphToMany
+    {
+        return $this->morphedByMany(SoftwareDeployment::class, 'linkable', 'document_links')
+            ->using(DocumentLink::class)
+            ->withTimestamps();
+    }
+
+    public function softwareLicenses(): MorphToMany
+    {
+        return $this->morphedByMany(SoftwareLicense::class, 'linkable', 'document_links')
+            ->using(DocumentLink::class)
+            ->withTimestamps();
+    }
+
     public static function uniqueSlugForTenant(int|string $tenantId, string $title, ?int $ignoreId = null): string
     {
         $base = Str::slug($title);

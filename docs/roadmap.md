@@ -48,7 +48,8 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 
 - [~] **Assets** / CMDB: models, relationships, Filament, API v1; multi-source identity, patch/software satellites, ambiguity resolution
 - [x] **Service catalog**: `Supplier`, `ServiceOffering`, pivots to assets/suppliers, config-driven kinds/roles ([`docs/service-catalog.md`](service-catalog.md))
-- [~] **Documents**: Filament, API v1, links to work_items, **assets, suppliers, service offerings**
+- [~] **Service offerings + software** (design: [`docs/service-offerings-and-software.md`](service-offerings-and-software.md)): multi-org assignment; `SoftwareProduct` / `SoftwareDeployment`; rich `SoftwareLicense`; partner vs customer docs UX (Filament + models; dedicated software REST API still open)
+- [~] **Documents**: Filament, API v1, links to work_items, **assets, suppliers, service offerings** (extend morphs to software product/deployment/license)
 - [x] **Microsoft Entra sync**: users, departments, Intune devices → `Asset`, security → `MonitoringEvent` (via `organization_integrations`)
 - [x] **Multi-source asset integration** (design: [`docs/integrations.md`](integrations.md)):
   - [x] Phase 1: `organization_integrations` table + migrate from org JSON; CMDB satellite tables; identity resolution (serial + MAC/hostname); tenant auto-retire setting; retirement activity logging
@@ -108,10 +109,11 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 1. **Stabilize**: expand automated tests across problems, changes, assets, documents, monitoring; fix gaps found in manual QA.
 2. **Monitoring Phase D**: close the loop from *event ingested* → *actionable ticket/workflow*.
 3. **Dashboards Phase E**: ship a small set of high-value widgets tied to real queries.
-4. **Operations**: add Horizon + Redis + storage to default deployment story so architecture matches `technical-architecture.md`.
-5. **API docs**: OpenAPI for v1 to support integrations.
-6. **Major work_items & SLA** when service-desk depth is the priority.
+4. **Service offerings + software** (Phase C): implement [`service-offerings-and-software.md`](service-offerings-and-software.md) when documentation/CMDB depth is the priority.
+5. **Operations**: add Horizon + Redis + storage to default deployment story so architecture matches `technical-architecture.md`.
+6. **API docs**: OpenAPI for v1 to support integrations.
+7. **Major work_items & SLA** when service-desk depth is the priority.
 
 ---
 
-*Last updated: 2026-07-14 — multi-source integration Phases 1–4 marked complete.*
+*Last updated: 2026-07-29 — service offerings / software product design approved.*

@@ -64,7 +64,8 @@ Relationships:
 - belongs to `Tenant`
 - belongs to `Organization` as parent (optional)
 - has many `Organization` as children
-- has many `User`, `Asset`, `ServiceOffering` (service offerings **only** on `customer` nodes)
+- has many `User`, `Asset`
+- belongs to many `ServiceOffering` via **`organization_service_offering`** (explicit multi-select; `customer` and/or `group` nodes — **no** child inheritance). See [`service-offerings-and-software.md`](service-offerings-and-software.md).
 - has many `OrganizationIntegration` (planned — [`integrations.md`](integrations.md))
 
 Scoped records (`User`, `Asset`, `WorkItem`, etc.) reference a **single** `organization_id` pointing at the tree node they belong to. Use `organization_id = null` for tenant-wide records (e.g. unassigned CIs).
@@ -585,26 +586,95 @@ Relationships:
 
 ### 4.5 Service offering (service catalog)
 
-A **business service** consumed by a customer organization: what the company needs (e.g. “Internet connectivity”, “Financial and HR systems”), distinct from CIs (`Asset`).
+A **customer IT capability** the tenant supports (e.g. “Internet connectivity”, “Financial software”, “Office support”) — **not** the MSP’s commercial package (e.g. “IT operations”). Distinct from CIs (`Asset`) and from software catalog entities (§4.6–4.8). Full design: [`service-offerings-and-software.md`](service-offerings-and-software.md).
 
 Key fields:
 
-- `id`, `tenant_id`, `organization_id` (customer org; required; must be `type = customer`)
+- `id`, `tenant_id`
 - `name`, `description` (nullable), `code` (nullable, internal reference)
 - `kind` (`internet_connectivity`, `business_application_suite`, `custom`, …) — drives suggested asset/supplier roles and optional required attributes
 - `attributes_json` (nullable) — service-specific facts (e.g. `line_number` for connectivity); validated per `kind` where configured
 
+**Organization scope:** many-to-many via **`organization_service_offering`** (explicit multi-select of `customer` and/or `group` nodes). **No inheritance** from group to children. The same organization may have **multiple** offerings of the same `kind`.
+
+*(Legacy: single `organization_id` on `service_offerings` — migrate into the pivot, then remove.)*
+
 Relationships:
 
-- belongs to `Tenant`, `Organization`
+- belongs to `Tenant`
+- belongs to many `Organization` via **`organization_service_offering`**
 - belongs to many `Supplier` via **`service_offering_supplier`**
-- belongs to many `Asset` via **`service_offering_asset`** with pivot **`role`** (e.g. `primary_access`, `backup_access`, `financial_application`, `payroll_application`, `circuit`) — **technical realization** of the service
+- belongs to many `Asset` via **`service_offering_asset`** with pivot **`role`** (e.g. `primary_access`, `backup_access`, `circuit`) — non-software technical realization
+- belongs to many `SoftwareDeployment` via **`service_offering_software_deployment`** — application realization
 - documents via **`document_links`** (morph)
 
 Invariants:
 
-- All linked `Supplier` and `Asset` rows must belong to the same `tenant_id` as the offering.
-- `organization_id` identifies **who** consumes the service; CIs may belong to the same or a related org per tenant practice.
+- All linked `Supplier`, `Asset`, and `SoftwareDeployment` rows must belong to the same `tenant_id` as the offering.
+- Pivot organizations must share that `tenant_id`.
+
+### 4.6 Software product
+
+Tenant-wide catalog entry for a product reused across customers (e.g. Microsoft 365, Visma ERP).
+
+Key fields:
+
+- `id`, `tenant_id`, `name`, optional `vendor_name`, `supplier_id`, `category`, `description`, `partner_notes`, `external_reference`, `is_active`
+
+Relationships:
+
+- belongs to `Tenant`, optional `Supplier`
+- has many `SoftwareDeployment`
+- documents via **`document_links`** — **partner-level** documentation
+
+Invariants:
+
+- Prefer unique `(tenant_id, name)` (enforce in application validation).
+
+### 4.7 Software deployment
+
+Concrete use of a **Software product** at one **Organization** (normally a customer).
+
+Key fields:
+
+- `id`, `tenant_id`, `software_product_id`, `organization_id`
+- `name`, optional `environment` (`production`, `test`, `dr`, `other`), `status` (`active`, `planned`, `retired`)
+- optional `external_tenant_id`, `admin_url`, `notes`, `attributes_json`
+
+Relationships:
+
+- belongs to `Tenant`, `SoftwareProduct`, `Organization`
+- belongs to many `ServiceOffering` via **`service_offering_software_deployment`** (one deployment may serve multiple offerings)
+- has many `SoftwareLicense`
+- belongs to many `Asset` via **`software_deployment_asset`** (pivot `role`: e.g. `hosted_on`, `related`, `identity_provider`)
+- documents via **`document_links`** — **customer-level** documentation (default agent UX focus)
+
+Invariants:
+
+- Product, organization, and deployment share `tenant_id`.
+- Multiple deployments of the same product are allowed (per customer and/or environments).
+
+### 4.8 Software license
+
+Dedicated entitlement row on a **Software deployment** (rich documentation: seats, expiry, contract refs). Not the same as a generic License-type `Asset`, though assets may still represent physical media.
+
+Key fields:
+
+- `id`, `tenant_id`, `software_deployment_id`, `name`
+- optional `sku` / `product_code`, `license_type`, `metric`
+- optional `seat_count`, `seats_used` (manual in v1 — not auto-synced)
+- optional `starts_on`, `expires_on`, `auto_renew`
+- optional `cost_amount`, `cost_currency`, `billing_period`
+- optional `vendor_contract_reference`, `purchase_order_reference`, `notes`, `attributes_json`
+
+Relationships:
+
+- belongs to `Tenant`, `SoftwareDeployment`
+- documents via **`document_links`** (optional)
+
+Invariants:
+
+- Each license belongs to exactly one deployment (customer context).
 
 ---
 

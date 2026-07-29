@@ -21,7 +21,6 @@ class ServiceOffering extends TenantModel
      */
     protected $fillable = [
         'tenant_id',
-        'organization_id',
         'name',
         'description',
         'code',
@@ -36,29 +35,15 @@ class ServiceOffering extends TenantModel
         ];
     }
 
-    protected static function booted(): void
-    {
-        parent::booted();
-
-        static::saving(function (ServiceOffering $offering): void {
-            $organization = $offering->organization;
-
-            if ($organization !== null && ! $organization->acceptsServiceOfferings()) {
-                throw ValidationException::withMessages([
-                    'organization_id' => __('Service offerings can only be assigned to customer organizations.'),
-                ]);
-            }
-        });
-    }
-
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
     }
 
-    public function organization(): BelongsTo
+    public function organizations(): BelongsToMany
     {
-        return $this->belongsTo(Organization::class);
+        return $this->belongsToMany(Organization::class, 'organization_service_offering')
+            ->withTimestamps();
     }
 
     public function suppliers(): BelongsToMany
@@ -77,10 +62,48 @@ class ServiceOffering extends TenantModel
             ->withTimestamps();
     }
 
+    public function softwareDeployments(): BelongsToMany
+    {
+        return $this->belongsToMany(SoftwareDeployment::class, 'service_offering_software_deployment')
+            ->withTimestamps();
+    }
+
     public function documents(): MorphToMany
     {
         return $this->morphToMany(Document::class, 'linkable', 'document_links')
             ->using(DocumentLink::class)
             ->withTimestamps();
+    }
+
+    /**
+     * @param  list<int|string>  $organizationIds
+     */
+    public function syncOrganizations(array $organizationIds): void
+    {
+        $organizations = Organization::query()
+            ->whereIn('id', $organizationIds)
+            ->get();
+
+        if ($organizations->count() !== count(array_unique(array_map('intval', $organizationIds)))) {
+            throw ValidationException::withMessages([
+                'organization_ids' => __('One or more organizations could not be found.'),
+            ]);
+        }
+
+        foreach ($organizations as $organization) {
+            if ((int) $organization->tenant_id !== (int) $this->tenant_id) {
+                throw ValidationException::withMessages([
+                    'organization_ids' => __('Organizations must belong to the same tenant as the service offering.'),
+                ]);
+            }
+
+            if (! $organization->acceptsServiceOfferings()) {
+                throw ValidationException::withMessages([
+                    'organization_ids' => __('Service offerings can only be assigned to customer or group organizations.'),
+                ]);
+            }
+        }
+
+        $this->organizations()->sync($organizationIds);
     }
 }

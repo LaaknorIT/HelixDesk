@@ -27,7 +27,7 @@ class ServiceOfferingController extends Controller
         }
 
         $offerings = ServiceOffering::query()
-            ->with(['organization'])
+            ->with(['organizations', 'softwareDeployments'])
             ->orderBy('name')
             ->get();
 
@@ -40,13 +40,18 @@ class ServiceOfferingController extends Controller
     {
         $user = $request->user();
 
-        $data = $request->validated();
+        $data = $request->safe()->except(['organization_ids', 'organization_id', 'software_deployment_ids']);
         $data['tenant_id'] = $user->operatingTenantId();
 
         $offering = ServiceOffering::query()->create($data);
+        $offering->syncOrganizations($request->validated('organization_ids'));
+
+        if ($request->filled('software_deployment_ids')) {
+            $offering->softwareDeployments()->sync($request->validated('software_deployment_ids'));
+        }
 
         return response()->json([
-            'data' => $offering->load(['organization']),
+            'data' => $offering->load(['organizations', 'softwareDeployments']),
         ], 201);
     }
 
@@ -69,9 +74,10 @@ class ServiceOfferingController extends Controller
 
         return response()->json([
             'data' => $serviceOffering->load([
-                'organization',
+                'organizations',
                 'suppliers',
                 'realizationAssets.assetType',
+                'softwareDeployments.softwareProduct',
             ]),
         ]);
     }

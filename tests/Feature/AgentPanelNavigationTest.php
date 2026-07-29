@@ -14,6 +14,8 @@ use App\Filament\Agent\Resources\People\PeopleResource;
 use App\Filament\Agent\Resources\Problems\ProblemResource;
 use App\Filament\Agent\Resources\Queues\QueueResource;
 use App\Filament\Agent\Resources\ServiceOfferings\ServiceOfferingResource;
+use App\Filament\Agent\Resources\SoftwareDeployments\SoftwareDeploymentResource;
+use App\Filament\Agent\Resources\SoftwareProducts\SoftwareProductResource;
 use App\Filament\Agent\Resources\Suppliers\SupplierResource;
 use App\Filament\Agent\Resources\TenantRoles\TenantRoleResource;
 use App\Filament\Agent\Resources\WorkItems\WorkItemResource;
@@ -86,6 +88,14 @@ class AgentPanelNavigationTest extends TestCase
         $this->assertSame('Infrastructure', SupplierResource::getNavigationGroup());
         $this->assertSame(32, SupplierResource::getNavigationSort());
 
+        $this->assertSame('Infrastructure', SoftwareProductResource::getNavigationGroup());
+        $this->assertSame(34, SoftwareProductResource::getNavigationSort());
+        $this->assertSame(Heroicon::OutlinedCube, SoftwareProductResource::getNavigationIcon());
+
+        $this->assertSame('Infrastructure', SoftwareDeploymentResource::getNavigationGroup());
+        $this->assertSame(35, SoftwareDeploymentResource::getNavigationSort());
+        $this->assertSame(Heroicon::OutlinedServerStack, SoftwareDeploymentResource::getNavigationIcon());
+
         $this->assertSame('Knowledge', DocumentResource::getNavigationGroup());
         $this->assertSame('Documents', DocumentResource::getNavigationLabel());
         $this->assertSame(40, DocumentResource::getNavigationSort());
@@ -142,7 +152,7 @@ class AgentPanelNavigationTest extends TestCase
             );
 
             $this->assertSame(
-                ['Assets', 'Service offerings', 'Suppliers', 'Identity ambiguities'],
+                ['Assets', 'Service offerings', 'Suppliers', 'Identity ambiguities', 'Software products', 'Software deployments'],
                 $this->navigationItemLabelsForGroup($navigation, 'Infrastructure'),
             );
 
@@ -152,7 +162,18 @@ class AgentPanelNavigationTest extends TestCase
             );
 
             $this->assertSame(
-                ['Queues', 'Mail accounts', 'Roles', 'Integration settings', 'Dashboard layouts'],
+                [
+                    'Queues',
+                    'Mail accounts',
+                    'Roles',
+                    'Integration settings',
+                    'Dashboard layouts',
+                    'Ticket statuses',
+                    'Ticket transitions',
+                    'Categories',
+                    'Ticket automations',
+                    'SLA policies',
+                ],
                 $this->navigationItemLabelsForGroup($navigation, 'Administration'),
             );
         } finally {

@@ -21,7 +21,6 @@ class ServiceOfferingFactory extends Factory
     {
         return [
             'tenant_id' => Tenant::factory(),
-            'organization_id' => Organization::factory(),
             'name' => fake()->words(3, true).' service',
             'description' => fake()->sentence(),
             'code' => fake()->optional()->bothify('SRV-####'),
@@ -32,27 +31,16 @@ class ServiceOfferingFactory extends Factory
 
     public function configure(): static
     {
-        return $this->afterMaking(function (ServiceOffering $offering): void {
-            $tenantId = $offering->tenant_id;
-            if ($tenantId === null) {
+        return $this->afterCreating(function (ServiceOffering $offering): void {
+            if ($offering->organizations()->exists()) {
                 return;
             }
 
-            $orgId = $offering->organization_id;
-            if ($orgId === null) {
-                $offering->organization_id = Organization::factory()->create([
-                    'tenant_id' => $tenantId,
-                ])->id;
+            $organization = Organization::factory()->create([
+                'tenant_id' => $offering->tenant_id,
+            ]);
 
-                return;
-            }
-
-            $org = Organization::query()->find($orgId);
-            if ($org === null || (int) $org->tenant_id !== (int) $tenantId) {
-                $offering->organization_id = Organization::factory()->create([
-                    'tenant_id' => $tenantId,
-                ])->id;
-            }
+            $offering->organizations()->attach($organization->id);
         });
     }
 }

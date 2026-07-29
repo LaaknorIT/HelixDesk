@@ -7,6 +7,7 @@ use App\Support\OrganizationHierarchy;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use SolutionForest\FilamentTree\Concern\ModelTree;
 
@@ -77,9 +78,15 @@ class Organization extends TenantModel
         return $this->hasMany(Asset::class);
     }
 
-    public function serviceOfferings(): HasMany
+    public function serviceOfferings(): BelongsToMany
     {
-        return $this->hasMany(ServiceOffering::class);
+        return $this->belongsToMany(ServiceOffering::class, 'organization_service_offering')
+            ->withTimestamps();
+    }
+
+    public function softwareDeployments(): HasMany
+    {
+        return $this->hasMany(SoftwareDeployment::class);
     }
 
     public function acceptsServiceOfferings(): bool

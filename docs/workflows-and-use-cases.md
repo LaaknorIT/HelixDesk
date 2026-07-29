@@ -181,6 +181,13 @@ Use cases:
   - services/assets (for service catalogs).
 - Link helpdesk guides and IT docs to:
   - processes, risks, non-conformances (for ISO).
+- Link IT ops docs to the software catalog (see [`service-offerings-and-software.md`](service-offerings-and-software.md)):
+  - **Software product** — partner-level docs (CSP, shared vendor runbooks).
+  - **Software deployment** — customer-level docs (default agent focus).
+  - **Service offering** — capability overviews spanning deployments.
+  - **Software license** — optional contract attachments.
+
+Agent UX: when viewing a customer deployment, show **customer documents** first; provide navigation to **partner / product** documents without mixing them into the default list.
 
 Implementation:
 

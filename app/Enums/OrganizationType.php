@@ -35,6 +35,6 @@ enum OrganizationType: string
 
     public function acceptsServiceOfferings(): bool
     {
-        return $this === self::Customer;
+        return $this === self::Customer || $this === self::Group;
     }
 }

@@ -75,10 +75,15 @@ class OrganizationHierarchyTest extends TestCase
         $this->assertTrue(OrganizationResource::canCreate());
     }
 
-    public function test_service_offering_requires_customer_organization(): void
+    public function test_service_offering_rejects_department_organization(): void
     {
         $tenant = Tenant::factory()->create();
-        $group = Organization::factory()->group()->create(['tenant_id' => $tenant->id]);
+        $customer = Organization::factory()->create(['tenant_id' => $tenant->id]);
+        $department = Organization::factory()->create([
+            'tenant_id' => $tenant->id,
+            'type' => OrganizationType::Department,
+            'parent_id' => $customer->id,
+        ]);
 
         $agent = User::factory()->create([
             'tenant_id' => $tenant->id,
@@ -91,11 +96,11 @@ class OrganizationHierarchyTest extends TestCase
 
         $this->actingAs($agent)
             ->postJson('/api/v1/service-offerings', [
-                'organization_id' => $group->id,
+                'organization_id' => $department->id,
                 'name' => 'Invalid offering',
                 'kind' => 'custom',
             ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['organization_id']);
+            ->assertJsonValidationErrors(['organization_ids']);
     }
 }

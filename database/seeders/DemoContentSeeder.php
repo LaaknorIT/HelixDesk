@@ -79,7 +79,6 @@ class DemoContentSeeder extends Seeder
         $demoOffering = ServiceOffering::query()->withoutGlobalScopes()->firstOrCreate(
             [
                 'tenant_id' => $tenant->getKey(),
-                'organization_id' => $organization->getKey(),
                 'name' => 'Demo Internet connectivity',
             ],
             [
@@ -89,6 +88,10 @@ class DemoContentSeeder extends Seeder
                 'attributes_json' => ['line_number' => 'LN-DEMO-001'],
             ],
         );
+
+        if (! $demoOffering->organizations()->whereKey($organization->getKey())->exists()) {
+            $demoOffering->organizations()->attach($organization->getKey());
+        }
 
         if (! $demoOffering->suppliers()->whereKey($demoSupplier->getKey())->exists()) {
             $demoOffering->suppliers()->attach($demoSupplier->getKey(), [
