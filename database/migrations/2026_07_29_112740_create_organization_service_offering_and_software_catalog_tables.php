@@ -165,16 +165,43 @@ return new class extends Migration
                 ]);
             }
 
-            // SQLite cannot ALTER DROP a column that still has a FK; drop FK (rebuilds table) first.
-            Schema::table('service_offerings', function (Blueprint $table) {
-                $table->dropIndex(['tenant_id', 'organization_id']);
-            });
+            $this->dropServiceOfferingOrganizationIdColumn();
+        }
+    }
 
-            Schema::table('service_offerings', function (Blueprint $table) {
+    /**
+     * Drop organization_id safely across MySQL/SQLite and partial prior runs.
+     */
+    private function dropServiceOfferingOrganizationIdColumn(): void
+    {
+        $hasOrganizationForeignKey = collect(Schema::getForeignKeys('service_offerings'))
+            ->contains(fn (array $foreignKey): bool => in_array('organization_id', $foreignKey['columns'], true));
+
+        if ($hasOrganizationForeignKey) {
+            // SQLite requires column-based dropForeign; MySQL accepts it too.
+            Schema::table('service_offerings', function (Blueprint $table): void {
                 $table->dropForeign(['organization_id']);
             });
+        }
 
-            Schema::table('service_offerings', function (Blueprint $table) {
+        foreach (Schema::getIndexes('service_offerings') as $index) {
+            if ($index['primary'] ?? false) {
+                continue;
+            }
+
+            if (! in_array('organization_id', $index['columns'], true)) {
+                continue;
+            }
+
+            $indexName = $index['name'];
+
+            Schema::table('service_offerings', function (Blueprint $table) use ($indexName): void {
+                $table->dropIndex($indexName);
+            });
+        }
+
+        if (Schema::hasColumn('service_offerings', 'organization_id')) {
+            Schema::table('service_offerings', function (Blueprint $table): void {
                 $table->dropColumn('organization_id');
             });
         }
@@ -182,13 +209,14 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('service_offerings', function (Blueprint $table) {
-            if (! Schema::hasColumn('service_offerings', 'organization_id')) {
+        if (! Schema::hasColumn('service_offerings', 'organization_id')) {
+            Schema::table('service_offerings', function (Blueprint $table): void {
                 $table->foreignId('organization_id')->nullable()->constrained('organizations')->nullOnDelete();
-            }
-        });
+                $table->index(['tenant_id', 'organization_id']);
+            });
+        }
 
-        if (Schema::hasTable('organization_service_offering')) {
+        if (Schema::hasTable('organization_service_offering') && Schema::hasColumn('service_offerings', 'organization_id')) {
             $pivots = DB::table('organization_service_offering')
                 ->orderBy('id')
                 ->get()
