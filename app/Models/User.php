@@ -34,6 +34,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         'tenant_id',
         'organization_id',
         'entra_object_id',
+        'identity_integration_id',
         'name',
         'email',
         'password',
@@ -65,6 +66,14 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             'is_admin' => 'boolean',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Users synced from an identity provider sign in through it and have no local password.
+     */
+    public function isManagedByIdentityProvider(): bool
+    {
+        return filled($this->entra_object_id);
     }
 
     public function canAccessPanel(Panel $panel): bool

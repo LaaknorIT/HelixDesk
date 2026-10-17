@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Login;
+use App\Filament\Auth\RequestPasswordReset;
 use App\Http\Middleware\SyncFilamentTenantContext;
 use App\Models\Tenant;
 use Filament\Http\Middleware\Authenticate;
@@ -37,6 +38,7 @@ class EndUserPanelProvider extends PanelProvider
             ->tenantMenu(false)
             ->tenantSwitcher(false)
             ->login(Login::class)
+            ->passwordReset(RequestPasswordReset::class)
             ->colors([
                 'primary' => Color::Rose,
             ])
