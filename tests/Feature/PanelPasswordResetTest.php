@@ -96,6 +96,41 @@ class PanelPasswordResetTest extends TestCase
         Notification::assertNothingSent();
     }
 
+    public function test_user_synced_from_identity_provider_gets_no_reset_link(): void
+    {
+        Notification::fake();
+
+        $syncedUser = User::factory()->create([
+            'tenant_id' => Tenant::factory()->create()->id,
+            'type' => 'end_user',
+            'entra_object_id' => '11111111-1111-1111-1111-111111111111',
+            'password' => null,
+        ]);
+
+        Filament::setCurrentPanel('end-user');
+
+        Livewire::test(RequestPasswordReset::class)
+            ->fillForm(['email' => $syncedUser->email])
+            ->call('request')
+            ->assertNotified(__('passwords.sent'));
+
+        Notification::assertNothingSent();
+    }
+
+    public function test_user_synced_from_identity_provider_cannot_sign_in_with_a_password(): void
+    {
+        $syncedUser = User::factory()->create([
+            'tenant_id' => Tenant::factory()->create()->id,
+            'type' => 'end_user',
+            'entra_object_id' => '11111111-1111-1111-1111-111111111111',
+            'password' => null,
+        ]);
+
+        $this->assertTrue($syncedUser->isManagedByIdentityProvider());
+        $this->assertFalse(auth()->validate(['email' => $syncedUser->email, 'password' => '']));
+        $this->assertFalse(auth()->validate(['email' => $syncedUser->email, 'password' => 'password']));
+    }
+
     private function endUser(): User
     {
         return User::factory()->create([

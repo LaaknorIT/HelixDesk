@@ -3,6 +3,7 @@
 namespace App\Filament\Agent\Resources\People\Schemas;
 
 use App\Models\Organization;
+use App\Models\User;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
@@ -29,7 +30,8 @@ class PeopleForm
                     ->password()
                     ->revealable()
                     ->maxLength(255)
-                    ->dehydrated(fn (?string $state): bool => filled($state)),
+                    ->dehydrated(fn (?string $state): bool => filled($state))
+                    ->hidden(fn (?User $record): bool => $record?->isManagedByIdentityProvider() ?? false),
                 Select::make('type')
                     ->options([
                         'agent' => 'Agent',

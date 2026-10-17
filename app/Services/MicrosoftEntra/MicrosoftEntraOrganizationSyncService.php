@@ -20,7 +20,6 @@ use App\Support\EntraSyncTarget;
 use App\Support\IntegrationType;
 use App\Support\OrganizationIntegrationSettings;
 use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -183,7 +182,7 @@ final class MicrosoftEntraOrganizationSyncService
                         'email' => $email,
                         'organization_id' => $userOrganizationId,
                         'type' => 'end_user',
-                        'password' => Hash::make(Str::password(32)),
+                        'password' => null,
                     ]);
                 } else {
                     $user->update([
@@ -191,6 +190,7 @@ final class MicrosoftEntraOrganizationSyncService
                         'email' => $email,
                         'organization_id' => $userOrganizationId,
                         'type' => 'end_user',
+                        'password' => null,
                     ]);
                 }
             } catch (UniqueConstraintViolationException) {

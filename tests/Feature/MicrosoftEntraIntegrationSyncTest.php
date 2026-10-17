@@ -80,6 +80,7 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
             'email' => 'syncuser@example.test',
             'entra_object_id' => '11111111-1111-1111-1111-111111111111',
             'type' => 'end_user',
+            'password' => null,
         ]);
 
         $integration->refresh();
