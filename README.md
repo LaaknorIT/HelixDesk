@@ -10,7 +10,7 @@ If you run a **modified** version over a network, AGPL requires you to offer cor
 
 ## Requirements
 
-- PHP 8.2+
+- PHP 8.4+ (CI runs 8.5)
 - Composer
 - Node.js (for Vite frontend assets)
 
@@ -33,4 +33,8 @@ Product and architecture notes live in `[docs/](docs/)`. The working delivery pl
 
 ## Contributing
 
-Contributions are welcome. By submitting changes, you agree they are licensed under AGPL-3.0-or-later, the same as the project.
+Contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, tests and how to open a pull request. By submitting changes, you agree they are licensed under AGPL-3.0-or-later, the same as the project.
+
+## Security
+
+Please report vulnerabilities privately, as described in [`SECURITY.md`](SECURITY.md).

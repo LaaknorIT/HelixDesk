@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Tenant;
 use App\Models\User;
-use App\Models\WorkItem;
 use App\Models\WorkflowTransition;
+use App\Models\WorkItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

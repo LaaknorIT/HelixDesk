@@ -1,0 +1,64 @@
+name: Bug report
+description: Something in HelixDesk does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please do not include passwords, API keys, customer data or other secrets.
+        Security problems should be reported privately, see SECURITY.md.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Tickets / work items
+        - Email handling
+        - SLA and automations
+        - Problems and changes
+        - Assets / CMDB
+        - Integrations (Entra, Action1, ...)
+        - Documents
+        - Monitoring
+        - Dashboards
+        - End-user portal
+        - Global admin / tenants
+        - API
+        - Installation / upgrade
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect to see instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Log in to the agent panel as ...
+        2. Open ...
+        3. Click ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: HelixDesk version or commit
+      placeholder: e.g. main @ d640bf1
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: PHP version, database, how it is hosted.
+      placeholder: e.g. PHP 8.5, MySQL 8, Docker
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: From storage/logs. Remove any personal or customer data first.
+      render: text
