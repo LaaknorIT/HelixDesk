@@ -127,6 +127,32 @@ class MicrosoftSignInTest extends TestCase
         $this->assertNull(session(EntraSignInService::SESSION_KEY));
     }
 
+    public function test_synced_agent_signs_in_to_the_agent_panel_without_a_password(): void
+    {
+        [$user, $integration] = $this->syncedEndUser();
+        $user->update(['type' => 'agent']);
+        $this->fakeMicrosoftAccount(self::OBJECT_ID);
+
+        Filament::setCurrentPanel('agent');
+
+        Livewire::test(Login::class)
+            ->set('data.email', $user->email)
+            ->call('signInWithMicrosoft')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('auth.microsoft.redirect'));
+
+        $this->withSession([EntraSignInService::SESSION_KEY => [
+            'user_id' => $user->getKey(),
+            'integration_id' => (string) $integration->getKey(),
+            'panel' => 'agent',
+        ]])
+            ->get(route('auth.microsoft.callback', ['code' => 'code', 'state' => 'state']))
+            ->assertRedirect();
+
+        $this->assertAuthenticatedAs($user);
+        $this->assertNull($user->fresh()->password);
+    }
+
     public function test_callback_rejects_a_different_microsoft_account(): void
     {
         [$user, $integration] = $this->syncedEndUser();

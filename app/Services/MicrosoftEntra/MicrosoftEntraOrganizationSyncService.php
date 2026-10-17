@@ -186,12 +186,12 @@ final class MicrosoftEntraOrganizationSyncService
                         'password' => null,
                     ]);
                 } else {
+                    // Keep the existing type: synced agents must stay agents.
                     $user->update([
                         'identity_integration_id' => $target->integrationId,
                         'name' => $displayName,
                         'email' => $email,
                         'organization_id' => $userOrganizationId,
-                        'type' => 'end_user',
                         'password' => null,
                     ]);
                 }

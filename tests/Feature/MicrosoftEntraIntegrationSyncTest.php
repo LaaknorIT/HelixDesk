@@ -11,6 +11,7 @@ use App\Models\MonitoringEvent;
 use App\Models\Organization;
 use App\Models\OrganizationIntegration;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\MicrosoftEntra\MicrosoftEntraOrganizationSyncService;
 use App\Support\EntraSyncTarget;
 use App\Support\OrganizationIntegrationSettings;
@@ -87,6 +88,52 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
         $integration->refresh();
         $this->assertNotNull($integration->last_sync_at);
         $this->assertNull($integration->last_sync_error);
+    }
+
+    public function test_sync_keeps_synced_agent_as_agent_without_a_password(): void
+    {
+        Http::fake(function (Request $request) {
+            $url = $request->url();
+            if (str_contains($url, 'login.microsoftonline.com')) {
+                return Http::response(['access_token' => 'fake-token', 'expires_in' => 3600], 200);
+            }
+            if (str_contains($url, 'graph.microsoft.com/v1.0/users')) {
+                return Http::response([
+                    'value' => [[
+                        'id' => '33333333-3333-3333-3333-333333333333',
+                        'userPrincipalName' => 'tech@msp.example.test',
+                        'mail' => 'tech@msp.example.test',
+                        'displayName' => 'MSP Technician',
+                        'userType' => 'Member',
+                        'accountEnabled' => true,
+                    ]],
+                ], 200);
+            }
+
+            return Http::response(['error' => 'unexpected '.$url], 500);
+        });
+
+        $tenant = Tenant::factory()->create();
+        $organization = Organization::factory()->create(['tenant_id' => $tenant->id]);
+        $integration = $this->createEntraIntegration($tenant, $organization, 'int-msp-staff');
+
+        $agent = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'organization_id' => $organization->id,
+            'entra_object_id' => '33333333-3333-3333-3333-333333333333',
+            'email' => 'tech@msp.example.test',
+            'type' => 'agent',
+            'password' => 'left-over-password',
+        ]);
+
+        app(MicrosoftEntraOrganizationSyncService::class)->sync(
+            $this->entraTargetFromIntegration($tenant, $organization, $integration),
+        );
+
+        $agent->refresh();
+        $this->assertSame('agent', $agent->type);
+        $this->assertNull($agent->password);
+        $this->assertSame('int-msp-staff', $agent->identity_integration_id);
     }
 
     public function test_security_incident_sync_creates_and_closes_monitoring_event(): void
