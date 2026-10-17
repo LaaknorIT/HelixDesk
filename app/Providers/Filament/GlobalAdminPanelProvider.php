@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Login;
+use App\Filament\Auth\RequestPasswordReset;
 use App\Filament\GlobalAdmin\Widgets\TenantsOverviewWidget;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -30,6 +31,7 @@ class GlobalAdminPanelProvider extends PanelProvider
             ->id('global-admin')
             ->path('global-admin')
             ->login(Login::class)
+            ->passwordReset(RequestPasswordReset::class)
             ->colors([
                 'primary' => Color::Amber,
             ])
