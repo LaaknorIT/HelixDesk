@@ -81,6 +81,7 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
             'entra_object_id' => '11111111-1111-1111-1111-111111111111',
             'type' => 'end_user',
             'password' => null,
+            'identity_integration_id' => 'int-sync-1',
         ]);
 
         $integration->refresh();

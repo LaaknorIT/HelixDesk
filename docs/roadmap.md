@@ -25,7 +25,7 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 - [x] Config-driven `{module}.{action}` permissions and role matrix UI (**Administration → Roles**)
 - [x] **Per-queue work item permissions** on `role_queue` (`work_item_permissions` JSON); global **`work_item.admin`** for full bypass
 - [ ] **Teams** as first-class org units (if required beyond current model): CRUD, reporting, optional linkage to queues/workflows
-- [ ] **SSO / Entra** and tenant-level IdP configuration (spec item; not wired in app yet)
+- [~] **SSO / Entra**: synced users sign in with Microsoft through their organization's Entra integration ([`docs/integrations.md`](integrations.md) §9.2); other identity providers still open
 - [ ] **Google Workspace Gmail API** mail (service account + domain-wide delegation) — [`docs/google-workspace-mail.md`](google-workspace-mail.md)
 
 ---

@@ -653,9 +653,22 @@ Refactor `MicrosoftEntraOrganizationSyncService::syncManagedDevices()`:
    - `EntraIntuneManagedDeviceId` ← Intune `id`
 5. Leave `asset_identifier` null unless tenant uses manual tags (or migrate existing Entra GUIDs — see §13).
 
-### 9.2 User mapping
+### 9.2 User mapping and sign-in
 
-No change: continue `users.entra_object_id` for directory users.
+Directory users keep `users.entra_object_id`, and the sync also stores the integration they came from in `users.identity_integration_id`.
+
+Synced users have **no local password** (`users.password` is null) and cannot use password reset. They sign in with **Sign in with Microsoft** on the login page:
+
+1. The user enters their e-mail and clicks **Sign in with Microsoft**.
+2. HelixDesk finds the user's integration (`identity_integration_id`, or the nearest Entra integration up the organization tree for users synced before that column existed) and redirects to `login.microsoftonline.com/{azure_tenant_id}` using that integration's app registration.
+3. On return to `/auth/microsoft/callback`, the Microsoft account's object id must equal `users.entra_object_id`, or sign-in is refused.
+
+To enable it for a customer, open the **same app registration** the integration already uses and:
+
+- under **Authentication**, add a **Web** platform redirect URI: `https://<your HelixDesk host>/auth/microsoft/callback`
+- under **API permissions**, add the delegated Microsoft Graph permissions `openid`, `profile`, `email` and `User.Read`, then grant admin consent
+
+Sign-in is offered only while the integration is enabled and has a tenant id, client id and client secret.
 
 ### 9.3 Security incidents
 

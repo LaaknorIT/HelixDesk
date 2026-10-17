@@ -178,6 +178,7 @@ final class MicrosoftEntraOrganizationSyncService
                     User::query()->create([
                         'tenant_id' => $target->tenantId,
                         'entra_object_id' => $graphId,
+                        'identity_integration_id' => $target->integrationId,
                         'name' => $displayName,
                         'email' => $email,
                         'organization_id' => $userOrganizationId,
@@ -186,6 +187,7 @@ final class MicrosoftEntraOrganizationSyncService
                     ]);
                 } else {
                     $user->update([
+                        'identity_integration_id' => $target->integrationId,
                         'name' => $displayName,
                         'email' => $email,
                         'organization_id' => $userOrganizationId,

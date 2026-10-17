@@ -34,6 +34,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         'tenant_id',
         'organization_id',
         'entra_object_id',
+        'identity_integration_id',
         'name',
         'email',
         'password',
