@@ -4,9 +4,7 @@ Multi-tenant IT service desk software (ITIL-oriented) built with **Laravel 12**,
 
 ## License
 
-HelixDesk is free software published under the **[GNU Affero General Public License v3.0 or later** (AGPL-3.0-or-later)](https://www.gnu.org/licenses/agpl-3.0.html). See `[LICENSE](LICENSE)` and `[NOTICE](NOTICE)`.
-
-If you run a **modified** version over a network, AGPL requires you to offer corresponding source to users interacting with it. Review the license carefully before deployment.
+HelixDesk is open source software released under the **[MIT License](https://opensource.org/licenses/MIT)**. See [`LICENSE`](LICENSE).
 
 ## Requirements
 
@@ -33,7 +31,7 @@ Product and architecture notes live in `[docs/](docs/)`. The working delivery pl
 
 ## Contributing
 
-Contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, tests and how to open a pull request. By submitting changes, you agree they are licensed under AGPL-3.0-or-later, the same as the project.
+Contributions are welcome. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup, tests and how to open a pull request. By submitting changes, you agree they are licensed under the MIT License, the same as the project.
 
 ## Security
 

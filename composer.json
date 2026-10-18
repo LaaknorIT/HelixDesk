@@ -2,9 +2,9 @@
     "$schema": "https://getcomposer.org/schema.json",
     "name": "helixdesk/helixdesk",
     "type": "project",
-    "description": "Multi-tenant IT service desk (ITIL-oriented), AGPL-3.0-or-later.",
+    "description": "Multi-tenant IT service desk (ITIL-oriented), MIT licensed.",
     "keywords": ["laravel", "filament", "itsm", "itil", "service-desk"],
-    "license": "AGPL-3.0-or-later",
+    "license": "MIT",
     "require": {
         "php": "^8.2",
         "filament/filament": "^5.3",

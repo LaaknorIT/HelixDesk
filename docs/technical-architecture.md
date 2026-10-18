@@ -2,7 +2,7 @@
 
 This document turns the high-level requirements in `project-description.md` into concrete technical architecture decisions for the first major version of HelixDesk.
 
-**License:** The application is **AGPL-3.0-or-later** (see repository `LICENSE`). **Billing, payments, and Stripe/Cashier are not part of this codebase.**
+**License:** The application is **MIT licensed** (see repository `LICENSE`). **Billing, payments, and Stripe/Cashier are not part of this codebase.**
 
 ---
 
@@ -190,7 +190,7 @@ Initial major bounded contexts:
 10. **Dashboards**
    - DashboardLayout, WidgetPreset, role defaults, user overrides.
 
-Historic subscription or metered-billing designs are **not** implemented in the AGPL core.
+Historic subscription or metered-billing designs are **not** implemented in the core.
 
 ---
 

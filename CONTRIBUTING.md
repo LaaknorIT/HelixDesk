@@ -40,4 +40,4 @@ Architecture and domain notes are in [`docs/`](docs/). [`AGENTS.md`](AGENTS.md) 
 
 ## License
 
-HelixDesk is licensed under the [GNU AGPL v3.0 or later](LICENSE). By submitting a contribution you agree that it is licensed under the same terms.
+HelixDesk is licensed under the [MIT License](LICENSE). By submitting a contribution you agree that it is licensed under the same terms.

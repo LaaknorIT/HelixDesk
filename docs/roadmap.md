@@ -100,7 +100,7 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 
 ## Explicitly out of scope (this repo)
 
-- [ ] **Subscription billing**, Stripe, metered usage (see `project-description.md` / AGPL product boundary)
+- [ ] **Subscription billing**, Stripe, metered usage (see `project-description.md` / product boundary)
 
 ---
 
