@@ -104,16 +104,60 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 
 ---
 
-## Suggested next steps (order of execution)
+## Prioritized delivery plan (2026-10)
 
-1. **Stabilize**: expand automated tests across problems, changes, assets, documents, monitoring; fix gaps found in manual QA.
-2. **Monitoring Phase D**: close the loop from *event ingested* → *actionable ticket/workflow*.
-3. **Dashboards Phase E**: ship a small set of high-value widgets tied to real queries.
-4. **Service offerings + software** (Phase C): implement [`service-offerings-and-software.md`](service-offerings-and-software.md) when documentation/CMDB depth is the priority.
-5. **Operations**: add Horizon + Redis + storage to default deployment story so architecture matches `technical-architecture.md`.
-6. **API docs**: OpenAPI for v1 to support integrations.
-7. **Major work_items & SLA** when service-desk depth is the priority.
+This plan sets the order of work for making HelixDesk the preferred open source tool for IT departments and MSPs. It is grouped into three priority levels. Priority 1 is split into four releases, each one something users notice. Items that already exist in the phases above are named here by their phase.
+
+### Priority 1 — Required to compete
+
+**Release 1 — "Get started"**
+
+- [ ] **Docker image + docker-compose** with Redis and Horizon, and an installation guide (also closes the Horizon/Redis item in Phase F)
+- [ ] **Notifications**: new ticket, assigned, customer reply, SLA close to breach. Channels: email, in-app, Microsoft Teams, Slack
+- [ ] **Agent productivity**: canned responses, merge and link tickets, watchers/CC, collision warning when another agent is working on a ticket
+- [ ] **MFA (TOTP)** for agents (Phase G)
+
+**Release 2 — "MSP pack"**
+
+- [ ] **Time tracking** on tickets: billable / non-billable, hourly rate, hours
+- [ ] **Customer agreements**: prepaid hours, fixed price, SLA per agreement
+- [ ] **Billing data export** (CSV + API, later Tripletex / Fiken / PowerOffice). HelixDesk exports what the MSP bills its customers; billing for HelixDesk itself stays out of scope
+- [ ] **Recurring tickets** (e.g. monthly patch review, backup test per customer)
+
+**Release 3 — "Self-service"**
+
+- [ ] **Knowledge base** in the end-user portal, with article suggestions when a ticket is created (Phase B; `project-description.md` §8.1)
+- [ ] **Request forms** from the service catalog: custom fields and manager approval
+- [ ] **Customer satisfaction (CSAT)** survey after a ticket is closed
+- [ ] **Customer portal for MSP customers**: own tickets, assets, licenses and monthly report
+
+**Release 4 — "Insight and operations"**
+
+- [ ] **Reports and dashboard widgets**: SLA attainment, backlog, ticket age, time per customer (Phase E)
+- [ ] **Monitoring → ticket**: deduplication, correlation, rules that create or update tickets and problems (Phase D)
+- [ ] **Webhooks** and a published **OpenAPI** spec for API v1 (Phase F)
+
+### Priority 2 — Differentiators
+
+- [ ] More **RMM integrations**: Tactical RMM (open source), NinjaOne, Datto RMM, Microsoft Defender
+- [ ] **Password vault** per customer, with access control and audit log (Phase G; `project-description.md` §12)
+- [ ] **Contract and license alerts**: expiry of software licenses, warranties and supplier agreements
+- [ ] More **SSO providers**: Google, generic OIDC/SAML (Authentik, Keycloak)
+- [ ] **Norwegian and multi-language UI** (i18n)
+
+### Priority 3 — Later
+
+- [ ] **AI agent assist**: reply suggestions, thread summaries, auto-categorization and prioritization, with support for local models so data can stay in the EU (Phase G; §14)
+- [ ] **Major incidents** with status updates to affected customers (Phase B; §6.4)
+- [ ] **Public status page** per tenant or customer, linked to major incidents
+- [ ] **Documentation approval workflow** (draft → review → publish) (Phase C; §8.4)
+- [ ] **ISO modules**: non-conformance, risk, improvement actions, linked to problems and changes (Phase G; §11)
+- [ ] **Change calendar and CAB approval** with maintenance windows per customer
+- [ ] **Mobile-friendly agent view / PWA** for on-call and field work
+- [ ] **S3-compatible storage** for attachments and exports (Phase F)
+
+Ongoing alongside all releases: expand automated tests across problems, changes, assets, documents and monitoring, and fix gaps found in manual QA.
 
 ---
 
-*Last updated: 2026-07-29 — service offerings / software product design approved.*
+*Last updated: 2026-10-18 — prioritized delivery plan for IT departments and MSPs added.*
