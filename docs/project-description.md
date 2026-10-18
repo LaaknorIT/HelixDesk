@@ -1,6 +1,6 @@
 # **Requirements Specification – HelixDesk**
 
-> **Distribution:** HelixDesk is **open source** under the **GNU Affero General Public License v3 or later (AGPL-3.0-or-later)**. This repository does **not** include subscription billing, payment processing, or Stripe/Cashier integration; see **§16**.
+> **Distribution:** HelixDesk is **open source** under the **MIT License**. This repository does **not** include subscription billing, payment processing, or Stripe/Cashier integration; see **§16**.
 
 ## **1. Product overview**
 
@@ -728,9 +728,9 @@ Authentication:
 
 ## **16. Distribution, licensing, and optional modules**
 
-**Licensing:** The HelixDesk **codebase** is distributed under **AGPL-3.0-or-later**. Network use of modified versions must comply with Affero obligations (see the license text).
+**Licensing:** The HelixDesk **codebase** is distributed under the **MIT License** (see the repository `LICENSE`).
 
-**Payments:** In-repo **payment processing, subscriptions, Stripe, and Laravel Cashier are explicitly out of scope**. Operators may run the stack for internal use, offer separate commercial support or hosting, or maintain a compliant fork—without merging proprietary payment logic into the AGPL-covered core unless that code is also AGPL-compatible.
+**Payments:** In-repo **payment processing, subscriptions, Stripe, and Laravel Cashier are explicitly out of scope**. Operators may run the stack for internal use, offer separate commercial support or hosting, or maintain their own fork; payment logic is kept out of the core repository.
 
 ### **16.1 Extra modules (product scope, not payment-gated)**
 

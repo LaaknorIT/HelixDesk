@@ -3,7 +3,7 @@
 This document describes the main domain entities, their relationships, and key invariants. It is a working model to guide migrations, Eloquent models, and API design.
 
 > Note: Field lists are indicative, not exhaustive. Types and naming must follow Laravel and project conventions.  
-> **AGPL core:** payment processors, Stripe, and subscription tables are **not** part of this codebase; some sections below are retained as **historic product sketches** only.
+> **Open source core:** payment processors, Stripe, and subscription tables are **not** part of this codebase; some sections below are retained as **historic product sketches** only.
 
 ---
 
@@ -861,9 +861,9 @@ Key fields:
 
 ---
 
-## 9. Billing and subscriptions (out of scope in AGPL core)
+## 9. Billing and subscriptions (out of scope in the core)
 
-**Not implemented** in this repository: Stripe, Cashier, `Subscription`, seat metering exports, or payment webhooks. Any future **optional** usage accounting (e.g. AI quotas) should be documented separately and remain AGPL-compatible.
+**Not implemented** in this repository: Stripe, Cashier, `Subscription`, seat metering exports, or payment webhooks. Any future **optional** usage accounting (e.g. AI quotas) should be documented separately.
 
 ---
 
