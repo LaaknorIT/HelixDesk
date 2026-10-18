@@ -1,0 +1,79 @@
+# HelixDesk with PostgreSQL, Redis, Horizon and the scheduler.
+# Copy .env.docker.example to .env, fill in APP_KEY and passwords, then run
+# `docker compose up -d`. See docs/installation.md.
+
+x-helixdesk: &helixdesk
+    image: ${HELIXDESK_IMAGE:-ghcr.io/laaknorit/helixdesk:latest}
+    build:
+        context: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+        DB_CONNECTION: pgsql
+        DB_HOST: postgres
+        DB_PORT: 5432
+        REDIS_HOST: redis
+        REDIS_PORT: 6379
+        QUEUE_CONNECTION: redis
+        CACHE_STORE: redis
+        SESSION_DRIVER: redis
+    volumes:
+        - helixdesk-storage:/app/storage/app
+    depends_on:
+        postgres:
+            condition: service_healthy
+        redis:
+            condition: service_healthy
+
+services:
+    app:
+        <<: *helixdesk
+        command: web
+        ports:
+            - "${HELIXDESK_HTTP_PORT:-8080}:8080"
+
+    horizon:
+        <<: *helixdesk
+        command: horizon
+        depends_on:
+            app:
+                condition: service_healthy
+
+    scheduler:
+        <<: *helixdesk
+        command: scheduler
+        depends_on:
+            app:
+                condition: service_healthy
+
+    postgres:
+        image: postgres:17-alpine
+        restart: unless-stopped
+        environment:
+            POSTGRES_DB: ${DB_DATABASE:-helixdesk}
+            POSTGRES_USER: ${DB_USERNAME:-helixdesk}
+            POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+        volumes:
+            - postgres-data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+            interval: 5s
+            timeout: 5s
+            retries: 20
+
+    redis:
+        image: redis:7-alpine
+        restart: unless-stopped
+        command: ["redis-server", "--appendonly", "yes"]
+        volumes:
+            - redis-data:/data
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 5s
+            timeout: 5s
+            retries: 20
+
+volumes:
+    helixdesk-storage:
+    postgres-data:
+    redis-data:

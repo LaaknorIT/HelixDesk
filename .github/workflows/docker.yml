@@ -1,0 +1,99 @@
+name: Docker
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/helixdesk
+
+jobs:
+  smoke-test:
+    name: Build and smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: helixdesk:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start the stack
+        run: |
+          cp .env.docker.example .env
+          sed -i "s#^APP_KEY=.*#APP_KEY=base64:$(openssl rand -base64 32)#" .env
+          sed -i "s#^DB_PASSWORD=.*#DB_PASSWORD=$(openssl rand -hex 16)#" .env
+          sed -i "s#^HELIXDESK_IMAGE=.*#HELIXDESK_IMAGE=helixdesk:ci#" .env
+          sed -i "s#^MAIL_MAILER=.*#MAIL_MAILER=log#" .env
+          docker compose up -d --no-build --wait --wait-timeout 180
+
+      - name: Check the running stack
+        run: |
+          curl --fail --silent --show-error http://127.0.0.1:8080/up
+          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:8080/global-admin/login
+          docker compose exec -T app php artisan helixdesk:create-admin \
+            --name="CI Admin" --email=ci@example.com --password=ci-password-1234 --no-interaction
+          docker compose exec -T horizon php artisan horizon:status
+
+      - name: Show logs
+        if: failure()
+        run: docker compose logs --no-color
+
+  publish:
+    name: Publish image
+    if: github.event_name == 'push'
+    needs: smoke-test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
