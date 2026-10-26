@@ -6,13 +6,25 @@ Multi-tenant IT service desk software (ITIL-oriented) built with **Laravel 12**,
 
 HelixDesk is open source software released under the **[MIT License](https://opensource.org/licenses/MIT)**. See [`LICENSE`](LICENSE).
 
-## Requirements
+## Install with Docker
+
+The recommended way to run HelixDesk is the Docker image with Docker Compose, which includes PostgreSQL, Redis, Horizon and the scheduler:
+
+```bash
+cp .env.docker.example .env   # then set APP_URL, APP_KEY and DB_PASSWORD
+docker compose up -d --wait
+docker compose exec app php artisan helixdesk:create-admin
+```
+
+See [`docs/installation.md`](docs/installation.md) for the full guide, including HTTPS, upgrades and backups.
+
+## Development
+
+Requirements:
 
 - PHP 8.4+ (CI runs 8.5)
 - Composer
 - Node.js (for Vite frontend assets)
-
-## Quick start
 
 ```bash
 composer install

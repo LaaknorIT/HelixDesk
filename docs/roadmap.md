@@ -81,7 +81,7 @@ This file is the **working product roadmap**: what is shipped, what is next, and
 
 - [~] REST **API v1** for core entities (tenants, work_items, assets, documents, monitoring events)
 - [ ] **OpenAPI** (or equivalent) published and kept in sync with routes
-- [ ] **Laravel Horizon** + **Redis** in deployment and `composer.json` / ops docs (architecture assumes them)
+- [x] **Laravel Horizon** + **Redis** in deployment and `composer.json` / ops docs: Docker Compose stack and [`docs/installation.md`](installation.md)
 - [x] **Ticket email channel**: mail accounts, IMAP/POP3/Graph inbound polling, SMTP/Graph outbound, queue default address, attachments ([`docs/email-handling.md`](email-handling.md))
 - [x] **Organization integrations**: Entra + Google Workspace + Action1 in `organization_integrations`; multi-source CMDB per [`docs/integrations.md`](integrations.md)
 - [ ] **Queue-heavy jobs**: major-incident / status notifications, reporting, AI tasks (work item reply mail uses Horizon)
@@ -112,7 +112,7 @@ This plan sets the order of work for making HelixDesk the preferred open source 
 
 **Release 1 — "Get started"**
 
-- [ ] **Docker image + docker-compose** with Redis and Horizon, and an installation guide (also closes the Horizon/Redis item in Phase F)
+- [x] **Docker image + docker-compose** with Redis and Horizon, and an installation guide (also closes the Horizon/Redis item in Phase F): `Dockerfile`, `compose.yaml`, image published to `ghcr.io/laaknorit/helixdesk`, [`docs/installation.md`](installation.md)
 - [ ] **Notifications**: new ticket, assigned, customer reply, SLA close to breach. Channels: email, in-app, Microsoft Teams, Slack
 - [ ] **Agent productivity**: canned responses, merge and link tickets, watchers/CC, collision warning when another agent is working on a ticket
 - [ ] **MFA (TOTP)** for agents (Phase G)
@@ -160,4 +160,4 @@ Ongoing alongside all releases: expand automated tests across problems, changes,
 
 ---
 
-*Last updated: 2026-10-18 — prioritized delivery plan for IT departments and MSPs added.*
+*Last updated: 2026-10-18 — Docker image, Compose stack and installation guide delivered (Release 1).*
