@@ -2,6 +2,17 @@
 
 return [
 
+    'notifications' => [
+        // Minutes before an SLA target is due when agents are warned that it is at risk.
+        'sla_warning_minutes' => (int) env('HELIXDESK_SLA_WARNING_MINUTES', 30),
+
+        // Hosts HelixDesk may post chat webhooks to. A leading dot matches any subdomain.
+        'webhook_hosts' => [
+            'slack' => ['hooks.slack.com'],
+            'teams' => ['.logic.azure.com', '.powerplatform.com', '.webhook.office.com'],
+        ],
+    ],
+
     'demo_logins' => [
         'password' => 'password',
         'tenant_slug' => 'demo-tenant',

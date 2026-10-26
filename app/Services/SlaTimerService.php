@@ -7,6 +7,7 @@ use App\Enums\SlaTargetType;
 use App\Models\SlaPolicy;
 use App\Models\WorkItem;
 use App\Models\WorkItemStatus;
+use App\Services\Notifications\WorkItemNotifier;
 use Illuminate\Support\Carbon;
 
 class SlaTimerService
@@ -151,6 +152,67 @@ class SlaTimerService
         return $count;
     }
 
+    /**
+     * Warn agents once per target when first response or resolution is due within the warning window.
+     *
+     * @return int Number of warnings sent.
+     */
+    public function notifyAtRiskWorkItems(?Carbon $now = null): int
+    {
+        $now ??= now();
+        $warningMinutes = max(1, (int) config('helixdesk.notifications.sla_warning_minutes', 30));
+        $windowEnd = $now->copy()->addMinutes($warningMinutes);
+        $count = 0;
+
+        WorkItem::query()
+            ->whereNull('sla_paused_at')
+            ->where(function ($query) use ($now, $windowEnd): void {
+                $query->where(function ($q) use ($now, $windowEnd): void {
+                    $q->whereNull('first_responded_at')
+                        ->whereNull('response_breached_at')
+                        ->whereNull('response_warning_notified_at')
+                        ->whereBetween('first_response_due_at', [$now, $windowEnd]);
+                })->orWhere(function ($q) use ($now, $windowEnd): void {
+                    $q->whereNull('resolved_at')
+                        ->whereNull('resolution_breached_at')
+                        ->whereNull('resolution_warning_notified_at')
+                        ->whereBetween('resolution_due_at', [$now, $windowEnd]);
+                });
+            })
+            ->orderBy('id')
+            ->chunkById(100, function ($workItems) use ($now, $windowEnd, &$count): void {
+                foreach ($workItems as $workItem) {
+                    $targets = [];
+
+                    if ($workItem->first_responded_at === null
+                        && $workItem->response_breached_at === null
+                        && $workItem->response_warning_notified_at === null
+                        && $workItem->first_response_due_at?->betweenIncluded($now, $windowEnd)) {
+                        $workItem->response_warning_notified_at = $now;
+                        $targets[] = 'First response due '.$this->formatDue($workItem->first_response_due_at);
+                    }
+
+                    if ($workItem->resolved_at === null
+                        && $workItem->resolution_breached_at === null
+                        && $workItem->resolution_warning_notified_at === null
+                        && $workItem->resolution_due_at?->betweenIncluded($now, $windowEnd)) {
+                        $workItem->resolution_warning_notified_at = $now;
+                        $targets[] = 'Resolution due '.$this->formatDue($workItem->resolution_due_at);
+                    }
+
+                    if ($targets === []) {
+                        continue;
+                    }
+
+                    $workItem->save();
+                    app(WorkItemNotifier::class)->slaAtRisk($workItem, implode('. ', $targets).'.');
+                    $count++;
+                }
+            });
+
+        return $count;
+    }
+
     public function remainingSeconds(WorkItem $workItem, string $which = 'first_response'): ?int
     {
         $due = $which === 'resolution' ? $workItem->resolution_due_at : $workItem->first_response_due_at;
@@ -171,6 +233,11 @@ class SlaTimerService
             : now();
 
         return (int) Carbon::parse($due)->getTimestamp() - (int) $reference->getTimestamp();
+    }
+
+    private function formatDue(Carbon $due): string
+    {
+        return $due->copy()->timezone(config('app.timezone'))->format('Y-m-d H:i T');
     }
 
     private function statusPausesSla(WorkItem $workItem): bool
