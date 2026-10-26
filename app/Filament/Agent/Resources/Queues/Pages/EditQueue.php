@@ -2,6 +2,7 @@
 
 namespace App\Filament\Agent\Resources\Queues\Pages;
 
+use App\Enums\WorkItemNotificationEvent;
 use App\Filament\Agent\Resources\Queues\QueueResource;
 use Filament\Resources\Pages\EditRecord;
 
@@ -12,6 +13,7 @@ class EditQueue extends EditRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $data['mail_account_ids'] = $this->record->mailAccounts()->pluck('mail_accounts.id')->all();
+        $data['chat_notification_events'] ??= WorkItemNotificationEvent::defaultChatEvents();
 
         return $data;
     }

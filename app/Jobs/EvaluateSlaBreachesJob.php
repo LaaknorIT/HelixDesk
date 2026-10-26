@@ -13,5 +13,6 @@ class EvaluateSlaBreachesJob implements ShouldQueue
     public function handle(SlaTimerService $slaTimerService): void
     {
         $slaTimerService->evaluateBreaches();
+        $slaTimerService->notifyAtRiskWorkItems();
     }
 }
