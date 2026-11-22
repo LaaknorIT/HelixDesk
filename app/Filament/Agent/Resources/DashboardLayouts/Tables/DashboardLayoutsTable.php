@@ -20,15 +20,15 @@ class DashboardLayoutsTable
                     ->badge()
                     ->sortable(),
                 TextColumn::make('role_name')
-                    ->label('Role')
-                    ->placeholder('-')
+                    ->label(__('Role'))
+                    ->placeholder(__('-'))
                     ->sortable(),
                 TextColumn::make('user.name')
-                    ->label('User')
-                    ->placeholder('-')
+                    ->label(__('User'))
+                    ->placeholder(__('-'))
                     ->searchable(),
                 TextColumn::make('layout_json')
-                    ->label('Widgets')
+                    ->label(__('Widgets'))
                     ->state(fn ($record): string => (string) count($record->layout_json ?? [])),
                 IconColumn::make('is_active')
                     ->boolean(),
@@ -39,8 +39,8 @@ class DashboardLayoutsTable
             ->filters([
                 SelectFilter::make('scope')
                     ->options([
-                        'role_default' => 'Role default',
-                        'user_override' => 'User override',
+                        'role_default' => __('Role default'),
+                        'user_override' => __('User override'),
                     ]),
             ])
             ->recordActions([

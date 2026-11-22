@@ -22,9 +22,9 @@ class RealizationAssetsRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable(),
                 TextColumn::make('assetType.name')
-                    ->label('Type'),
+                    ->label(__('Type')),
                 TextColumn::make('pivot.role')
-                    ->label('Role')
+                    ->label(__('Role'))
                     ->badge(),
                 TextColumn::make('lifecycle_status')
                     ->badge(),

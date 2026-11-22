@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\WorkItemPriority;
 use App\Enums\WorkItemSource;
 use App\Enums\WorkItemType;
 use App\Models\MonitoringEvent;
@@ -55,12 +56,7 @@ class ProcessMonitoringEventJob implements ShouldQueue
                 return;
             }
 
-            $priority = match (strtolower($event->severity)) {
-                'critical' => 'Critical',
-                'high' => 'High',
-                'low' => 'Low',
-                default => 'Medium',
-            };
+            $priority = WorkItemPriority::normalize($event->severity);
 
             $title = mb_substr('[Monitoring] '.$event->message, 0, 250);
 

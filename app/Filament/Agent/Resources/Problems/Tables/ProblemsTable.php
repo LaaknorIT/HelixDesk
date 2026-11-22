@@ -15,15 +15,15 @@ class ProblemsTable
         return $table
             ->columns([
                 TextColumn::make('title')
-                    ->label('Title')
+                    ->label(__('Title'))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('status')
-                    ->label('Status')
+                    ->label(__('Status'))
                     ->badge()
                     ->sortable(),
                 TextColumn::make('created_at')
-                    ->label('Created')
+                    ->label(__('Created'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

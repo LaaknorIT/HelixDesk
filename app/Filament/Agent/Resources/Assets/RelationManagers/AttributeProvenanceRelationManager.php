@@ -23,8 +23,8 @@ class AttributeProvenanceRelationManager extends RelationManager
                 TextColumn::make('provider')
                     ->badge(),
                 TextColumn::make('organizationIntegration.type')
-                    ->label('Integration')
-                    ->placeholder('—'),
+                    ->label(__('Integration'))
+                    ->placeholder(__('—')),
                 TextColumn::make('synced_at')
                     ->dateTime()
                     ->sortable(),

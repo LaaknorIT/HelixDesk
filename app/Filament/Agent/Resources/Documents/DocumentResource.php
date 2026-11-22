@@ -11,6 +11,7 @@ use App\Filament\Agent\Resources\Documents\RelationManagers\SuppliersRelationMan
 use App\Filament\Agent\Resources\Documents\RelationManagers\WorkItemsRelationManager;
 use App\Filament\Agent\Resources\Documents\Schemas\DocumentForm;
 use App\Filament\Agent\Resources\Documents\Tables\DocumentsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\Document;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -23,6 +24,8 @@ use UnitEnum;
 
 class DocumentResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = Document::class;
 
     protected static ?string $navigationLabel = 'Documents';

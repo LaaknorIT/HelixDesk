@@ -25,12 +25,12 @@ class DashboardLayoutForm
                 Select::make('scope')
                     ->required()
                     ->options([
-                        DashboardLayout::SCOPE_ROLE_DEFAULT => 'Role default',
-                        DashboardLayout::SCOPE_USER_OVERRIDE => 'User override',
+                        DashboardLayout::SCOPE_ROLE_DEFAULT => __('Role default'),
+                        DashboardLayout::SCOPE_USER_OVERRIDE => __('User override'),
                     ])
                     ->live(),
                 Select::make('role_name')
-                    ->label('Role')
+                    ->label(__('Role'))
                     ->options(
                         collect(config('helixdesk_permissions.tenant_roles', []))
                             ->mapWithKeys(fn (array $role): array => [$role['name'] => $role['name']])
@@ -38,7 +38,7 @@ class DashboardLayoutForm
                     ->required(fn (Get $get): bool => $get('scope') === DashboardLayout::SCOPE_ROLE_DEFAULT)
                     ->visible(fn (Get $get): bool => $get('scope') === DashboardLayout::SCOPE_ROLE_DEFAULT),
                 Select::make('user_id')
-                    ->label('User')
+                    ->label(__('User'))
                     ->relationship(
                         'user',
                         'name',
@@ -51,7 +51,7 @@ class DashboardLayoutForm
                     ->required(fn (Get $get): bool => $get('scope') === DashboardLayout::SCOPE_USER_OVERRIDE)
                     ->visible(fn (Get $get): bool => $get('scope') === DashboardLayout::SCOPE_USER_OVERRIDE),
                 Repeater::make('layout_json')
-                    ->label('Widgets layout')
+                    ->label(__('Widgets layout'))
                     ->schema([
                         TextInput::make('widget')
                             ->required()
@@ -73,9 +73,9 @@ class DashboardLayoutForm
                     ->columns(5)
                     ->required(),
                 TagsInput::make('locked_widgets')
-                    ->placeholder('my_work_items')
+                    ->placeholder(__('my_work_items'))
                     ->default([])
-                    ->helperText('Widget identifiers users cannot remove in personal overrides.'),
+                    ->helperText(__('Widget identifiers users cannot remove in personal overrides.')),
                 Toggle::make('is_active')
                     ->default(true)
                     ->required(),

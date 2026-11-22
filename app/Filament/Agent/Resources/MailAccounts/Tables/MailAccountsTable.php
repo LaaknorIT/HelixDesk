@@ -30,32 +30,32 @@ class MailAccountsTable
                 TextColumn::make('protocol')
                     ->badge()
                     ->formatStateUsing(fn (MailInboundProtocol $state): string => match ($state) {
-                        MailInboundProtocol::Imap => 'IMAP',
+                        MailInboundProtocol::Imap => __('IMAP'),
                         MailInboundProtocol::Pop3 => 'POP3',
-                        MailInboundProtocol::MicrosoftGraph => 'Microsoft 365',
-                        MailInboundProtocol::GoogleGmailApi => 'Google Workspace',
+                        MailInboundProtocol::MicrosoftGraph => __('Microsoft 365'),
+                        MailInboundProtocol::GoogleGmailApi => __('Google Workspace'),
                     })
                     ->sortable(),
                 TextColumn::make('outbound_protocol')
-                    ->label('Outbound')
+                    ->label(__('Outbound'))
                     ->badge()
                     ->formatStateUsing(fn (MailOutboundProtocol $state): string => match ($state) {
-                        MailOutboundProtocol::Smtp => 'SMTP',
-                        MailOutboundProtocol::MicrosoftGraph => 'Microsoft 365',
-                        MailOutboundProtocol::GoogleGmailApi => 'Google Workspace',
+                        MailOutboundProtocol::Smtp => __('SMTP'),
+                        MailOutboundProtocol::MicrosoftGraph => __('Microsoft 365'),
+                        MailOutboundProtocol::GoogleGmailApi => __('Google Workspace'),
                     }),
                 IconColumn::make('is_enabled')
                     ->boolean(),
                 TextColumn::make('last_polled_at')
                     ->dateTime()
                     ->sortable()
-                    ->placeholder('—'),
+                    ->placeholder(__('—')),
                 TextColumn::make('last_poll_error')
-                    ->label('Last error')
+                    ->label(__('Last error'))
                     ->limit(40)
                     ->tooltip(fn (MailAccount $record): ?string => $record->last_poll_error)
                     ->color('danger')
-                    ->placeholder('—')
+                    ->placeholder(__('—'))
                     ->toggleable(),
             ])
             ->recordActions([

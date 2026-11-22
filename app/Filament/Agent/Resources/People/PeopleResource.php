@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\People\Pages\EditPeople;
 use App\Filament\Agent\Resources\People\Pages\ListPeople;
 use App\Filament\Agent\Resources\People\Schemas\PeopleForm;
 use App\Filament\Agent\Resources\People\Tables\PeopleTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\User;
 use BackedEnum;
 use Filament\Facades\Filament;
@@ -21,13 +22,15 @@ use UnitEnum;
 
 class PeopleResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = User::class;
 
     protected static ?string $navigationLabel = 'People';
 
-    protected static ?string $modelLabel = 'Person';
+    protected static ?string $modelLabel = 'person';
 
-    protected static ?string $pluralModelLabel = 'People';
+    protected static ?string $pluralModelLabel = 'people';
 
     protected static ?int $navigationSort = 11;
 

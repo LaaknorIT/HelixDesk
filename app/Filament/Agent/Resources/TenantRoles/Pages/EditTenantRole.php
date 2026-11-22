@@ -104,7 +104,7 @@ class EditTenantRole extends EditRecord
         $headerCells = [
             Placeholder::make('matrix_header_module')
                 ->hiddenLabel()
-                ->content('Module'),
+                ->content(__('Module')),
         ];
 
         foreach ($matrixActions as $action) {
@@ -144,7 +144,7 @@ class EditTenantRole extends EditRecord
         $workItemActions = HelixdeskPermissionCatalog::workItemModuleActions();
         $repeaterSchema = [
             Select::make('queue_id')
-                ->label('Queue')
+                ->label(__('Queue'))
                 ->options(function (): array {
                     $tenant = Filament::getTenant();
                     abort_if($tenant === null, 404);
@@ -169,21 +169,21 @@ class EditTenantRole extends EditRecord
         return $this->defaultForm($schema)
             ->columns(1)
             ->components([
-                Section::make('Role')
+                Section::make(__('Role'))
                     ->schema([
                         TextInput::make('name')
                             ->required()
                             ->maxLength(255),
                     ]),
-                Section::make('Permissions')
-                    ->description('Capabilities for this role. Work item actions are configured per queue below.')
+                Section::make(__('Permissions'))
+                    ->description(__('Capabilities for this role. Work item actions are configured per queue below.'))
                     ->schema($matrixRows),
-                Section::make('Work item permissions by queue')
-                    ->description('Add each queue this role may access, then enable actions. Admin on a queue grants all work-item actions there. Users only see tickets in queues listed here. Enabling Admin on every listed queue restores tenant-wide work_item.admin.')
+                Section::make(__('Work item permissions by queue'))
+                    ->description(__('Add each queue this role may access, then enable actions. Admin on a queue grants all work-item actions there. Users only see tickets in queues listed here. Enabling Admin on every listed queue restores tenant-wide work_item.admin.'))
                     ->schema([
                         Repeater::make('work_item_queue_permissions')
                             ->label('')
-                            ->addActionLabel('Add queue')
+                            ->addActionLabel(__('Add queue'))
                             ->reorderable(false)
                             ->schema($repeaterSchema)
                             ->default([]),

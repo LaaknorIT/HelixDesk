@@ -3,35 +3,23 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Agent\Pages\NotificationSettings;
-use App\Filament\Auth\Login;
-use App\Filament\Auth\RequestPasswordReset;
 use App\Http\Middleware\SyncFilamentTenantContext;
 use App\Models\Tenant;
+use App\Providers\Filament\Concerns\ConfiguresHelixdeskPanel;
 use Filament\Actions\Action;
-use Filament\Http\Middleware\Authenticate;
-use Filament\Http\Middleware\AuthenticateSession;
-use Filament\Http\Middleware\DisableBladeIconComponents;
-use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
-use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
-use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
-use Illuminate\Cookie\Middleware\EncryptCookies;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
-use Illuminate\Routing\Middleware\SubstituteBindings;
-use Illuminate\Session\Middleware\StartSession;
-use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AgentPanelProvider extends PanelProvider
 {
+    use ConfiguresHelixdeskPanel;
+
     public function panel(Panel $panel): Panel
     {
-        return $panel
+        return $this->configureHelixdeskPanel($panel)
             ->default()
             ->id('agent')
             ->path('agent')
@@ -41,25 +29,30 @@ class AgentPanelProvider extends PanelProvider
             ], isPersistent: true)
             ->tenantMenu(false)
             ->tenantSwitcher(false)
-            ->login(Login::class)
-            ->passwordReset(RequestPasswordReset::class)
-            ->colors([
-                'primary' => Color::Indigo,
-            ])
+            // Group keys stay in English (resources refer to them); the labels follow the user's language.
             ->navigationGroups([
-                'Customers' => NavigationGroup::make('Customers')
+                'Service management' => NavigationGroup::make()
+                    ->label(fn (): string => __('Service management'))
+                    ->icon(Heroicon::OutlinedArrowPath)
+                    ->collapsed(false),
+                'Customers' => NavigationGroup::make()
+                    ->label(fn (): string => __('Customers and people'))
                     ->icon(Heroicon::OutlinedBuildingOffice)
                     ->collapsed(false),
-                'Service management' => NavigationGroup::make('Service management')
-                    ->icon(Heroicon::OutlinedArrowPath)
-                    ->collapsed(),
-                'Infrastructure' => NavigationGroup::make('Infrastructure')
+                'Infrastructure' => NavigationGroup::make()
+                    ->label(fn (): string => __('Infrastructure'))
                     ->icon(Heroicon::OutlinedServer)
                     ->collapsed(),
-                'Knowledge' => NavigationGroup::make('Knowledge')
+                'Knowledge' => NavigationGroup::make()
+                    ->label(fn (): string => __('Knowledge'))
                     ->icon(Heroicon::OutlinedBookOpen)
                     ->collapsed(),
-                'Administration' => NavigationGroup::make('Administration')
+                'Ticket setup' => NavigationGroup::make()
+                    ->label(fn (): string => __('Ticket setup'))
+                    ->icon(Heroicon::OutlinedAdjustmentsHorizontal)
+                    ->collapsed(),
+                'Administration' => NavigationGroup::make()
+                    ->label(fn (): string => __('Administration'))
                     ->icon(Heroicon::OutlinedCog6Tooth)
                     ->collapsed(),
             ])
@@ -68,7 +61,7 @@ class AgentPanelProvider extends PanelProvider
             ->databaseNotificationsPolling('30s')
             ->userMenuItems([
                 Action::make('notificationSettings')
-                    ->label('Notification settings')
+                    ->label(fn (): string => __('Notification settings'))
                     ->icon(Heroicon::OutlinedBell)
                     ->url(fn (): string => NotificationSettings::getUrl()),
             ])
@@ -77,24 +70,6 @@ class AgentPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Agent/Widgets'), for: 'App\\Filament\\Agent\\Widgets')
-            ->widgets([
-                AccountWidget::class,
-                FilamentInfoWidget::class,
-            ])
-            ->middleware([
-                EncryptCookies::class,
-                AddQueuedCookiesToResponse::class,
-                StartSession::class,
-                AuthenticateSession::class,
-                ShareErrorsFromSession::class,
-                VerifyCsrfToken::class,
-                SubstituteBindings::class,
-                DisableBladeIconComponents::class,
-                DispatchServingFilamentEvent::class,
-            ])
-            ->authMiddleware([
-                Authenticate::class,
-            ]);
+            ->discoverWidgets(in: app_path('Filament/Agent/Widgets'), for: 'App\\Filament\\Agent\\Widgets');
     }
 }

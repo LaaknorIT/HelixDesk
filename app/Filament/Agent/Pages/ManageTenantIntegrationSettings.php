@@ -2,6 +2,7 @@
 
 namespace App\Filament\Agent\Pages;
 
+use App\Filament\Concerns\TranslatesPageLabels;
 use App\Support\TenantIntegrationSettings;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -20,6 +21,8 @@ use UnitEnum;
 
 class ManageTenantIntegrationSettings extends Page
 {
+    use TranslatesPageLabels;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
 
     protected static ?string $navigationLabel = 'Integration settings';

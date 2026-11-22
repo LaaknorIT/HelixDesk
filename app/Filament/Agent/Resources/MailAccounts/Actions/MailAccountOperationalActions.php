@@ -15,7 +15,7 @@ final class MailAccountOperationalActions
     public static function testConnection(): Action
     {
         return Action::make('testConnection')
-            ->label('Test connection')
+            ->label(__('Test connection'))
             ->icon(Heroicon::OutlinedSignal)
             ->color('gray')
             ->visible(fn (?MailAccount $record): bool => $record !== null && MailAccountResource::canEdit($record))
@@ -23,7 +23,7 @@ final class MailAccountOperationalActions
                 $result = app(MailAccountConnectionVerifier::class)->verify($record);
 
                 $notification = Notification::make()
-                    ->title($result->ok ? 'Connection OK' : 'Connection failed')
+                    ->title($result->ok ? __('Connection OK') : __('Connection failed'))
                     ->body($result->message)
                     ->persistent();
 
@@ -40,19 +40,19 @@ final class MailAccountOperationalActions
     public static function checkEmail(): Action
     {
         return Action::make('checkEmail')
-            ->label('Check email')
+            ->label(__('Check email'))
             ->icon(Heroicon::OutlinedInboxArrowDown)
             ->color('primary')
             ->requiresConfirmation()
-            ->modalHeading('Check email now')
-            ->modalDescription('Run inbound polling for this mail account immediately (same job as the scheduler).')
+            ->modalHeading(__('Check email now'))
+            ->modalDescription(__('Run inbound polling for this mail account immediately (same job as the scheduler).'))
             ->visible(fn (?MailAccount $record): bool => $record !== null && MailAccountResource::canEdit($record))
             ->action(function (MailAccount $record): void {
                 $result = app(MailAccountPollService::class)->poll($record->fresh() ?? $record);
                 $record->refresh();
 
                 $notification = Notification::make()
-                    ->title($result->succeeded() ? 'Email check finished' : 'Email check failed')
+                    ->title($result->succeeded() ? __('Email check finished') : __('Email check failed'))
                     ->body($result->summary())
                     ->persistent();
 

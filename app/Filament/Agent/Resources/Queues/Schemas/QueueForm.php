@@ -29,10 +29,10 @@ class QueueForm
                     ->default(null)
                     ->rows(3)
                     ->columnSpanFull(),
-                Section::make('Email')
+                Section::make(__('Email'))
                     ->schema([
                         CheckboxList::make('mail_account_ids')
-                            ->label('Mail accounts')
+                            ->label(__('Mail accounts'))
                             ->options(function (): array {
                                 $tenant = Filament::getTenant();
                                 if ($tenant === null) {
@@ -48,8 +48,8 @@ class QueueForm
                             ->columns(2)
                             ->live(),
                         Select::make('default_mail_account_id')
-                            ->label('Default outbound address')
-                            ->helperText('Used when agents reply on work_items not created from email (portal, API, etc.).')
+                            ->label(__('Default outbound address'))
+                            ->helperText(__('Used when agents reply on work_items not created from email (portal, API, etc.).'))
                             ->options(fn (Get $get): array => MailAccount::query()
                                 ->whereIn('id', $get('mail_account_ids') ?? [])
                                 ->orderBy('name')
@@ -58,15 +58,15 @@ class QueueForm
                             ->searchable()
                             ->nullable(),
                     ]),
-                Section::make('Chat notifications')
-                    ->description('Post ticket activity in this queue to a Microsoft Teams or Slack channel.')
+                Section::make(__('Chat notifications'))
+                    ->description(__('Post ticket activity in this queue to a Microsoft Teams or Slack channel.'))
                     ->schema([
                         self::webhookInput(ChatPlatform::Teams)
-                            ->helperText('In Teams, add the "Post to a channel when a webhook request is received" workflow to the channel and paste its URL.'),
+                            ->helperText(__('In Teams, add the "Post to a channel when a webhook request is received" workflow to the channel and paste its URL.')),
                         self::webhookInput(ChatPlatform::Slack)
-                            ->helperText('Create an incoming webhook for the channel in your Slack app and paste its URL.'),
+                            ->helperText(__('Create an incoming webhook for the channel in your Slack app and paste its URL.')),
                         CheckboxList::make('chat_notification_events')
-                            ->label('Post these events')
+                            ->label(__('Post these events'))
                             ->options(WorkItemNotificationEvent::options())
                             ->default(WorkItemNotificationEvent::defaultChatEvents())
                             ->columns(2),

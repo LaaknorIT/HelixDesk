@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\MailAccounts\Pages\EditMailAccount;
 use App\Filament\Agent\Resources\MailAccounts\Pages\ListMailAccounts;
 use App\Filament\Agent\Resources\MailAccounts\Schemas\MailAccountForm;
 use App\Filament\Agent\Resources\MailAccounts\Tables\MailAccountsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\MailAccount;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -19,6 +20,8 @@ use UnitEnum;
 
 class MailAccountResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = MailAccount::class;
 
     protected static ?string $navigationLabel = 'Mail accounts';

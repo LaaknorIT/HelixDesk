@@ -19,7 +19,7 @@ class SoftwareDeploymentForm
         return $schema
             ->components([
                 Select::make('software_product_id')
-                    ->label('Software product')
+                    ->label(__('Software product'))
                     ->relationship(
                         name: 'softwareProduct',
                         titleAttribute: 'name',
@@ -30,7 +30,7 @@ class SoftwareDeploymentForm
                     ->required()
                     ->default(fn (): mixed => request()->query('software_product_id')),
                 Select::make('organization_id')
-                    ->label('Organization')
+                    ->label(__('Organization'))
                     ->relationship(
                         name: 'organization',
                         titleAttribute: 'name',
@@ -66,19 +66,19 @@ class SoftwareDeploymentForm
                     ->native(false)
                     ->default(SoftwareDeploymentStatus::Active->value),
                 TextInput::make('external_tenant_id')
-                    ->label('External tenant ID')
+                    ->label(__('External tenant ID'))
                     ->maxLength(255),
                 TextInput::make('admin_url')
-                    ->label('Admin URL')
+                    ->label(__('Admin URL'))
                     ->url()
                     ->maxLength(255),
                 Textarea::make('notes')
                     ->columnSpanFull(),
                 KeyValue::make('attributes_json')
-                    ->label('Attributes')
-                    ->keyLabel('Key')
-                    ->valueLabel('Value')
-                    ->addActionLabel('Add attribute')
+                    ->label(__('Attributes'))
+                    ->keyLabel(__('Key'))
+                    ->valueLabel(__('Value'))
+                    ->addActionLabel(__('Add attribute'))
                     ->default([])
                     ->columnSpanFull(),
             ]);

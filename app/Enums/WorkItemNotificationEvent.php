@@ -12,10 +12,10 @@ enum WorkItemNotificationEvent: string
     public function label(): string
     {
         return match ($this) {
-            self::Created => 'New ticket',
-            self::Assigned => 'Ticket assigned to me',
-            self::CustomerReplied => 'Customer reply',
-            self::SlaAtRisk => 'SLA close to breach',
+            self::Created => __('New ticket'),
+            self::Assigned => __('Ticket assigned to me'),
+            self::CustomerReplied => __('Customer reply'),
+            self::SlaAtRisk => __('SLA close to breach'),
         };
     }
 

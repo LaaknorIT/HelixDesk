@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\AutomationRules\Pages\EditAutomationRule;
 use App\Filament\Agent\Resources\AutomationRules\Pages\ListAutomationRules;
 use App\Filament\Agent\Resources\AutomationRules\Schemas\AutomationRuleForm;
 use App\Filament\Agent\Resources\AutomationRules\Tables\AutomationRulesTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\AutomationRule;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -19,19 +20,21 @@ use UnitEnum;
 
 class AutomationRuleResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = AutomationRule::class;
 
     protected static ?string $navigationLabel = 'Ticket automations';
 
-    protected static ?string $modelLabel = 'Ticket automation';
+    protected static ?string $modelLabel = 'ticket automation';
 
-    protected static ?string $pluralModelLabel = 'Ticket automations';
+    protected static ?string $pluralModelLabel = 'ticket automations';
 
     protected static ?int $navigationSort = 56;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBolt;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Administration';
+    protected static string|UnitEnum|null $navigationGroup = 'Ticket setup';
 
     public static function canAccess(): bool
     {

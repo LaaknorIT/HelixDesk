@@ -22,7 +22,7 @@ class ServiceOfferingForm
         return $schema
             ->components([
                 Select::make('organizations')
-                    ->label('Organizations')
+                    ->label(__('Organizations'))
                     ->relationship(
                         name: 'organizations',
                         titleAttribute: 'name',
@@ -37,7 +37,7 @@ class ServiceOfferingForm
                     ->searchable()
                     ->preload()
                     ->required()
-                    ->helperText('Explicit assignment only — groups do not inherit to child customers.')
+                    ->helperText(__('Explicit assignment only — groups do not inherit to child customers.'))
                     ->default(function (): ?array {
                         $organizationId = request()->query('organization_id');
 
@@ -50,7 +50,7 @@ class ServiceOfferingForm
                     ->default(null)
                     ->columnSpanFull(),
                 TextInput::make('code')
-                    ->label('Code')
+                    ->label(__('Code'))
                     ->maxLength(255)
                     ->default(null),
                 Select::make('kind')
@@ -58,10 +58,10 @@ class ServiceOfferingForm
                     ->required()
                     ->native(false),
                 KeyValue::make('attributes_json')
-                    ->label('Service attributes')
-                    ->keyLabel('Key')
-                    ->valueLabel('Value')
-                    ->addActionLabel('Add attribute')
+                    ->label(__('Service attributes'))
+                    ->keyLabel(__('Key'))
+                    ->valueLabel(__('Value'))
+                    ->addActionLabel(__('Add attribute'))
                     ->default([])
                     ->columnSpanFull(),
             ]);

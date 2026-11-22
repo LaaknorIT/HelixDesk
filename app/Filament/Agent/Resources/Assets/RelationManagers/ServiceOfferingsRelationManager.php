@@ -24,11 +24,11 @@ class ServiceOfferingsRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable(),
                 TextColumn::make('organization.name')
-                    ->label('Organization'),
+                    ->label(__('Organization')),
                 TextColumn::make('kind')
                     ->badge(),
                 TextColumn::make('pivot.role')
-                    ->label('Role')
+                    ->label(__('Role'))
                     ->badge(),
             ])
             ->headerActions([

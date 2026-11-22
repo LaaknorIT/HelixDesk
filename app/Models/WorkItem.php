@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\WorkItemPriority;
 use App\Enums\WorkItemSource;
 use App\Enums\WorkItemType;
 use App\Services\Mail\WorkItemPublicIdGenerator;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -45,6 +48,27 @@ class WorkItem extends TenantModel
         'cc_addresses',
         'merged_into_work_item_id',
     ];
+
+    /**
+     * Priorities are stored as low, normal, high or urgent, whatever name the caller used.
+     */
+    protected function priority(): Attribute
+    {
+        return Attribute::make(
+            set: fn (mixed $value): ?string => blank($value) ? null : WorkItemPriority::normalize($value),
+        );
+    }
+
+    /**
+     * Tickets still being worked on: not resolved and not closed.
+     *
+     * @param  Builder<WorkItem>  $query
+     * @return Builder<WorkItem>
+     */
+    public function scopeOpen(Builder $query): Builder
+    {
+        return $query->whereNull('resolved_at')->whereNull('closed_at');
+    }
 
     protected function casts(): array
     {

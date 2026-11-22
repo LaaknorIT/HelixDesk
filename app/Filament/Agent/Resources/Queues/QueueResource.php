@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\Queues\Pages\EditQueue;
 use App\Filament\Agent\Resources\Queues\Pages\ListQueues;
 use App\Filament\Agent\Resources\Queues\Schemas\QueueForm;
 use App\Filament\Agent\Resources\Queues\Tables\QueuesTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\Queue;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -19,6 +20,8 @@ use UnitEnum;
 
 class QueueResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = Queue::class;
 
     protected static ?string $navigationLabel = 'Queues';
@@ -27,7 +30,7 @@ class QueueResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedQueueList;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Administration';
+    protected static string|UnitEnum|null $navigationGroup = 'Ticket setup';
 
     public static function canAccess(): bool
     {

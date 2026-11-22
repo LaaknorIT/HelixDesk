@@ -15,7 +15,7 @@ class PeopleForm
         return $schema
             ->components([
                 Select::make('organization_id')
-                    ->label('Organization scope')
+                    ->label(__('Organization scope'))
                     ->options(fn (): array => Organization::selectArray())
                     ->searchable()
                     ->default(null),
@@ -34,8 +34,8 @@ class PeopleForm
                     ->hidden(fn (?User $record): bool => $record?->isManagedByIdentityProvider() ?? false),
                 Select::make('type')
                     ->options([
-                        'agent' => 'Agent',
-                        'end_user' => 'End user',
+                        'agent' => __('Agent'),
+                        'end_user' => __('End user'),
                     ])
                     ->required()
                     ->native(false),

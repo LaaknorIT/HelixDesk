@@ -16,35 +16,35 @@ class AssetsTable
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->label('Name')
+                    ->label(__('Name'))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('assetType.name')
-                    ->label('Type')
+                    ->label(__('Type'))
                     ->sortable(),
                 TextColumn::make('asset_identifier')
-                    ->label('Tag')
+                    ->label(__('Tag'))
                     ->searchable(),
                 TextColumn::make('lifecycle_status')
-                    ->label('Lifecycle')
+                    ->label(__('Lifecycle'))
                     ->badge()
                     ->sortable(),
                 TextColumn::make('identity_resolution_status')
-                    ->label('Identity')
+                    ->label(__('Identity'))
                     ->badge()
                     ->toggleable(),
                 TextColumn::make('primary_hostname')
-                    ->label('Hostname')
+                    ->label(__('Hostname'))
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('operating_system')
-                    ->label('OS')
+                    ->label(__('OS'))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('organization.name')
-                    ->label('Organization')
-                    ->placeholder('—'),
+                    ->label(__('Organization'))
+                    ->placeholder(__('—')),
                 TextColumn::make('created_at')
-                    ->label('Created')
+                    ->label(__('Created'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

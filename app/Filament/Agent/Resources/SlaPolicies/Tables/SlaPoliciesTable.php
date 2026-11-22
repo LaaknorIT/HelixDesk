@@ -28,12 +28,12 @@ class SlaPoliciesTable
                         : str((string) $state)->headline()->toString())
                     ->sortable(),
                 TextColumn::make('first_response_minutes')
-                    ->label('First response (min)')
-                    ->placeholder('—')
+                    ->label(__('First response (min)'))
+                    ->placeholder(__('—'))
                     ->sortable(),
                 TextColumn::make('resolution_minutes')
-                    ->label('Resolution (min)')
-                    ->placeholder('—')
+                    ->label(__('Resolution (min)'))
+                    ->placeholder(__('—'))
                     ->sortable(),
                 TextColumn::make('match_priority')
                     ->sortable(),

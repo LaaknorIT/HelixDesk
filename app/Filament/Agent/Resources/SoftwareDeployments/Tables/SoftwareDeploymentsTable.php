@@ -20,11 +20,11 @@ class SoftwareDeploymentsTable
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('softwareProduct.name')
-                    ->label('Product')
+                    ->label(__('Product'))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('organization.name')
-                    ->label('Organization')
+                    ->label(__('Organization'))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('status')
@@ -32,11 +32,11 @@ class SoftwareDeploymentsTable
                     ->sortable(),
                 TextColumn::make('environment')
                     ->badge()
-                    ->placeholder('—')
+                    ->placeholder(__('—'))
                     ->toggleable(),
                 TextColumn::make('licenses_count')
                     ->counts('licenses')
-                    ->label('Licenses')
+                    ->label(__('Licenses'))
                     ->toggleable(),
                 TextColumn::make('updated_at')
                     ->dateTime()
@@ -51,10 +51,10 @@ class SoftwareDeploymentsTable
                         ])
                         ->all()),
                 SelectFilter::make('software_product_id')
-                    ->label('Product')
+                    ->label(__('Product'))
                     ->relationship('softwareProduct', 'name'),
                 SelectFilter::make('organization_id')
-                    ->label('Organization')
+                    ->label(__('Organization'))
                     ->relationship('organization', 'name'),
             ])
             ->recordActions([

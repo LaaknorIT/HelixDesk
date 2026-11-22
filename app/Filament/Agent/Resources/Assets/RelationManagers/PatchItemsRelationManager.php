@@ -18,11 +18,11 @@ class PatchItemsRelationManager extends RelationManager
             ->defaultSort('severity')
             ->columns([
                 TextColumn::make('kb_id')
-                    ->label('KB')
+                    ->label(__('KB'))
                     ->searchable(),
                 TextColumn::make('cve_id')
-                    ->label('CVE')
-                    ->placeholder('—')
+                    ->label(__('CVE'))
+                    ->placeholder(__('—'))
                     ->searchable(),
                 TextColumn::make('title')
                     ->searchable()
@@ -31,13 +31,13 @@ class PatchItemsRelationManager extends RelationManager
                     ->badge(),
                 TextColumn::make('approval_status')
                     ->badge()
-                    ->placeholder('—'),
+                    ->placeholder(__('—')),
                 TextColumn::make('provider')
                     ->badge()
                     ->toggleable(),
                 TextColumn::make('last_seen_at')
                     ->dateTime()
-                    ->placeholder('—')
+                    ->placeholder(__('—'))
                     ->toggleable(),
             ])
             ->paginated([10, 25, 50]);

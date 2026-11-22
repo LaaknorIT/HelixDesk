@@ -16,12 +16,12 @@ final class TenantRolesTable
         return $table
             ->columns([
                 TextColumn::make('name')
-                    ->label('Role')
+                    ->label(__('Role'))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('queues_count')
                     ->counts('queues')
-                    ->label('Queues'),
+                    ->label(__('Queues')),
             ])
             ->recordActions([
                 EditAction::make(),

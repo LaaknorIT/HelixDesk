@@ -19,18 +19,18 @@ class SoftwareProductsTable
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('vendor_name')
-                    ->label('Vendor')
-                    ->placeholder('—')
+                    ->label(__('Vendor'))
+                    ->placeholder(__('—'))
                     ->toggleable(),
                 TextColumn::make('category')
-                    ->placeholder('—')
+                    ->placeholder(__('—'))
                     ->toggleable(),
                 IconColumn::make('is_active')
-                    ->label('Active')
+                    ->label(__('Active'))
                     ->boolean(),
                 TextColumn::make('deployments_count')
                     ->counts('deployments')
-                    ->label('Deployments'),
+                    ->label(__('Deployments')),
                 TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()

@@ -35,7 +35,7 @@ class OrganizationServiceOfferingsRelationManager extends RelationManager
                 TextColumn::make('kind')
                     ->badge(),
                 TextColumn::make('code')
-                    ->placeholder('—'),
+                    ->placeholder(__('—')),
             ])
             ->headerActions([
                 CreateAction::make()

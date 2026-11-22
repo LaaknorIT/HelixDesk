@@ -25,9 +25,9 @@ class OrganizationAssetsRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable(),
                 TextColumn::make('assetType.name')
-                    ->label('Type'),
+                    ->label(__('Type')),
                 TextColumn::make('lifecycle_status')
-                    ->label('Status'),
+                    ->label(__('Status')),
             ])
             ->headerActions([
                 CreateAction::make()

@@ -18,18 +18,18 @@ class ServiceOfferingsTable
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('organizations.name')
-                    ->label('Organizations')
+                    ->label(__('Organizations'))
                     ->badge()
                     ->separator(','),
                 TextColumn::make('kind')
                     ->badge()
                     ->sortable(),
                 TextColumn::make('code')
-                    ->placeholder('—')
+                    ->placeholder(__('—'))
                     ->toggleable(),
                 TextColumn::make('software_deployments_count')
                     ->counts('softwareDeployments')
-                    ->label('Deployments')
+                    ->label(__('Deployments'))
                     ->toggleable(),
                 TextColumn::make('updated_at')
                     ->dateTime()

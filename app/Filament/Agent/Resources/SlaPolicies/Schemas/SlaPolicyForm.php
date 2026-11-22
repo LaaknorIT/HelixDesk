@@ -4,6 +4,7 @@ namespace App\Filament\Agent\Resources\SlaPolicies\Schemas;
 
 use App\Enums\SlaCalendarType;
 use App\Enums\SlaTargetType;
+use App\Enums\WorkItemPriority;
 use App\Enums\WorkItemType;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -42,26 +43,27 @@ class SlaPolicyForm
                     ->default(SlaCalendarType::WorkingHours->value)
                     ->required()
                     ->native(false),
-                Section::make('Matching criteria')
+                Section::make(__('Matching criteria'))
                     ->schema([
-                        TextInput::make('applies_to_priority')
-                            ->label('Priority')
-                            ->maxLength(255)
+                        Select::make('applies_to_priority')
+                            ->label(__('Priority'))
+                            ->options(WorkItemPriority::options())
+                            ->placeholder(__('Any priority'))
                             ->nullable(),
                         Select::make('applies_to_organization_id')
-                            ->label('Organization')
+                            ->label(__('Organization'))
                             ->relationship('organization', 'name')
                             ->searchable()
                             ->preload()
                             ->nullable(),
                         Select::make('applies_to_category_id')
-                            ->label('Category')
+                            ->label(__('Category'))
                             ->relationship('category', 'name')
                             ->searchable()
                             ->preload()
                             ->nullable(),
                         Select::make('applies_to_work_item_type')
-                            ->label('Work item type')
+                            ->label(__('Work item type'))
                             ->options(WorkItemType::class)
                             ->enum(WorkItemType::class)
                             ->nullable()
@@ -70,7 +72,7 @@ class SlaPolicyForm
                             ->numeric()
                             ->default(0)
                             ->required()
-                            ->helperText('Higher values win when multiple policies match.'),
+                            ->helperText(__('Higher values win when multiple policies match.')),
                     ])
                     ->columns(2),
             ]);

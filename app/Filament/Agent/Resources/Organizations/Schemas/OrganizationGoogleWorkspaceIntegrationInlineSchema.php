@@ -16,7 +16,7 @@ final class OrganizationGoogleWorkspaceIntegrationInlineSchema
         return [
             TextInput::make('gws_customer_domain')
                 ->label(__('Workspace domain'))
-                ->placeholder('acme.example')
+                ->placeholder(__('acme.example'))
                 ->maxLength(255)
                 ->required()
                 ->helperText(__('Primary Google Workspace domain for this customer.')),

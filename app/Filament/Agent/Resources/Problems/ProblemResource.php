@@ -8,6 +8,7 @@ use App\Filament\Agent\Resources\Problems\Pages\ListProblems;
 use App\Filament\Agent\Resources\Problems\RelationManagers\WorkItemsRelationManager;
 use App\Filament\Agent\Resources\Problems\Schemas\ProblemForm;
 use App\Filament\Agent\Resources\Problems\Tables\ProblemsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\Problem;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -20,6 +21,8 @@ use UnitEnum;
 
 class ProblemResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = Problem::class;
 
     protected static ?int $navigationSort = 21;

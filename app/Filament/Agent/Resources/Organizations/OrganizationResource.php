@@ -15,6 +15,7 @@ use App\Filament\Agent\Resources\Organizations\RelationManagers\OrganizationServ
 use App\Filament\Agent\Resources\Organizations\RelationManagers\OrganizationUsersRelationManager;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationForm;
 use App\Filament\Agent\Resources\Organizations\Tables\OrganizationsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\Organization;
 use BackedEnum;
 use Filament\Navigation\NavigationItem;
@@ -30,6 +31,8 @@ use UnitEnum;
 
 class OrganizationResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = Organization::class;
 
     protected static ?string $modelLabel = null;
@@ -46,17 +49,17 @@ class OrganizationResource extends Resource
 
     public static function getNavigationLabel(): string
     {
-        return (string) config('helixdesk.organizations.navigation_label', static::$navigationLabel ?? 'Customers');
+        return __((string) config('helixdesk.organizations.navigation_label', static::$navigationLabel ?? 'Customers'));
     }
 
     public static function getModelLabel(): string
     {
-        return (string) config('helixdesk.organizations.model_label', 'Customer');
+        return __((string) config('helixdesk.organizations.model_label', 'customer'));
     }
 
     public static function getPluralModelLabel(): string
     {
-        return (string) config('helixdesk.organizations.plural_model_label', 'Customers');
+        return __((string) config('helixdesk.organizations.plural_model_label', 'customers'));
     }
 
     public static function getNavigationGroup(): string|UnitEnum|null

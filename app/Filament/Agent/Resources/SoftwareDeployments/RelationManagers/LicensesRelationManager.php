@@ -36,7 +36,7 @@ class LicensesRelationManager extends RelationManager
                 TextInput::make('sku')
                     ->maxLength(255),
                 TextInput::make('product_code')
-                    ->label('Product code')
+                    ->label(__('Product code'))
                     ->maxLength(255),
                 Select::make('license_type')
                     ->options(collect(SoftwareLicenseType::cases())
@@ -76,10 +76,10 @@ class LicensesRelationManager extends RelationManager
                         ->all())
                     ->native(false),
                 TextInput::make('vendor_contract_reference')
-                    ->label('Vendor contract reference')
+                    ->label(__('Vendor contract reference'))
                     ->maxLength(255),
                 TextInput::make('purchase_order_reference')
-                    ->label('Purchase order reference')
+                    ->label(__('Purchase order reference'))
                     ->maxLength(255),
                 Textarea::make('notes')
                     ->columnSpanFull(),
@@ -94,13 +94,13 @@ class LicensesRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable(),
                 TextColumn::make('sku')
-                    ->placeholder('—'),
+                    ->placeholder(__('—')),
                 TextColumn::make('seat_count')
-                    ->label('Seats')
-                    ->placeholder('—'),
+                    ->label(__('Seats'))
+                    ->placeholder(__('—')),
                 TextColumn::make('expires_on')
                     ->date()
-                    ->placeholder('—')
+                    ->placeholder(__('—'))
                     ->sortable(),
                 IconColumn::make('auto_renew')
                     ->boolean(),

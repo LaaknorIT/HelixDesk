@@ -16,43 +16,43 @@ class AssetIdentityAmbiguityInfolist
     {
         return $schema
             ->components([
-                Section::make('Ambiguity details')
+                Section::make(__('Ambiguity details'))
                     ->columns(2)
                     ->schema([
                         TextEntry::make('organization.name')
-                            ->label('Organization'),
+                            ->label(__('Organization')),
                         TextEntry::make('provider')
                             ->badge(),
                         TextEntry::make('status')
                             ->badge(),
                         TextEntry::make('organizationIntegration.type')
-                            ->label('Integration type'),
+                            ->label(__('Integration type')),
                         TextEntry::make('created_at')
                             ->dateTime(),
                         TextEntry::make('resolvedAsset.name')
-                            ->label('Resolved asset')
-                            ->placeholder('—')
+                            ->label(__('Resolved asset'))
+                            ->placeholder(__('—'))
                             ->url(fn (AssetIdentityAmbiguity $record): ?string => $record->resolved_asset_id !== null
                                 ? AssetResource::getUrl('view', ['record' => $record->resolved_asset_id])
                                 : null),
                     ]),
-                Section::make('Provider snapshot')
+                Section::make(__('Provider snapshot'))
                     ->schema([
                         RepeatableEntry::make('snapshot_json.identifiers')
-                            ->label('Identifiers')
+                            ->label(__('Identifiers'))
                             ->schema([
                                 TextEntry::make('type'),
                                 TextEntry::make('value'),
                             ])
                             ->columns(2)
-                            ->placeholder('No identifiers'),
+                            ->placeholder(__('No identifiers')),
                         RepeatableEntry::make('snapshot_json.attributes')
-                            ->label('Attributes')
+                            ->label(__('Attributes'))
                             ->schema([
                                 TextEntry::make('key')
-                                    ->label('Field'),
+                                    ->label(__('Field')),
                                 TextEntry::make('value')
-                                    ->label('Value'),
+                                    ->label(__('Value')),
                             ])
                             ->state(fn (AssetIdentityAmbiguity $record): array => collect(is_array($record->snapshot_json['attributes'] ?? null) ? $record->snapshot_json['attributes'] : [])
                                 ->map(fn (mixed $value, string|int $key): array => [
@@ -62,12 +62,12 @@ class AssetIdentityAmbiguityInfolist
                                 ->values()
                                 ->all())
                             ->columns(2)
-                            ->placeholder('No attributes'),
+                            ->placeholder(__('No attributes')),
                     ]),
-                Section::make('Candidate assets')
+                Section::make(__('Candidate assets'))
                     ->schema([
                         RepeatableEntry::make('candidate_assets')
-                            ->label('Candidates')
+                            ->label(__('Candidates'))
                             ->state(fn (AssetIdentityAmbiguity $record): array => Asset::query()
                                 ->whereIn('id', $record->candidate_asset_ids ?? [])
                                 ->get()
@@ -82,9 +82,9 @@ class AssetIdentityAmbiguityInfolist
                                 TextEntry::make('name')
                                     ->url(fn (array $state): string => AssetResource::getUrl('view', ['record' => $state['id']])),
                                 TextEntry::make('serial_number')
-                                    ->placeholder('—'),
+                                    ->placeholder(__('—')),
                                 TextEntry::make('primary_hostname')
-                                    ->placeholder('—'),
+                                    ->placeholder(__('—')),
                             ])
                             ->columns(3),
                     ]),

@@ -3,8 +3,10 @@
 namespace App\Services\Notifications;
 
 use App\Enums\WorkItemNotificationEvent;
+use App\Enums\WorkItemPriority;
 use App\Filament\Agent\Resources\WorkItems\WorkItemResource;
 use App\Models\WorkItem;
+use App\Support\WorkItemStatusDisplay;
 use Illuminate\Support\Str;
 
 /**
@@ -30,11 +32,11 @@ final readonly class WorkItemNotificationContent
         $reference = filled($workItem->public_id) ? '#'.$workItem->public_id : '#'.$workItem->getKey();
 
         $facts = array_filter([
-            'Queue' => $workItem->queue?->name,
-            'Customer' => $workItem->organization?->name,
-            'Priority' => filled($workItem->priority) ? Str::ucfirst((string) $workItem->priority) : null,
-            'Status' => $workItem->status,
-            'Assignee' => $workItem->assignedAgent?->name ?? 'Unassigned',
+            __('Queue') => $workItem->queue?->name,
+            __('Customer') => $workItem->organization?->name,
+            __('Priority') => filled($workItem->priority) ? WorkItemPriority::labelFor($workItem->priority) : null,
+            __('Status') => filled($workItem->status) ? WorkItemStatusDisplay::label($workItem->status) : null,
+            __('Assignee') => $workItem->assignedAgent?->name ?? __('Unassigned'),
         ], fn (?string $value): bool => filled($value));
 
         return new self(

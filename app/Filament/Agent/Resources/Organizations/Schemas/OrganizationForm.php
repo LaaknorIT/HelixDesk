@@ -17,14 +17,14 @@ class OrganizationForm
         return $schema
             ->components([
                 Select::make('type')
-                    ->label('Type')
+                    ->label(__('Type'))
                     ->options(fn (Get $get): array => static::typeOptions($get('parent_id')))
                     ->enum(OrganizationType::class)
                     ->required()
                     ->native(false)
                     ->live(),
                 Select::make('parent_id')
-                    ->label('Parent')
+                    ->label(__('Parent'))
                     ->options(fn (): array => Organization::selectArray())
                     ->searchable()
                     ->default(Organization::defaultParentKey())
@@ -36,11 +36,11 @@ class OrganizationForm
                     ->maxLength(64)
                     ->default(null),
                 Toggle::make('is_billable')
-                    ->label('Billable customer')
+                    ->label(__('Billable customer'))
                     ->visible(fn (Get $get): bool => ($get('type') ?? OrganizationType::Customer->value) === OrganizationType::Customer->value)
                     ->default(true),
                 TextInput::make('external_reference')
-                    ->label('External reference')
+                    ->label(__('External reference'))
                     ->maxLength(255)
                     ->default(null),
             ]);

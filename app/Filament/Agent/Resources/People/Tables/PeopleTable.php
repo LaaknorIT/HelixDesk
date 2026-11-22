@@ -24,8 +24,8 @@ class PeopleTable
                     ->badge()
                     ->sortable(),
                 TextColumn::make('organization.name')
-                    ->label('Organization scope')
-                    ->placeholder('—')
+                    ->label(__('Organization scope'))
+                    ->placeholder(__('—'))
                     ->sortable(),
             ])
             ->filters([

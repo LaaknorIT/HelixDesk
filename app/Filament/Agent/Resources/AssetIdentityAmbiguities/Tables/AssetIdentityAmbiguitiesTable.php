@@ -17,7 +17,7 @@ class AssetIdentityAmbiguitiesTable
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('organization.name')
-                    ->label('Organization')
+                    ->label(__('Organization'))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('provider')
@@ -27,11 +27,11 @@ class AssetIdentityAmbiguitiesTable
                     ->badge()
                     ->sortable(),
                 TextColumn::make('candidate_asset_ids')
-                    ->label('Candidates')
+                    ->label(__('Candidates'))
                     ->formatStateUsing(fn (array $state): string => (string) count($state)),
                 TextColumn::make('resolvedAsset.name')
-                    ->label('Resolved asset')
-                    ->placeholder('—'),
+                    ->label(__('Resolved asset'))
+                    ->placeholder(__('—')),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
@@ -39,9 +39,9 @@ class AssetIdentityAmbiguitiesTable
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        AssetIdentityAmbiguityStatus::Open->value => 'Open',
-                        AssetIdentityAmbiguityStatus::Resolved->value => 'Resolved',
-                        AssetIdentityAmbiguityStatus::Dismissed->value => 'Dismissed',
+                        AssetIdentityAmbiguityStatus::Open->value => __('Open'),
+                        AssetIdentityAmbiguityStatus::Resolved->value => __('Resolved'),
+                        AssetIdentityAmbiguityStatus::Dismissed->value => __('Dismissed'),
                     ])
                     ->default(AssetIdentityAmbiguityStatus::Open->value),
             ])
