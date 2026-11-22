@@ -1,6 +1,6 @@
 # Active Directory integration and device coverage report
 
-**Status:** proposal, not implemented.
+**Status:** accepted 2026-11-22; implementation in progress (see §7).
 
 This document designs two related features:
 
@@ -121,25 +121,44 @@ POST /api/v1/integrations/{integration}/heartbeat               ← { collector_
 
 ## 3. Device sources
 
-The coverage report treats each of these as a **separate source**. Intune and Defender are deliberately separate, because a PC can be in one and not the other, and both gaps matter.
+### 3.0 Sources are registered, not hard-coded
+
+HelixDesk will have many integrations, so neither the report nor the rules may name specific products. Instead:
+
+- Each integration declares the **device sources** it produces in its `IntegrationCatalog` entry (`device_sources`). One integration can produce several sources: the Microsoft Entra integration produces *Entra ID*, *Intune* and *Defender for Endpoint*.
+- Each source has a stable **key** (stored as `asset_source_records.source`), a label, and one or more **roles** (`App\Enums\DeviceSourceRole`):
+
+| Role | Meaning | Examples |
+| ---- | ------- | -------- |
+| `directory` | The device is joined to / known by a directory | Active Directory, Entra ID |
+| `device_management` | The device is enrolled in MDM | Intune, Jamf, Google endpoint management |
+| `remote_management` | An RMM / patch agent is installed | Action1, Tactical RMM, NinjaOne, Datto RMM |
+| `endpoint_security` | An EDR / antivirus agent is onboarded | Defender for Endpoint, SentinelOne, CrowdStrike |
+
+- A sync service only has to put a `DeviceSourceRecordData` on the `AssetProviderSnapshot` it already builds. `AssetReconciliationService` stores it in `asset_source_records`, linked to the asset it resolved (or unlinked). Nothing in the report changes when a provider is added.
+- Report columns are the sources that are enabled for the organization (from `organization_integrations` and the source's scope). Built-in rules (§5.3) are written against **roles**, so a new RMM is checked by "devices in device management must have remote management" without any change.
+
+The sources HelixDesk knows today or in this design:
 
 | Source | Integration type | What it proves | Activity signal | Identifiers |
 | ------ | ---------------- | -------------- | --------------- | ----------- |
 | Active Directory | `active_directory` (new) | The computer is domain joined | `lastLogonTimestamp`, `pwdLastSet` | `AdObjectGuid`, `AdObjectSid`, hostname |
 | Entra ID (devices) | `microsoft_entra` (new scope `devices`) | Entra joined / hybrid joined / registered | `approximateLastSignInDateTime` | `EntraDeviceId`, `EntraAzureAdDeviceId`, `onPremisesSecurityIdentifier` |
 | Intune | `microsoft_entra` (scope `computers`, exists) | Managed by Intune (MDM) | `lastSyncDateTime` | `EntraIntuneManagedDeviceId`, `EntraAzureAdDeviceId`, serial |
-| Defender for Endpoint | `microsoft_defender` (new) | Onboarded to Defender (EDR/AV) | `lastSeen` | `DefenderMachineId`, `aadDeviceId`, hostname, MAC |
+| Defender for Endpoint | `microsoft_entra` (new scope `defender_devices`) | Onboarded to Defender (EDR/AV) | `lastSeen` | `DefenderMachineId`, `aadDeviceId`, hostname, MAC |
 | Action1 | `action1` (exists) | RMM / patch agent installed | `last_seen` | `Action1EndpointId`, serial, MAC, hostname |
 
-Future sources plug into the same table: Tactical RMM, NinjaOne, Datto RMM (roadmap Priority 2), Google Workspace endpoint management (ChromeOS and Windows devices), Jamf.
+Future sources plug into the same registry: Tactical RMM, NinjaOne, Datto RMM (roadmap Priority 2), Google Workspace endpoint management (ChromeOS and Windows devices), Jamf.
 
-### 3.1 Microsoft Defender for Endpoint as its own integration
+### 3.1 Microsoft Defender for Endpoint
 
-- New type `microsoft_defender` and its own gallery entry (category *Security*), so it can be enabled for customers that have Defender for Endpoint and switched off for those that do not.
-- Reads `GET /api/machines` from the Defender API (`api.security.microsoft.com`, permission `Machine.Read.All` on the *WindowsDefenderATP* API).
-- To avoid a second app registration, the form offers **"Use the app registration from the Microsoft Entra integration for this organization"**. It then reuses that row's client ID and secret and only adds the Defender permission. A separate app registration is still possible.
-- Defender also reports **discovered but not onboarded** devices (`onboardingStatus = CanBeOnboarded`). These are useful: they are devices on the network that no management tool knows about. They are stored as observations but never create assets on their own.
-- The existing *Security incidents* scope on the Entra integration stays where it is for now. Moving it to the Defender integration can be decided later.
+*Decided 2026-11-22:* Defender uses the **same app registration and credentials** as the Microsoft Entra integration. There is no separate application in Entra for the same read access.
+
+- New scope `defender_devices` on the `microsoft_entra` integration. It reads `GET /api/machines` from the Defender API (`api.security.microsoft.com`, application permission `Machine.Read.All` on the *WindowsDefenderATP* API, added to the existing app registration).
+- It produces its **own source**, `microsoft_defender`, with role `endpoint_security`, so it is shown and checked separately from Intune even though it comes from the same integration row.
+- In the integration gallery and on the integration page, *Security incidents* and *Defender devices* are grouped under **Microsoft Defender**, separate from the directory and Intune scopes. The security incident ingest itself stays where it is in code; only the presentation moves.
+- Defender also reports **discovered but not onboarded** devices (`onboardingStatus = CanBeOnboarded`). These are stored as source records but never create assets on their own.
+- Permission checks in `MicrosoftEntraIntegrationCatalog::runtimePermissionRequirements()` get the Defender permission, so a missing consent shows up as a health warning like the other scopes.
 
 ---
 
@@ -154,7 +173,7 @@ Today a provider record exists only as `asset_external_identifiers` rows plus me
 | `id` | bigint PK | |
 | `tenant_id`, `organization_id` | FK | Tenant scoped, like all CMDB tables |
 | `organization_integration_id` | uuid FK | |
-| `provider` | string | `active_directory`, `microsoft_entra_device`, `microsoft_intune`, `microsoft_defender`, `action1`, … |
+| `source` | string | Registered source key (§3.0): `active_directory`, `microsoft_entra_device`, `microsoft_intune`, `microsoft_defender`, `action1`, … |
 | `provider_record_id` | string | The source's own ID (objectGUID, Intune id, Defender machine id, …) |
 | `asset_id` | FK nullable | Null when the record is not linked to an asset (§4.3) |
 | `display_name`, `hostname`, `fqdn`, `serial_number`, `mac_addresses` | strings / JSON | Normalized with `AssetIdentityNormalizer` |
@@ -165,11 +184,11 @@ Today a provider record exists only as `asset_external_identifiers` rows plus me
 | `gone_at` | timestamp nullable | Set when a complete run or sync no longer reports it |
 | `metadata_json` | JSON | OU, join type, onboarding status, agent version, … |
 
-Unique `(tenant_id, organization_integration_id, provider_record_id)`.
+Unique `(tenant_id, organization_integration_id, source, provider_record_id)`.
 
 Note that `asset_external_identifiers.last_seen_at` is the time HelixDesk last *synced* the identifier, not when the device was last *active*. The report needs `last_activity_at` from the source.
 
-Entra and Intune come from the same integration row but are stored with different `provider` values, so they appear as separate sources.
+Entra ID, Intune and Defender come from the same integration row but are stored with different `source` values, so they appear as separate sources.
 
 ### 4.2 New identifier types
 
@@ -197,7 +216,7 @@ Rules:
 1. Link through the hard bridges in §4.2 when possible.
 2. Otherwise, link when the **FQDN** matches exactly one asset in the organization and no other AD record claims it. Short hostname alone is not enough (same rule as today: hostname-only never merges).
 3. Otherwise, depending on `create_assets`:
-   - `active_only` (default): create an asset only for **enabled and active** computers. Stale and disabled objects stay as unlinked source records, visible in the report but not cluttering the CMDB.
+   - `active_only` (default, decided 2026-11-22): create an asset only for **enabled and active** computers. Stale and disabled objects stay as unlinked source records, visible in the report but not cluttering the CMDB.
    - `all` / `never`: as named.
 4. An asset that was created from AD alone (AD is its only source) may later be **merged** with a provider that reports the same FQDN, because there is nothing on the AD-only asset that could conflict. Merges are logged in provenance and can be undone from the ambiguity screen.
 5. Two or more candidates → `asset_identity_ambiguities`, as today.
@@ -208,7 +227,7 @@ The duplicate-identifier handling from PR #19 still applies: soft hints stay on 
 
 A source record is **active** when it is enabled (where the source has that concept), not `gone_at`, and `last_activity_at` is within the threshold. For AD the activity time is the newest of `lastLogonTimestamp` and `pwdLastSet`.
 
-- Default threshold: 30 days, per integration (`active_threshold_days`), overridable per tenant.
+- Default threshold: 30 days (decided 2026-11-22), per integration (`active_threshold_days`), overridable per tenant.
 - Because `lastLogonTimestamp` can lag up to about 14 days, AD thresholds below 21 days are not allowed in the form.
 - Records that are not active are *stale*; the report shows them separately so they can also be used for cleanup (§5.3).
 
@@ -225,7 +244,7 @@ A source record is **active** when it is enabled (where the source has that conc
 
 ### 5.2 The matrix
 
-Agent panel → **Assets → Coverage**. One row per device, one column per source enabled for the organization:
+Agent panel → **Assets → Coverage**. One row per device, one column per source enabled for the organization. The columns come from the source registry (§3.0); the example below is what an organization with AD, Microsoft 365 and Action1 would see:
 
 | Device | Class | AD | Entra ID | Intune | Defender | Action1 | Findings |
 | ------ | ----- | -- | -------- | ------ | -------- | ------- | -------- |
@@ -243,32 +262,32 @@ Agent panel → **Assets → Coverage**. One row per device, one column per sour
 
 ### 5.3 Coverage rules
 
-A finding comes from a **rule**: *devices that are active in source X (and match a filter) are expected to be in source Y.* Tenants get a set of built-in rules that are switched on automatically for the sources an organization has enabled, and can change or add rules later.
+A finding comes from a **rule**: *devices that are active in a source with role X (and match a filter) are expected in a source with role Y.* Rules can also name source keys when a tenant needs something specific. Built-in rules use roles only, so they apply to any integration that registers sources with those roles, and are switched on for an organization when it has at least one source on each side.
 
 | Rule (built-in) | Condition | Likely cause shown to the agent |
 | --------------- | --------- | ------------------------------- |
-| **AD → Entra ID** | Active Windows workstation in AD, not in Entra | Hybrid join not configured, or the OU is not in Entra Connect's sync scope |
-| **AD / Entra → Intune** | Active workstation in AD or Entra, not in Intune | Missing Intune license for the primary user, enrollment GPO not applied, or enrollment failed |
-| **Intune → Action1** | Active device in Intune (Windows/macOS), no Action1 agent | Action1 agent not deployed (e.g. missing from the Intune app assignment) |
-| **Any → Defender** | Active workstation or server in any source, not onboarded to Defender | Onboarding package not deployed; for servers, Defender for Servers not enabled |
-| **Defender discovered, unmanaged** | Defender reports `CanBeOnboarded`, no other source knows the device | Unknown device on the network |
-| **Stale in AD, active elsewhere** | Active in Intune/Action1, stale or disabled in AD | Device left the domain or was rebuilt under another name; clean up AD |
-| **Active in AD, stale everywhere else** | Active in AD, stale in all other sources | Agents broken on a device that is still in use |
+| **On-prem directory → cloud directory** | Active Windows workstation in AD, not in Entra (both role `directory`; AD flagged `on_premises`) | Hybrid join not configured, or the OU is not in Entra Connect's sync scope |
+| **Directory → device management** | Active workstation in a `directory` source, not in any `device_management` source | Missing Intune license for the primary user, enrollment GPO not applied, or enrollment failed |
+| **Device management → remote management** | Active device in a `device_management` source (Windows/macOS), not in any `remote_management` source | RMM agent not deployed (e.g. missing from the Intune app assignment) |
+| **Any → endpoint security** | Active workstation or server in any source, not in any `endpoint_security` source | Onboarding package not deployed; for servers, Defender for Servers not enabled |
+| **Discovered, unmanaged** | A source reports a discovered-only device (e.g. Defender `CanBeOnboarded`), no other source knows it | Unknown device on the network |
+| **Stale in directory, active elsewhere** | Active in a management source, stale or disabled in a `directory` source | Device left the domain or was rebuilt under another name; clean up AD |
+| **Active in directory, stale everywhere else** | Active in a `directory` source, stale in all other sources | Agents broken on a device that is still in use |
 
 Rule definition (stored in `device_coverage_rules`, tenant scoped, optionally organization scoped):
 
 ```json
 {
-  "name": "AD / Entra → Intune",
-  "when_active_in": ["active_directory", "microsoft_entra_device"],
-  "expect_in": ["microsoft_intune"],
+  "name": "Directory → device management",
+  "when_active_in": { "roles": ["directory"] },
+  "expect_in": { "roles": ["device_management"] },
   "device_classes": ["workstation"],
   "os_filter": "windows",
   "severity": "warning"
 }
 ```
 
-**License hint (later):** when Entra users are synced, the rule *AD / Entra → Intune* can check whether the device's last signed-in user has a license that contains the Intune service plan (`assignedLicenses` / `INTUNE_A`). The finding then says "User has no Intune license" instead of listing all possible causes.
+**License hint (later):** when Entra users are synced, the rule *Directory → device management* can check whether the device's last signed-in user has a license that contains the Intune service plan (`assignedLicenses` / `INTUNE_A`). The finding then says "User has no Intune license" instead of listing all possible causes.
 
 ### 5.4 Findings, exceptions and follow-up
 
@@ -294,19 +313,20 @@ Rule definition (stored in `device_coverage_rules`, tenant scoped, optionally or
 
 | Phase | Content | Depends on |
 | ----- | ------- | ---------- |
-| **1. Source records** | `asset_source_records`, `last_activity_at` for Intune and Action1, Entra `devices` scope, new identifier types and bridges | — |
-| **2. Coverage report v1** | Matrix, built-in rules for Entra / Intune / Action1, CSV, health warning | Phase 1 |
-| **3. Active Directory** | `active_directory` type, push API, PowerShell collector, pairing, LDAPS mode, AD rules in the report | Phase 1, Sanctum tokens (Release 4) |
-| **4. Defender for Endpoint** | `microsoft_defender` type, machines sync, Defender rules, discovered devices | Phase 1 |
+| **1. Source records** | `asset_source_records`, `DeviceSourceRole`, `device_sources` in the integration catalog, source records and activity time from Intune and Action1, marking records gone after a complete sync, sources on the asset page | — |
+| **2. Coverage report v1** | Generic matrix (columns from registered sources), role-based built-in rules, CSV, health warning | Phase 1 |
+| **3. Active Directory** | `active_directory` type, push API, PowerShell collector with API credentials, pairing, LDAPS mode, Entra `devices` scope and the SID bridge | Phase 1, Sanctum tokens |
+| **4. Defender for Endpoint** | `defender_devices` scope on the Entra integration (same credentials), Defender grouping in the UI, discovered devices | Phase 1 |
 | **5. Follow-up** | Rule editor, exceptions, trends, tickets per rule, MSP overview, dashboard widget, license hint | Phase 2 |
 
-Phases 3 and 4 are independent of each other and can be done in either order. Phase 2 is useful on its own (Intune vs Action1 is already possible with today's integrations), so it ships before AD.
+Each phase is its own pull request. Phases 3 and 4 are independent of each other. Phase 2 is useful on its own (Intune vs Action1 works with today's integrations), so it ships before AD.
 
 ---
 
-## 8. Open questions
+## 8. Decisions (2026-11-22)
 
-1. Should AD create assets for active computers by default (`active_only`), or only show them in the report until an agent creates them (`never`)? This proposal says `active_only`.
-2. Is a PowerShell script acceptable as the first collector, or is an installable Windows service needed from the start for MSP customers?
-3. Is 30 days the right default for "active"?
-4. Should the Defender integration take over the *Security incidents* scope from the Entra integration?
+1. AD creates assets for **active** computers only (`create_assets = active_only`). Stale and disabled objects stay as source records.
+2. The first collector is a **PowerShell script** authenticating with **API credentials** (an integration-scoped token).
+3. **30 days** is the default for "active".
+4. Defender is shown as its own source and groups *Security incidents* with *Defender devices*, but uses the **same app registration and credentials** as the Entra integration (§3.1).
+5. The report and rules are **generic**: driven by sources that integrations register, with rules written against roles (§3.0).

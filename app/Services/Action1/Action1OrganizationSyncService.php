@@ -4,6 +4,7 @@ namespace App\Services\Action1;
 
 use App\Data\AssetProviderSnapshot;
 use App\Data\AssetReconciliationResult;
+use App\Data\DeviceSourceRecordData;
 use App\Enums\AssetExternalIdentifierType;
 use App\Enums\AssetPatchComplianceStatus;
 use App\Enums\AssetSoftwareSource;
@@ -20,10 +21,12 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\AssetReconciliationService;
 use App\Services\AssetRetirementService;
+use App\Services\DeviceSourceRecordService;
 use App\Services\MonitoringEventAssetLinker;
 use App\Services\TenantContext;
 use App\Support\Action1SyncTarget;
 use App\Support\AssetIdentityNormalizer;
+use App\Support\DeviceSourceKey;
 use App\Support\IntegrationHealth\IntegrationHealthRecorder;
 use App\Support\IntegrationType;
 use App\Support\OrganizationIntegrationSettings;
@@ -39,6 +42,7 @@ final class Action1OrganizationSyncService
         private readonly AssetReconciliationService $assetReconciliationService,
         private readonly AssetRetirementService $assetRetirementService,
         private readonly MonitoringEventAssetLinker $monitoringEventAssetLinker,
+        private readonly DeviceSourceRecordService $deviceSourceRecordService,
     ) {}
 
     public function sync(Action1SyncTarget $target): void
@@ -150,6 +154,8 @@ final class Action1OrganizationSyncService
             [],
         );
 
+        $syncStartedAt = now();
+
         foreach ($client->listManagedEndpoints($action1OrganizationId) as $endpoint) {
             $endpointId = trim((string) ($endpoint['id'] ?? ''));
             if ($endpointId === '') {
@@ -188,6 +194,15 @@ final class Action1OrganizationSyncService
             if ($syncPatches) {
                 $this->syncPatchItems($client, $target, $action1OrganizationId, $endpointId, $result->asset);
             }
+        }
+
+        if ($syncEndpoints) {
+            $this->deviceSourceRecordService->markMissingAsGone(
+                $target->tenantId,
+                $target->integrationId,
+                DeviceSourceKey::ACTION1,
+                $syncStartedAt,
+            );
         }
     }
 
@@ -268,6 +283,21 @@ final class Action1OrganizationSyncService
                     'last_seen' => $endpoint['last_seen'] ?? $endpoint['last_online'] ?? null,
                 ],
             ],
+            sourceRecord: new DeviceSourceRecordData(
+                source: DeviceSourceKey::ACTION1,
+                providerRecordId: $endpointId,
+                displayName: $name !== '' ? $name : null,
+                hostname: $hostnameRaw !== '' ? $hostnameRaw : null,
+                serialNumber: $serial,
+                macAddresses: $mac !== null ? [$mac] : [],
+                operatingSystem: $operatingSystem,
+                lastActivityAt: DeviceSourceRecordData::parseActivityTime($endpoint['last_seen'] ?? $endpoint['last_online'] ?? null),
+                metadata: array_filter([
+                    'status' => $endpoint['status'] ?? null,
+                    'agent_version' => $endpoint['agent_version'] ?? null,
+                    'azure_ad_device_id' => $azureAdDeviceId !== '' ? $azureAdDeviceId : null,
+                ], fn (mixed $value): bool => $value !== null && $value !== ''),
+            ),
         );
     }
 

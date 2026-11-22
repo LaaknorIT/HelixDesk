@@ -7,12 +7,14 @@ use App\Enums\OrganizationType;
 use App\Jobs\OrganizationSettingsImport;
 use App\Jobs\SyncNextMicrosoftEntraIntegrationJob;
 use App\Models\Asset;
+use App\Models\AssetSourceRecord;
 use App\Models\MonitoringEvent;
 use App\Models\Organization;
 use App\Models\OrganizationIntegration;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\MicrosoftEntra\MicrosoftEntraOrganizationSyncService;
+use App\Support\DeviceSourceKey;
 use App\Support\EntraSyncTarget;
 use App\Support\OrganizationIntegrationSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -324,6 +326,67 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
             'identifier_type' => AssetExternalIdentifierType::EntraIntuneManagedDeviceId->value,
             'external_id' => '22222222-2222-2222-2222-222222222222',
         ]);
+    }
+
+    public function test_managed_device_sync_records_intune_source_and_marks_missing_devices_gone(): void
+    {
+        $devices = [[
+            'id' => '33333333-3333-3333-3333-333333333333',
+            'deviceName' => 'LAPTOP-INTUNE',
+            'serialNumber' => 'SN-INTUNE-001',
+            'azureADDeviceId' => '44444444-4444-4444-4444-444444444444',
+            'operatingSystem' => 'Windows',
+            'osVersion' => '10.0.22631.1',
+            'lastSyncDateTime' => '2026-11-20T08:30:00Z',
+            'managementAgent' => 'mdm',
+            'complianceState' => 'compliant',
+            'wiFiMacAddress' => 'aabbccddee01',
+        ]];
+
+        Http::fake(function (Request $request) use (&$devices) {
+            $url = $request->url();
+            if (str_contains($url, 'login.microsoftonline.com')) {
+                return Http::response(['access_token' => 'fake-token', 'expires_in' => 3600], 200);
+            }
+            if (str_contains($url, 'graph.microsoft.com/v1.0/deviceManagement/managedDevices')) {
+                return Http::response(['value' => $devices], 200);
+            }
+
+            return Http::response(['value' => []], 200);
+        });
+
+        $tenant = Tenant::factory()->create();
+        $organization = Organization::factory()->create(['tenant_id' => $tenant->id]);
+        $integration = $this->createEntraIntegration($tenant, $organization, (string) Str::uuid(), [
+            'scopes' => [
+                'users' => false,
+                'departments' => false,
+                'computers' => true,
+                'security_work_items' => false,
+            ],
+        ]);
+        $target = $this->entraTargetFromIntegration($tenant, $organization, $integration);
+
+        app(MicrosoftEntraOrganizationSyncService::class)->sync($target);
+
+        $record = AssetSourceRecord::query()->withoutGlobalScopes()->sole();
+        $asset = Asset::query()->withoutGlobalScopes()->where('name', 'LAPTOP-INTUNE')->sole();
+
+        $this->assertSame(DeviceSourceKey::MICROSOFT_INTUNE, $record->source);
+        $this->assertSame('33333333-3333-3333-3333-333333333333', $record->provider_record_id);
+        $this->assertSame($asset->id, $record->asset_id);
+        $this->assertSame('laptop-intune', $record->hostname);
+        $this->assertSame(['aa:bb:cc:dd:ee:01'], $record->mac_addresses);
+        $this->assertSame('workstation', $record->device_class->value);
+        $this->assertTrue($record->last_activity_at->equalTo(Carbon::parse('2026-11-20T08:30:00Z')));
+        $this->assertSame('compliant', $record->metadata_json['compliance_state']);
+        $this->assertNull($record->gone_at);
+
+        $devices = [];
+        $this->travel(1)->minutes();
+        app(MicrosoftEntraOrganizationSyncService::class)->sync($target);
+
+        $this->assertNotNull($record->fresh()->gone_at);
     }
 
     /**

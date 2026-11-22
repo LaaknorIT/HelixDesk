@@ -8,11 +8,13 @@ use App\Jobs\OrganizationSettingsImport;
 use App\Jobs\SyncNextAction1IntegrationJob;
 use App\Models\Asset;
 use App\Models\AssetPatchItem;
+use App\Models\AssetSourceRecord;
 use App\Models\Organization;
 use App\Models\OrganizationIntegration;
 use App\Models\Tenant;
 use App\Services\Action1\Action1OrganizationSyncService;
 use App\Support\Action1SyncTarget;
+use App\Support\DeviceSourceKey;
 use App\Support\IntegrationType;
 use App\Support\OrganizationIntegrationSettings;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -307,6 +309,51 @@ class Action1IntegrationSyncTest extends TestCase
             'missing_other_count' => 1,
             'compliance_status' => AssetPatchComplianceStatus::CriticalMissing->value,
         ]);
+    }
+
+    public function test_endpoint_sync_records_action1_source_with_last_seen(): void
+    {
+        $baseUrl = config('helixdesk_integrations.action1.regions.us');
+        Http::fake(function (Request $request) use ($baseUrl) {
+            $url = $request->url();
+            if (str_contains($url, $baseUrl.'oauth2/token')) {
+                return Http::response(['access_token' => 'fake-token', 'expires_in' => 3600], 200);
+            }
+            if (str_contains($url, $baseUrl.'endpoints/managed/action1-org-1')) {
+                return Http::response([
+                    'data' => [[
+                        'id' => 'endpoint-src-1',
+                        'name' => 'SRV-FILE01',
+                        'serial' => 'SN-SRV-001',
+                        'mac' => 'AA:BB:CC:DD:EE:02',
+                        'platform' => 'Windows Server',
+                        'OS_version' => '2022',
+                        'last_seen' => '2026-11-21T10:00:00Z',
+                    ]],
+                ], 200);
+            }
+
+            return Http::response(['data' => []], 200);
+        });
+
+        $tenant = Tenant::factory()->create();
+        $organization = Organization::factory()->create(['tenant_id' => $tenant->id]);
+        $integration = $this->createAction1Integration($tenant, $organization, [
+            'api_base_url' => $baseUrl,
+            'scopes' => ['endpoints' => true, 'software' => false, 'patches' => false, 'alerts' => false],
+        ]);
+
+        app(Action1OrganizationSyncService::class)->sync(
+            $this->action1TargetFromIntegration($tenant, $organization, $integration),
+        );
+
+        $record = AssetSourceRecord::query()->withoutGlobalScopes()->sole();
+
+        $this->assertSame(DeviceSourceKey::ACTION1, $record->source);
+        $this->assertSame('endpoint-src-1', $record->provider_record_id);
+        $this->assertNotNull($record->asset_id);
+        $this->assertSame('server', $record->device_class->value);
+        $this->assertSame('2026-11-21 10:00:00', $record->last_activity_at->utc()->format('Y-m-d H:i:s'));
     }
 
     /**
