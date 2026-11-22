@@ -15,6 +15,7 @@ use App\Support\AssetIdentifierHelper;
 use App\Support\AssetIdentityNormalizer;
 use App\Support\IntegrationType;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 final class AssetReconciliationService
 {
@@ -359,6 +360,14 @@ final class AssetReconciliationService
             ->first();
     }
 
+    /**
+     * Stores the snapshot's identifiers on the asset. An identifier is unique per tenant, provider and type,
+     * so when another asset already holds it:
+     *  - a device ID (hard match) moves to this asset, because the provider says this is that device now
+     *    (for example a device that moved to another customer organization);
+     *  - a soft hint such as a serial number, MAC address or hostname stays where it is. Two provider records
+     *    can share these (re-enrolled devices, cloned images, placeholder serials), and the sync must not fail.
+     */
     private function upsertExternalIdentifiers(AssetProviderSnapshot $snapshot, Asset $asset): void
     {
         $now = now();
@@ -369,21 +378,62 @@ final class AssetReconciliationService
                 continue;
             }
 
-            AssetExternalIdentifier::query()->updateOrCreate(
-                [
+            $type = $identifier['type'];
+            $attributes = [
+                'organization_id' => $snapshot->organizationId,
+                'organization_integration_id' => $snapshot->organizationIntegrationId,
+                'is_primary' => $type->isHardMatchType(),
+                'last_seen_at' => $now,
+            ];
+
+            $existing = AssetExternalIdentifier::query()
+                ->withoutGlobalScopes()
+                ->where('tenant_id', $snapshot->tenantId)
+                ->where('provider', $snapshot->provider)
+                ->where('identifier_type', $type)
+                ->where('external_id', $value)
+                ->first();
+
+            if ($existing === null) {
+                AssetExternalIdentifier::query()->create([
                     'tenant_id' => $snapshot->tenantId,
                     'asset_id' => $asset->getKey(),
                     'provider' => $snapshot->provider,
-                    'identifier_type' => $identifier['type'],
+                    'identifier_type' => $type,
                     'external_id' => $value,
-                ],
-                [
-                    'organization_id' => $snapshot->organizationId,
-                    'organization_integration_id' => $snapshot->organizationIntegrationId,
-                    'is_primary' => $identifier['type']->isHardMatchType(),
-                    'last_seen_at' => $now,
-                ],
-            );
+                    ...$attributes,
+                ]);
+
+                continue;
+            }
+
+            if ((int) $existing->asset_id === (int) $asset->getKey()) {
+                $existing->fill($attributes)->save();
+
+                continue;
+            }
+
+            if ($type->isHardMatchType()) {
+                Log::info('Asset external identifier moved to another asset.', [
+                    'tenant_id' => $snapshot->tenantId,
+                    'provider' => $snapshot->provider,
+                    'identifier_type' => $type->value,
+                    'from_asset_id' => $existing->asset_id,
+                    'to_asset_id' => $asset->getKey(),
+                ]);
+
+                $existing->fill(['asset_id' => $asset->getKey(), ...$attributes])->save();
+
+                continue;
+            }
+
+            Log::info('Asset external identifier already belongs to another asset; kept on the original asset.', [
+                'tenant_id' => $snapshot->tenantId,
+                'provider' => $snapshot->provider,
+                'identifier_type' => $type->value,
+                'existing_asset_id' => $existing->asset_id,
+                'asset_id' => $asset->getKey(),
+            ]);
         }
     }
 }
