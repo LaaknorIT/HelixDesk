@@ -136,9 +136,12 @@ This plan sets the order of work for making HelixDesk the preferred open source 
 - [ ] **Reports and dashboard widgets**: SLA attainment, backlog, ticket age, time per customer (Phase E)
 - [ ] **Monitoring → ticket**: deduplication, correlation, rules that create or update tickets and problems (Phase D)
 - [ ] **Webhooks** and a published **OpenAPI** spec for API v1 (Phase F)
+- [ ] **API tokens and widget API**: Laravel Sanctum tokens, QR pairing of devices under *Connected devices*, read-only `/api/v1/widgets/*` endpoints that also feed the dashboard widgets ([`docs/widgets-and-companion-apps.md`](widgets-and-companion-apps.md))
 
 ### Priority 2 — Differentiators
 
+- [ ] **Project module**: projects and project portfolio management for both MSPs and IT departments, with tasks, milestones, owners, status, and links to customers, tickets and changes
+- [ ] **Widgets and companion apps**: browser extension, installable PWA with badge and push, Windows widget, then Android and iOS/macOS apps with home screen widgets, in a separate client repository ([`docs/widgets-and-companion-apps.md`](widgets-and-companion-apps.md))
 - [ ] More **RMM integrations**: Tactical RMM (open source), NinjaOne, Datto RMM, Microsoft Defender
 - [ ] **Password vault** per customer, with access control and audit log (Phase G; `project-description.md` §12)
 - [ ] **Contract and license alerts**: expiry of software licenses, warranties and supplier agreements
@@ -160,4 +163,4 @@ Ongoing alongside all releases: expand automated tests across problems, changes,
 
 ---
 
-*Last updated: 2026-10-26 — agent notifications delivered (Release 1).*
+*Last updated: 2026-11-22 — widget API, widgets and companion apps, and project module added to the plan.*
