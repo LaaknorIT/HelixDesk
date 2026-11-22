@@ -4,7 +4,7 @@ This document designs how HelixDesk ingests and reconciles device/asset data fro
 
 It implements the organization-scoped **`organization_integrations`** table (model `OrganizationIntegration`) sketched in [`technical-architecture.md`](technical-architecture.md) §5.2, replacing the interim JSON-only registry in `organizations.organizational_settings.settings[]`. [`OrganizationIntegrationSettings`](../app/Support/OrganizationIntegrationSettings.php) and [`OrganizationIntegrationRepository`](../app/Repositories/OrganizationIntegrationRepository.php) read and write **only** the table after migration; legacy org JSON is migrated and stripped via Laravel migrations.
 
-**Related docs:** [`domain-model.md`](domain-model.md) §1.2 (Organization), §4 (CMDB), [`project-description.md`](project-description.md) §7.2 (automatic collection), [`roadmap.md`](roadmap.md) Phase C/F.
+**Related docs:** [`domain-model.md`](domain-model.md) §1.2 (Organization), §4 (CMDB), [`project-description.md`](project-description.md) §7.2 (automatic collection).
 
 ---
 

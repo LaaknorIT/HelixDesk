@@ -64,4 +64,4 @@ Payloads support nested `supplier_links` / `asset_links` on create/update where 
 
 ---
 
-*See also [`roadmap.md`](roadmap.md) Phase C and [`service-offerings-and-software.md`](service-offerings-and-software.md).*
+*See also [`service-offerings-and-software.md`](service-offerings-and-software.md).*
