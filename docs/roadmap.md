@@ -142,7 +142,9 @@ This plan sets the order of work for making HelixDesk the preferred open source 
 
 - [ ] **Project module**: projects and project portfolio management for both MSPs and IT departments, with tasks, milestones, owners, status, and links to customers, tickets and changes
 - [ ] **Widgets and companion apps**: browser extension, installable PWA with badge and push, Windows widget, then Android and iOS/macOS apps with home screen widgets, in a separate client repository ([`docs/widgets-and-companion-apps.md`](widgets-and-companion-apps.md))
-- [ ] More **RMM integrations**: Tactical RMM (open source), NinjaOne, Datto RMM, Microsoft Defender
+- [ ] More **RMM integrations**: Tactical RMM (open source), NinjaOne, Datto RMM, Microsoft Defender for Endpoint (as its own integration, [`docs/active-directory-and-device-coverage.md`](active-directory-and-device-coverage.md) §3.1)
+- [ ] **Active Directory (on-premises)** integration: a collector on the customer network pushes computer objects to the HelixDesk API, with direct LDAPS as an option for self-hosted installs ([`docs/active-directory-and-device-coverage.md`](active-directory-and-device-coverage.md))
+- [ ] **Device coverage report**: which devices each source (AD, Entra ID, Intune, Defender, Action1) sees, with findings such as active AD computers missing in Intune or Intune devices without an Action1 agent ([`docs/active-directory-and-device-coverage.md`](active-directory-and-device-coverage.md))
 - [ ] **Password vault** per customer, with access control and audit log (Phase G; `project-description.md` §12)
 - [ ] **Contract and license alerts**: expiry of software licenses, warranties and supplier agreements
 - [ ] More **SSO providers**: Google, generic OIDC/SAML (Authentik, Keycloak)
