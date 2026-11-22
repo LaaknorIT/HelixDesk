@@ -3,8 +3,10 @@
 namespace App\Services\MicrosoftEntra;
 
 use App\Support\EntraSyncTarget;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Throwable;
 
 final class MicrosoftGraphHttpClient
 {
@@ -47,6 +49,81 @@ final class MicrosoftGraphHttpClient
         }
 
         $this->token = $token;
+    }
+
+    /**
+     * Application permissions (the `roles` claim) granted to the app registration, read from the access token.
+     * Returns null when the token cannot be decoded, so callers can tell "unknown" apart from "none granted".
+     *
+     * @return list<string>|null
+     */
+    public function grantedApplicationPermissions(): ?array
+    {
+        if ($this->token === null) {
+            $this->authenticate();
+        }
+
+        $segments = explode('.', (string) $this->token);
+        if (count($segments) !== 3) {
+            return null;
+        }
+
+        $payload = base64_decode(strtr($segments[1], '-_', '+/'), true);
+        if ($payload === false) {
+            return null;
+        }
+
+        $claims = json_decode($payload, true);
+        if (! is_array($claims)) {
+            return null;
+        }
+
+        $roles = $claims['roles'] ?? [];
+        if (! is_array($roles)) {
+            return [];
+        }
+
+        return array_values(array_filter($roles, 'is_string'));
+    }
+
+    /**
+     * Best-effort lookup of when the client secret in use expires. Needs Application.Read.All (or broader);
+     * returns null when the app may not read its own registration or no matching secret is found.
+     */
+    public function clientSecretExpiresAt(): ?Carbon
+    {
+        try {
+            $application = $this->getJson("applications(appId='".rawurlencode($this->clientId)."')", [
+                '$select' => 'passwordCredentials',
+            ]);
+        } catch (Throwable) {
+            return null;
+        }
+
+        $credentials = $application['passwordCredentials'] ?? [];
+        if (! is_array($credentials)) {
+            return null;
+        }
+
+        foreach ($credentials as $credential) {
+            if (! is_array($credential)) {
+                continue;
+            }
+
+            $hint = (string) ($credential['hint'] ?? '');
+            $endDateTime = $credential['endDateTime'] ?? null;
+            if ($hint === '' || ! is_string($endDateTime) || ! str_starts_with($this->clientSecret, $hint)) {
+                continue;
+            }
+
+            try {
+                return Carbon::parse($endDateTime);
+            } catch (Throwable) {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /**

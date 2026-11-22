@@ -17,7 +17,9 @@ use App\Services\MonitoringEventAssetLinker;
 use App\Services\TenantContext;
 use App\Support\AssetIdentityNormalizer;
 use App\Support\EntraSyncTarget;
+use App\Support\IntegrationHealth\IntegrationHealthRecorder;
 use App\Support\IntegrationType;
+use App\Support\MicrosoftEntraIntegrationCatalog;
 use App\Support\OrganizationIntegrationSettings;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Log;
@@ -26,6 +28,17 @@ use Throwable;
 
 final class MicrosoftEntraOrganizationSyncService
 {
+    /**
+     * Permissions that let the app read its own registration (used to detect when the client secret expires).
+     *
+     * @var list<string>
+     */
+    private const APPLICATION_READ_PERMISSIONS = [
+        'Application.Read.All',
+        'Application.ReadWrite.All',
+        'Application.ReadWrite.OwnedBy',
+    ];
+
     public function __construct(
         private readonly TenantContext $tenantContext,
         private readonly AssetReconciliationService $assetReconciliationService,
@@ -38,6 +51,12 @@ final class MicrosoftEntraOrganizationSyncService
         $client = MicrosoftGraphHttpClient::fromTarget($target);
         $client->authenticate();
 
+        $grantedPermissions = $client->grantedApplicationPermissions();
+        $secretExpiresAt = $grantedPermissions !== null && array_intersect($grantedPermissions, self::APPLICATION_READ_PERMISSIONS) !== []
+            ? $client->clientSecretExpiresAt()
+            : null;
+        IntegrationHealthRecorder::recordGrantedPermissions($target->integrationId, $grantedPermissions, $secretExpiresAt);
+
         $this->tenantContext->setTenantId($target->tenantId);
         setPermissionsTeamId($target->tenantId);
 
@@ -47,8 +66,7 @@ final class MicrosoftEntraOrganizationSyncService
                 throw new \RuntimeException('Organization not found: '.$target->organizationId);
             }
 
-            $scopes = $target->config['scopes'] ?? [];
-            $scopes = is_array($scopes) ? $scopes : [];
+            $scopes = $this->runnableScopes($target, $grantedPermissions);
 
             if (($scopes['users'] ?? false) || ($scopes['departments'] ?? false)) {
                 $this->syncDirectoryUsers(
@@ -85,6 +103,50 @@ final class MicrosoftEntraOrganizationSyncService
             $this->tenantContext->setTenantId(null);
             setPermissionsTeamId(null);
         }
+    }
+
+    /**
+     * Enabled directory scopes that the app registration has permission to run. Scopes without the
+     * required Microsoft Graph permission are skipped (and shown as warnings) instead of failing the whole sync.
+     *
+     * @param  list<string>|null  $grantedPermissions  null when the token could not be inspected
+     * @return array<string, bool>
+     */
+    private function runnableScopes(EntraSyncTarget $target, ?array $grantedPermissions): array
+    {
+        $configured = $target->config['scopes'] ?? [];
+        $configured = is_array($configured) ? $configured : [];
+
+        $runnable = [];
+        $missing = [];
+
+        foreach (MicrosoftEntraIntegrationCatalog::directorySyncScopeKeys() as $scopeKey) {
+            if (! ($configured[$scopeKey] ?? false)) {
+                continue;
+            }
+
+            $missingForScope = $grantedPermissions === null
+                ? []
+                : MicrosoftEntraIntegrationCatalog::missingPermissionsForScope($scopeKey, $grantedPermissions);
+
+            if ($missingForScope === []) {
+                $runnable[$scopeKey] = true;
+
+                continue;
+            }
+
+            $missing = [...$missing, ...$missingForScope];
+        }
+
+        if ($runnable === [] && $missing !== []) {
+            throw new \RuntimeException(
+                'Microsoft Graph application permissions are missing for every enabled capability ('
+                .implode(', ', array_values(array_unique($missing)))
+                .'). Add them under API permissions in the app registration and grant admin consent (HTTP 403).'
+            );
+        }
+
+        return $runnable;
     }
 
     public function recordFailure(EntraSyncTarget $target, Throwable $exception): void
@@ -341,7 +403,7 @@ final class MicrosoftEntraOrganizationSyncService
     ): void {
         $source = $this->monitoringEventSource($target, $organization);
 
-        foreach ($client->paginateCollection('security/work_items', [
+        foreach ($client->paginateCollection('security/incidents', [
             '$top' => 50,
         ]) as $workItem) {
             $extId = (string) ($workItem['id'] ?? '');

@@ -165,6 +165,7 @@ class AgentPanelNavigationTest extends TestCase
                 [
                     'Queues',
                     'Mail accounts',
+                    'Integrations',
                     'Roles',
                     'Integration settings',
                     'Dashboard layouts',

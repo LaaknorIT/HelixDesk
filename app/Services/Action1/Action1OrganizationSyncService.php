@@ -24,10 +24,12 @@ use App\Services\MonitoringEventAssetLinker;
 use App\Services\TenantContext;
 use App\Support\Action1SyncTarget;
 use App\Support\AssetIdentityNormalizer;
+use App\Support\IntegrationHealth\IntegrationHealthRecorder;
 use App\Support\IntegrationType;
 use App\Support\OrganizationIntegrationSettings;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 final class Action1OrganizationSyncService
@@ -50,7 +52,7 @@ final class Action1OrganizationSyncService
         try {
             $organization = Organization::query()->find($target->organizationId);
             if ($organization === null) {
-                throw new \RuntimeException('Organization not found: '.$target->organizationId);
+                throw new RuntimeException('Organization not found: '.$target->organizationId);
             }
 
             $scopes = is_array($target->config['scopes'] ?? null) ? $target->config['scopes'] : [];
@@ -76,7 +78,9 @@ final class Action1OrganizationSyncService
             }
 
             if (($scopes['alerts'] ?? false)) {
-                $this->syncAlerts($client, $target, $organization, $action1OrganizationId);
+                $this->syncAlertsOrRecordWarning($client, $target, $organization, $action1OrganizationId);
+            } else {
+                IntegrationHealthRecorder::recordScopeWarning($target->integrationId, 'alerts', null);
             }
 
             OrganizationIntegrationSettings::patchAction1IntegrationConfig(
@@ -476,6 +480,35 @@ final class Action1OrganizationSyncService
             'last_assessed_at' => $now,
             'compliance_status' => $complianceStatus,
         ]);
+    }
+
+    /**
+     * Alerts need extra rights on the Action1 API credential. When they are missing, keep the rest of the
+     * sync running and surface a warning instead of failing the whole integration.
+     */
+    private function syncAlertsOrRecordWarning(
+        Action1HttpClient $client,
+        Action1SyncTarget $target,
+        Organization $organization,
+        string $action1OrganizationId,
+    ): void {
+        try {
+            $this->syncAlerts($client, $target, $organization, $action1OrganizationId);
+        } catch (RuntimeException $exception) {
+            if (preg_match('/HTTP 403|status code 403/', $exception->getMessage()) !== 1) {
+                throw $exception;
+            }
+
+            IntegrationHealthRecorder::recordScopeWarning(
+                $target->integrationId,
+                'alerts',
+                __('Alerts are enabled for this integration, but the Action1 API credential is not allowed to read audit events. Give the credential read access to audit events in Action1, or turn off alerts.'),
+            );
+
+            return;
+        }
+
+        IntegrationHealthRecorder::recordScopeWarning($target->integrationId, 'alerts', null);
     }
 
     private function syncAlerts(

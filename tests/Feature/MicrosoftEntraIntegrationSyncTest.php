@@ -143,7 +143,7 @@ class MicrosoftEntraIntegrationSyncTest extends TestCase
             if (str_contains($url, 'login.microsoftonline.com')) {
                 return Http::response(['access_token' => 'fake-token', 'expires_in' => 3600], 200);
             }
-            if (str_contains($url, 'graph.microsoft.com/v1.0/security/work_items')) {
+            if (str_contains($url, 'graph.microsoft.com/v1.0/security/incidents')) {
                 return Http::response([
                     'value' => [[
                         'id' => 'inc-42',
