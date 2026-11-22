@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Enums\DeviceSourceRole;
 use Filament\Support\Icons\Heroicon;
 
 /**
@@ -43,6 +44,7 @@ final class IntegrationCatalog
      *     requirements: list<string>,
      *     capabilities: array<string, string>,
      *     docs_url: ?string,
+     *     device_sources: array<string, array{label: string, roles: list<DeviceSourceRole>, scope: string}>,
      * }>
      */
     public static function definitions(): array
@@ -70,6 +72,13 @@ final class IntegrationCatalog
                     'mail' => __($entraScopes['mail']['label']),
                 ],
                 'docs_url' => 'https://learn.microsoft.com/entra/identity-platform/quickstart-register-app',
+                'device_sources' => [
+                    DeviceSourceKey::MICROSOFT_INTUNE => [
+                        'label' => __('Intune'),
+                        'roles' => [DeviceSourceRole::DeviceManagement],
+                        'scope' => 'computers',
+                    ],
+                ],
             ],
             IntegrationType::ACTION1 => [
                 'type' => IntegrationType::ACTION1,
@@ -89,6 +98,13 @@ final class IntegrationCatalog
                     'alerts' => __('Alerts (audit events poll)'),
                 ],
                 'docs_url' => 'https://www.action1.com/api-documentation/',
+                'device_sources' => [
+                    DeviceSourceKey::ACTION1 => [
+                        'label' => __('Action1'),
+                        'roles' => [DeviceSourceRole::RemoteManagement],
+                        'scope' => 'endpoints',
+                    ],
+                ],
             ],
             IntegrationType::GOOGLE_WORKSPACE => [
                 'type' => IntegrationType::GOOGLE_WORKSPACE,
@@ -106,12 +122,13 @@ final class IntegrationCatalog
                     'mail' => __('Mail (Gmail API)'),
                 ],
                 'docs_url' => 'https://developers.google.com/workspace/guides/create-credentials#service-account',
+                'device_sources' => [],
             ],
         ];
     }
 
     /**
-     * @return array{type: string, name: string, vendor: string, summary: string, categories: list<string>, icon: Heroicon, setup_minutes: int, requirements: list<string>, capabilities: array<string, string>, docs_url: ?string}|null
+     * @return array{type: string, name: string, vendor: string, summary: string, categories: list<string>, icon: Heroicon, setup_minutes: int, requirements: list<string>, capabilities: array<string, string>, docs_url: ?string, device_sources: array<string, array{label: string, roles: list<DeviceSourceRole>, scope: string}>}|null
      */
     public static function find(string $type): ?array
     {

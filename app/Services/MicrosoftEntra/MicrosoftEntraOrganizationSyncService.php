@@ -3,6 +3,7 @@
 namespace App\Services\MicrosoftEntra;
 
 use App\Data\AssetProviderSnapshot;
+use App\Data\DeviceSourceRecordData;
 use App\Enums\AssetExternalIdentifierType;
 use App\Enums\OrganizationType;
 use App\Models\AssetType;
@@ -13,9 +14,11 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Services\AssetReconciliationService;
 use App\Services\AssetRetirementService;
+use App\Services\DeviceSourceRecordService;
 use App\Services\MonitoringEventAssetLinker;
 use App\Services\TenantContext;
 use App\Support\AssetIdentityNormalizer;
+use App\Support\DeviceSourceKey;
 use App\Support\EntraSyncTarget;
 use App\Support\IntegrationHealth\IntegrationHealthRecorder;
 use App\Support\IntegrationType;
@@ -44,6 +47,7 @@ final class MicrosoftEntraOrganizationSyncService
         private readonly AssetReconciliationService $assetReconciliationService,
         private readonly AssetRetirementService $assetRetirementService,
         private readonly MonitoringEventAssetLinker $monitoringEventAssetLinker,
+        private readonly DeviceSourceRecordService $deviceSourceRecordService,
     ) {}
 
     public function sync(EntraSyncTarget $target): void
@@ -320,8 +324,10 @@ final class MicrosoftEntraOrganizationSyncService
             []
         );
 
+        $syncStartedAt = now();
+
         foreach ($client->paginateCollection('deviceManagement/managedDevices', [
-            '$select' => 'id,deviceName,serialNumber,emailAddress,userPrincipalName,azureADDeviceId,operatingSystem',
+            '$select' => 'id,deviceName,serialNumber,emailAddress,userPrincipalName,azureADDeviceId,operatingSystem,osVersion,lastSyncDateTime,enrolledDateTime,managementAgent,complianceState,wiFiMacAddress,ethernetMacAddress',
             '$top' => 100,
         ]) as $device) {
             $azureAdDeviceId = trim((string) ($device['azureADDeviceId'] ?? ''));
@@ -390,10 +396,37 @@ final class MicrosoftEntraOrganizationSyncService
                     'lifecycle_status' => 'in_use',
                     'asset_type_id' => $assetType->getKey(),
                 ], fn (mixed $value): bool => $value !== null && $value !== ''),
+                sourceRecord: new DeviceSourceRecordData(
+                    source: DeviceSourceKey::MICROSOFT_INTUNE,
+                    providerRecordId: $intuneManagedDeviceId !== '' ? $intuneManagedDeviceId : $azureAdDeviceId,
+                    displayName: $deviceName !== '' ? $deviceName : null,
+                    hostname: $deviceName !== '' ? $deviceName : null,
+                    serialNumber: $serial,
+                    macAddresses: array_values(array_filter([
+                        (string) ($device['wiFiMacAddress'] ?? ''),
+                        (string) ($device['ethernetMacAddress'] ?? ''),
+                    ])),
+                    operatingSystem: trim((string) ($device['operatingSystem'] ?? '')) ?: null,
+                    lastActivityAt: DeviceSourceRecordData::parseActivityTime($device['lastSyncDateTime'] ?? null),
+                    metadata: array_filter([
+                        'os_version' => $device['osVersion'] ?? null,
+                        'management_agent' => $device['managementAgent'] ?? null,
+                        'compliance_state' => $device['complianceState'] ?? null,
+                        'enrolled_at' => $device['enrolledDateTime'] ?? null,
+                        'azure_ad_device_id' => $azureAdDeviceId !== '' ? $azureAdDeviceId : null,
+                    ], fn (mixed $value): bool => $value !== null && $value !== ''),
+                ),
             );
 
             $this->assetReconciliationService->reconcile($snapshot);
         }
+
+        $this->deviceSourceRecordService->markMissingAsGone(
+            $target->tenantId,
+            $target->integrationId,
+            DeviceSourceKey::MICROSOFT_INTUNE,
+            $syncStartedAt,
+        );
     }
 
     private function syncSecurityIncidents(

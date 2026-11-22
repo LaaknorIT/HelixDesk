@@ -14,6 +14,7 @@ use App\Filament\Agent\Resources\Assets\RelationManagers\PatchItemsRelationManag
 use App\Filament\Agent\Resources\Assets\RelationManagers\PatchStatusesRelationManager;
 use App\Filament\Agent\Resources\Assets\RelationManagers\ServiceOfferingsRelationManager;
 use App\Filament\Agent\Resources\Assets\RelationManagers\SoftwareInstallationsRelationManager;
+use App\Filament\Agent\Resources\Assets\RelationManagers\SourceRecordsRelationManager;
 use App\Filament\Agent\Resources\Assets\Schemas\AssetForm;
 use App\Filament\Agent\Resources\Assets\Schemas\AssetInfolist;
 use App\Filament\Agent\Resources\Assets\Tables\AssetsTable;
@@ -93,6 +94,7 @@ class AssetResource extends Resource
     public static function getRelations(): array
     {
         return [
+            SourceRecordsRelationManager::class,
             ExternalIdentifiersRelationManager::class,
             SoftwareInstallationsRelationManager::class,
             PatchStatusesRelationManager::class,

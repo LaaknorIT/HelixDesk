@@ -19,6 +19,7 @@ final class AssetProviderSnapshot
         public array $identifiers,
         public array $attributes = [],
         public array $satellite = [],
+        public ?DeviceSourceRecordData $sourceRecord = null,
     ) {}
 
     public function identifierValue(AssetExternalIdentifierType $type): ?string

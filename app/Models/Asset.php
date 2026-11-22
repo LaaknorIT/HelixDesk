@@ -110,6 +110,11 @@ class Asset extends TenantModel
         return $this->hasMany(AssetExternalIdentifier::class);
     }
 
+    public function sourceRecords(): HasMany
+    {
+        return $this->hasMany(AssetSourceRecord::class);
+    }
+
     public function softwareInstallations(): HasMany
     {
         return $this->hasMany(AssetSoftwareInstallation::class);

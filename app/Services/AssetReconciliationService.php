@@ -21,9 +21,23 @@ final class AssetReconciliationService
 {
     public function __construct(
         private readonly AssetAttributeMerger $attributeMerger,
+        private readonly DeviceSourceRecordService $deviceSourceRecordService,
     ) {}
 
+    /**
+     * Resolves the snapshot to an asset (or an ambiguity) and stores the snapshot's device source record,
+     * linked to the resolved asset.
+     */
     public function reconcile(AssetProviderSnapshot $snapshot): AssetReconciliationResult
+    {
+        $result = $this->resolve($snapshot);
+
+        $this->deviceSourceRecordService->record($snapshot, $result->ambiguous ? null : $result->asset);
+
+        return $result;
+    }
+
+    private function resolve(AssetProviderSnapshot $snapshot): AssetReconciliationResult
     {
         $matchedAsset = $this->findHardMatchedAsset($snapshot);
 

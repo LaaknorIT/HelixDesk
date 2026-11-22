@@ -795,5 +795,21 @@
     "work items": "saker",
     "your organization": "organisasjonen din",
     "{1} :count ticket updated|[2,*] :count tickets updated": "{1} :count sak oppdatert|[2,*] :count saker oppdatert",
-    "{1} :count ticket was skipped: you may not change it, or the status change is not allowed.|[2,*] :count tickets were skipped: you may not change them, or the status change is not allowed.": "{1} :count sak ble hoppet over: du kan ikke endre den, eller statusendringen er ikke tillatt.|[2,*] :count saker ble hoppet over: du kan ikke endre dem, eller statusendringen er ikke tillatt."
+    "{1} :count ticket was skipped: you may not change it, or the status change is not allowed.|[2,*] :count tickets were skipped: you may not change them, or the status change is not allowed.": "{1} :count sak ble hoppet over: du kan ikke endre den, eller statusendringen er ikke tillatt.|[2,*] :count saker ble hoppet over: du kan ikke endre dem, eller statusendringen er ikke tillatt.",
+    "Sources": "Kilder",
+    "Stale": "Utdatert",
+    "No longer reported": "Rapporteres ikke lenger",
+    "Class": "Klasse",
+    "Last active": "Sist aktiv",
+    "Last reported": "Sist rapportert",
+    "Source ID": "Kilde-ID",
+    "Workstation": "Arbeidsstasjon",
+    "Server": "Server",
+    "Mobile": "Mobil",
+    "Directory": "Katalog",
+    "Device management (MDM)": "Enhetsadministrasjon (MDM)",
+    "Remote management (RMM)": "Fjernadministrasjon (RMM)",
+    "Endpoint security": "Endepunktsikkerhet",
+    "Intune": "Intune",
+    "Action1": "Action1"
 }
