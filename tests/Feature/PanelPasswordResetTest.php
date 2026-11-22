@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Auth\Login;
 use App\Filament\Auth\RequestPasswordReset;
 use App\Models\Tenant;
 use App\Models\User;
@@ -16,14 +17,16 @@ class PanelPasswordResetTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_every_panel_login_page_links_to_password_reset(): void
+    public function test_shared_login_page_links_to_the_shared_password_reset_page(): void
     {
-        foreach (['global-admin', 'agent', 'end-user'] as $panelId) {
-            $this->get("/{$panelId}/login")
-                ->assertOk()
-                ->assertSee(route("filament.{$panelId}.auth.password-reset.request"), escape: false);
+        $this->get('/login')
+            ->assertOk()
+            ->assertSee(route('password.request'), escape: false);
 
-            $this->get("/{$panelId}/password-reset/request")->assertOk();
+        $this->get('/password-reset')->assertOk();
+
+        foreach (['global-admin', 'agent', 'end-user'] as $panelId) {
+            $this->get("/{$panelId}/password-reset/request")->assertRedirect(route('password.request'));
         }
     }
 
@@ -33,21 +36,48 @@ class PanelPasswordResetTest extends TestCase
 
         $endUser = $this->endUser();
 
-        Filament::setCurrentPanel('end-user');
+        Filament::setCurrentPanel(Login::SHARED_PANEL);
 
         Livewire::test(RequestPasswordReset::class)
             ->fillForm(['email' => $endUser->email])
             ->call('request')
             ->assertNotified(__('passwords.sent'));
 
-        Notification::assertSentTo($endUser, ResetPassword::class);
+        Notification::assertSentTo(
+            $endUser,
+            ResetPassword::class,
+            fn (ResetPassword $notification): bool => str_starts_with($notification->url, url('/end-user/password-reset/reset')),
+        );
+    }
+
+    public function test_agent_receives_a_reset_link_into_the_agent_panel(): void
+    {
+        Notification::fake();
+
+        $agent = User::factory()->create([
+            'tenant_id' => Tenant::factory()->create()->id,
+            'type' => 'agent',
+        ]);
+
+        Filament::setCurrentPanel(Login::SHARED_PANEL);
+
+        Livewire::test(RequestPasswordReset::class)
+            ->fillForm(['email' => $agent->email])
+            ->call('request')
+            ->assertNotified(__('passwords.sent'));
+
+        Notification::assertSentTo(
+            $agent,
+            ResetPassword::class,
+            fn (ResetPassword $notification): bool => str_starts_with($notification->url, url('/agent/password-reset/reset')),
+        );
     }
 
     public function test_unknown_email_gets_the_same_response_as_a_known_one(): void
     {
         Notification::fake();
 
-        Filament::setCurrentPanel('end-user');
+        Filament::setCurrentPanel(Login::SHARED_PANEL);
 
         Livewire::test(RequestPasswordReset::class)
             ->fillForm(['email' => 'nobody@example.test'])
@@ -61,7 +91,7 @@ class PanelPasswordResetTest extends TestCase
     {
         $endUser = $this->endUser();
 
-        Filament::setCurrentPanel('end-user');
+        Filament::setCurrentPanel(Login::SHARED_PANEL);
 
         Notification::fake();
 
@@ -77,16 +107,17 @@ class PanelPasswordResetTest extends TestCase
         Notification::assertSentToTimes($endUser, ResetPassword::class, 1);
     }
 
-    public function test_user_without_access_to_the_panel_gets_no_reset_link(): void
+    public function test_user_without_access_to_any_panel_gets_no_reset_link(): void
     {
         Notification::fake();
 
         $agent = User::factory()->create([
-            'tenant_id' => Tenant::factory()->create()->id,
+            'tenant_id' => null,
             'type' => 'agent',
+            'is_admin' => false,
         ]);
 
-        Filament::setCurrentPanel('end-user');
+        Filament::setCurrentPanel(Login::SHARED_PANEL);
 
         Livewire::test(RequestPasswordReset::class)
             ->fillForm(['email' => $agent->email])
@@ -107,7 +138,7 @@ class PanelPasswordResetTest extends TestCase
             'password' => null,
         ]);
 
-        Filament::setCurrentPanel('end-user');
+        Filament::setCurrentPanel(Login::SHARED_PANEL);
 
         Livewire::test(RequestPasswordReset::class)
             ->fillForm(['email' => $syncedUser->email])
