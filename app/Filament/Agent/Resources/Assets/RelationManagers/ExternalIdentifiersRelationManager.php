@@ -21,18 +21,18 @@ class ExternalIdentifiersRelationManager extends RelationManager
                 TextColumn::make('provider')
                     ->badge(),
                 TextColumn::make('identifier_type')
-                    ->label('Type')
+                    ->label(__('Type'))
                     ->badge(),
                 TextColumn::make('external_id')
-                    ->label('External ID')
+                    ->label(__('External ID'))
                     ->searchable()
                     ->copyable(),
                 IconColumn::make('is_primary')
                     ->boolean()
-                    ->label('Primary'),
+                    ->label(__('Primary')),
                 TextColumn::make('last_seen_at')
                     ->dateTime()
-                    ->placeholder('—'),
+                    ->placeholder(__('—')),
             ])
             ->paginated([10, 25, 50]);
     }

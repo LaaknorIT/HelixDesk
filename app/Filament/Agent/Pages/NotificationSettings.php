@@ -4,6 +4,7 @@ namespace App\Filament\Agent\Pages;
 
 use App\Enums\AgentNotificationChannel;
 use App\Enums\WorkItemNotificationEvent;
+use App\Filament\Concerns\TranslatesPageLabels;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -19,6 +20,8 @@ use Illuminate\Support\Facades\Auth;
 
 class NotificationSettings extends Page
 {
+    use TranslatesPageLabels;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBell;
 
     protected static ?string $title = 'Notification settings';
@@ -60,12 +63,12 @@ class NotificationSettings extends Page
         return $schema
             ->components([
                 CheckboxList::make(AgentNotificationChannel::Mail->value)
-                    ->label('Email me about')
+                    ->label(__('Email me about'))
                     ->options(WorkItemNotificationEvent::options())
                     ->bulkToggleable(),
                 CheckboxList::make(AgentNotificationChannel::Database->value)
-                    ->label('Show in HelixDesk')
-                    ->helperText('In-app notifications appear under the bell icon.')
+                    ->label(__('Show in HelixDesk'))
+                    ->helperText(__('In-app notifications appear under the bell icon.'))
                     ->options(WorkItemNotificationEvent::options())
                     ->bulkToggleable(),
             ])
@@ -82,7 +85,7 @@ class NotificationSettings extends Page
                     ->footer([
                         Actions::make([
                             Action::make('save')
-                                ->label('Save')
+                                ->label(__('Save'))
                                 ->submit('save'),
                         ]),
                     ]),
@@ -106,7 +109,7 @@ class NotificationSettings extends Page
         $user->forceFill(['notification_preferences' => $preferences])->save();
 
         Notification::make()
-            ->title('Notification settings saved')
+            ->title(__('Notification settings saved'))
             ->success()
             ->send();
     }

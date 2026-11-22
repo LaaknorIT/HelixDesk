@@ -11,6 +11,7 @@ use App\Filament\Agent\Resources\SoftwareDeployments\RelationManagers\LicensesRe
 use App\Filament\Agent\Resources\SoftwareDeployments\RelationManagers\ServiceOfferingsRelationManager;
 use App\Filament\Agent\Resources\SoftwareDeployments\Schemas\SoftwareDeploymentForm;
 use App\Filament\Agent\Resources\SoftwareDeployments\Tables\SoftwareDeploymentsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\SoftwareDeployment;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -23,13 +24,15 @@ use UnitEnum;
 
 class SoftwareDeploymentResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = SoftwareDeployment::class;
 
     protected static ?string $navigationLabel = 'Software deployments';
 
-    protected static ?string $modelLabel = 'Software deployment';
+    protected static ?string $modelLabel = 'software deployment';
 
-    protected static ?string $pluralModelLabel = 'Software deployments';
+    protected static ?string $pluralModelLabel = 'software deployments';
 
     protected static ?int $navigationSort = 35;
 

@@ -28,7 +28,7 @@ class ParentAssetRelationshipsRelationManager extends RelationManager
             Hidden::make('tenant_id')
                 ->default(fn (): int => $this->ownerRecord->tenant_id),
             Select::make('parent_asset_id')
-                ->label('Related asset')
+                ->label(__('Related asset'))
                 ->relationship(
                     'parentAsset',
                     'name',
@@ -42,10 +42,10 @@ class ParentAssetRelationshipsRelationManager extends RelationManager
                 ->preload()
                 ->required(),
             TextInput::make('relationship_type')
-                ->label('Relationship type')
+                ->label(__('Relationship type'))
                 ->required()
                 ->maxLength(255)
-                ->helperText('Examples: contains, depends_on, runs_on, connected_to'),
+                ->helperText(__('Examples: contains, depends_on, runs_on, connected_to')),
         ]);
     }
 
@@ -55,12 +55,12 @@ class ParentAssetRelationshipsRelationManager extends RelationManager
             ->recordTitleAttribute('relationship_type')
             ->columns([
                 TextColumn::make('parentAsset.name')
-                    ->label('Asset')
+                    ->label(__('Asset'))
                     ->searchable(),
                 TextColumn::make('parentAsset.assetType.name')
-                    ->label('Type'),
+                    ->label(__('Type')),
                 TextColumn::make('relationship_type')
-                    ->label('Relationship')
+                    ->label(__('Relationship'))
                     ->badge(),
             ])
             ->headerActions([

@@ -28,27 +28,27 @@ class OrganizationsTable
                     ->formatStateUsing(fn (OrganizationType $state): string => $state->label())
                     ->sortable(),
                 TextColumn::make('parent.name')
-                    ->label('Parent')
-                    ->placeholder('—')
+                    ->label(__('Parent'))
+                    ->placeholder(__('—'))
                     ->sortable(),
                 IconColumn::make('is_billable')
-                    ->label('Billable')
+                    ->label(__('Billable'))
                     ->boolean()
                     ->toggleable(),
                 TextColumn::make('external_reference')
-                    ->placeholder('—')
+                    ->placeholder(__('—'))
                     ->toggleable(),
                 TextColumn::make('users_count')
                     ->counts('users')
-                    ->label('Users')
+                    ->label(__('Users'))
                     ->sortable(),
                 TextColumn::make('children_count')
                     ->counts('children')
-                    ->label('Children')
+                    ->label(__('Children'))
                     ->sortable(),
                 TextColumn::make('assets_count')
                     ->counts('assets')
-                    ->label('Assets')
+                    ->label(__('Assets'))
                     ->sortable(),
             ])
             ->filters([

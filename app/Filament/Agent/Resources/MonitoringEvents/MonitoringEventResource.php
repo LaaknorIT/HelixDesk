@@ -4,6 +4,7 @@ namespace App\Filament\Agent\Resources\MonitoringEvents;
 
 use App\Filament\Agent\Resources\MonitoringEvents\Pages\ListMonitoringEvents;
 use App\Filament\Agent\Resources\MonitoringEvents\Tables\MonitoringEventsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\MonitoringEvent;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -11,14 +12,19 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use UnitEnum;
 
 class MonitoringEventResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = MonitoringEvent::class;
 
     protected static ?string $navigationLabel = 'Monitoring events';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 36;
+
+    protected static string|UnitEnum|null $navigationGroup = 'Infrastructure';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSignal;
 

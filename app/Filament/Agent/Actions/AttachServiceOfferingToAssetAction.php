@@ -14,7 +14,7 @@ final class AttachServiceOfferingToAssetAction extends AttachAction
         $this->schema(fn (): array => [
             $this->getRecordSelect(),
             TextInput::make('role')
-                ->label('Realization role')
+                ->label(__('Realization role'))
                 ->required()
                 ->maxLength(255)
                 ->helperText(__('Use roles appropriate for the offering kind (e.g. primary_access, financial_application).')),

@@ -21,16 +21,16 @@ class WorkItemStatusForm
                     ->default(0)
                     ->required(),
                 Toggle::make('is_default_open')
-                    ->label('Default open status')
+                    ->label(__('Default open status'))
                     ->default(false),
                 Toggle::make('pauses_sla')
-                    ->label('Pauses SLA timer')
+                    ->label(__('Pauses SLA timer'))
                     ->default(false),
                 Toggle::make('sets_resolved_at')
-                    ->label('Sets resolved timestamp')
+                    ->label(__('Sets resolved timestamp'))
                     ->default(false),
                 Toggle::make('sets_closed_at')
-                    ->label('Sets closed timestamp')
+                    ->label(__('Sets closed timestamp'))
                     ->default(false),
                 ColorPicker::make('color')
                     ->nullable(),

@@ -18,10 +18,10 @@ class SoftwareProductForm
                     ->required()
                     ->maxLength(255),
                 TextInput::make('vendor_name')
-                    ->label('Vendor')
+                    ->label(__('Vendor'))
                     ->maxLength(255),
                 Select::make('supplier_id')
-                    ->label('Supplier')
+                    ->label(__('Supplier'))
                     ->relationship('supplier', 'name')
                     ->searchable()
                     ->preload()
@@ -29,16 +29,16 @@ class SoftwareProductForm
                 TextInput::make('category')
                     ->maxLength(255),
                 TextInput::make('external_reference')
-                    ->label('External reference')
+                    ->label(__('External reference'))
                     ->maxLength(255),
                 Toggle::make('is_active')
-                    ->label('Active')
+                    ->label(__('Active'))
                     ->default(true),
                 Textarea::make('description')
                     ->columnSpanFull(),
                 Textarea::make('partner_notes')
-                    ->label('Partner notes')
-                    ->helperText('Short MSP-facing partner context. Prefer Documents for full partner documentation.')
+                    ->label(__('Partner notes'))
+                    ->helperText(__('Short MSP-facing partner context. Prefer Documents for full partner documentation.'))
                     ->columnSpanFull(),
             ]);
     }

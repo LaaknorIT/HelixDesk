@@ -9,6 +9,7 @@ use App\Filament\Agent\Resources\SoftwareProducts\RelationManagers\DeploymentsRe
 use App\Filament\Agent\Resources\SoftwareProducts\RelationManagers\DocumentsRelationManager;
 use App\Filament\Agent\Resources\SoftwareProducts\Schemas\SoftwareProductForm;
 use App\Filament\Agent\Resources\SoftwareProducts\Tables\SoftwareProductsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\SoftwareProduct;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -21,13 +22,15 @@ use UnitEnum;
 
 class SoftwareProductResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = SoftwareProduct::class;
 
     protected static ?string $navigationLabel = 'Software products';
 
-    protected static ?string $modelLabel = 'Software product';
+    protected static ?string $modelLabel = 'software product';
 
-    protected static ?string $pluralModelLabel = 'Software products';
+    protected static ?string $pluralModelLabel = 'software products';
 
     protected static ?int $navigationSort = 34;
 

@@ -18,11 +18,11 @@ class CannedResponsesTable
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('queue.name')
-                    ->label('Queue')
-                    ->placeholder('All queues')
+                    ->label(__('Queue'))
+                    ->placeholder(__('All queues'))
                     ->sortable(),
                 TextColumn::make('body')
-                    ->label('Text')
+                    ->label(__('Text'))
                     ->limit(80)
                     ->searchable(),
             ])

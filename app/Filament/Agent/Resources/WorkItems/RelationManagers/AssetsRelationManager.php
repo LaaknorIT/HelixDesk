@@ -21,10 +21,10 @@ class AssetsRelationManager extends RelationManager
             ->recordTitleAttribute('name')
             ->columns([
                 TextColumn::make('name')
-                    ->label('Name')
+                    ->label(__('Name'))
                     ->searchable(),
                 TextColumn::make('assetType.name')
-                    ->label('Type'),
+                    ->label(__('Type')),
                 TextColumn::make('lifecycle_status')
                     ->badge(),
             ])

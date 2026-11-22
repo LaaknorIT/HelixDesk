@@ -36,22 +36,24 @@ class AgentPanelNavigationTest extends TestCase
         $labels = $this->registeredNavigationGroupLabels();
 
         $this->assertSame([
-            'Customers',
             'Service management',
+            'Customers and people',
             'Infrastructure',
             'Knowledge',
+            'Ticket setup',
             'Administration',
         ], $labels);
     }
 
-    public function test_customers_navigation_group_is_expanded_and_secondary_groups_are_collapsed(): void
+    public function test_daily_work_groups_are_expanded_and_setup_groups_are_collapsed(): void
     {
         $collapsedByLabel = $this->registeredNavigationGroupCollapsedState();
 
-        $this->assertFalse($collapsedByLabel['Customers']);
-        $this->assertTrue($collapsedByLabel['Service management']);
+        $this->assertFalse($collapsedByLabel['Customers and people']);
+        $this->assertFalse($collapsedByLabel['Service management']);
         $this->assertTrue($collapsedByLabel['Infrastructure']);
         $this->assertTrue($collapsedByLabel['Knowledge']);
+        $this->assertTrue($collapsedByLabel['Ticket setup']);
         $this->assertTrue($collapsedByLabel['Administration']);
     }
 
@@ -60,8 +62,8 @@ class AgentPanelNavigationTest extends TestCase
         $this->assertNull(WorkItemResource::getNavigationGroup());
         $this->assertSame(1, WorkItemResource::getNavigationSort());
 
-        $this->assertNull(MonitoringEventResource::getNavigationGroup());
-        $this->assertSame(2, MonitoringEventResource::getNavigationSort());
+        $this->assertSame('Infrastructure', MonitoringEventResource::getNavigationGroup());
+        $this->assertSame(36, MonitoringEventResource::getNavigationSort());
 
         $this->assertSame('Customers', OrganizationResource::getNavigationGroup());
         $this->assertSame(10, OrganizationResource::getNavigationSort());
@@ -100,7 +102,7 @@ class AgentPanelNavigationTest extends TestCase
         $this->assertSame('Documents', DocumentResource::getNavigationLabel());
         $this->assertSame(40, DocumentResource::getNavigationSort());
 
-        $this->assertSame('Administration', QueueResource::getNavigationGroup());
+        $this->assertSame('Ticket setup', QueueResource::getNavigationGroup());
         $this->assertSame(50, QueueResource::getNavigationSort());
 
         $this->assertSame('Administration', MailAccountResource::getNavigationGroup());
@@ -139,11 +141,11 @@ class AgentPanelNavigationTest extends TestCase
             $topLevelLabels = $this->navigationItemLabelsForGroup($navigation, null);
             $this->assertContains('Dashboard', $topLevelLabels);
             $this->assertContains('Tickets', $topLevelLabels);
-            $this->assertContains('Monitoring events', $topLevelLabels);
+            $this->assertNotContains('Monitoring events', $topLevelLabels);
 
             $this->assertSame(
                 ['Customers', 'People'],
-                $this->navigationItemLabelsForGroup($navigation, 'Customers'),
+                $this->navigationItemLabelsForGroup($navigation, 'Customers and people'),
             );
 
             $this->assertSame(
@@ -152,7 +154,7 @@ class AgentPanelNavigationTest extends TestCase
             );
 
             $this->assertSame(
-                ['Assets', 'Service offerings', 'Suppliers', 'Identity ambiguities', 'Software products', 'Software deployments'],
+                ['Assets', 'Service offerings', 'Suppliers', 'Identity ambiguities', 'Software products', 'Software deployments', 'Monitoring events'],
                 $this->navigationItemLabelsForGroup($navigation, 'Infrastructure'),
             );
 
@@ -164,16 +166,22 @@ class AgentPanelNavigationTest extends TestCase
             $this->assertSame(
                 [
                     'Queues',
-                    'Mail accounts',
-                    'Roles',
-                    'Integration settings',
-                    'Dashboard layouts',
                     'Ticket statuses',
                     'Ticket transitions',
                     'Categories',
                     'Ticket automations',
                     'Canned responses',
                     'SLA policies',
+                ],
+                $this->navigationItemLabelsForGroup($navigation, 'Ticket setup'),
+            );
+
+            $this->assertSame(
+                [
+                    'Mail accounts',
+                    'Roles',
+                    'Integration settings',
+                    'Dashboard layouts',
                 ],
                 $this->navigationItemLabelsForGroup($navigation, 'Administration'),
             );

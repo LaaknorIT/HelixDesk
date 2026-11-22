@@ -17,7 +17,7 @@ final class AttachOfferingSupplierAction extends AttachAction
         $this->schema(fn (): array => [
             $this->getRecordSelect(),
             Select::make('role')
-                ->label('Supplier role')
+                ->label(__('Supplier role'))
                 ->options(array_combine($roles, $roles))
                 ->required(),
             Textarea::make('notes')

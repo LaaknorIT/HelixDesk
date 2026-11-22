@@ -17,6 +17,7 @@ use App\Filament\Agent\Resources\Assets\RelationManagers\SoftwareInstallationsRe
 use App\Filament\Agent\Resources\Assets\Schemas\AssetForm;
 use App\Filament\Agent\Resources\Assets\Schemas\AssetInfolist;
 use App\Filament\Agent\Resources\Assets\Tables\AssetsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\Asset;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -29,6 +30,8 @@ use UnitEnum;
 
 class AssetResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = Asset::class;
 
     protected static ?int $navigationSort = 30;

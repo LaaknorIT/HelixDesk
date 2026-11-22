@@ -31,10 +31,10 @@ class ProblemForm
                 Select::make('status')
                     ->required()
                     ->options([
-                        'open' => 'Open',
-                        'under_investigation' => 'Under investigation',
-                        'resolved' => 'Resolved',
-                        'closed' => 'Closed',
+                        'open' => __('Open'),
+                        'under_investigation' => __('Under investigation'),
+                        'resolved' => __('Resolved'),
+                        'closed' => __('Closed'),
                     ])
                     ->default('open'),
             ]);

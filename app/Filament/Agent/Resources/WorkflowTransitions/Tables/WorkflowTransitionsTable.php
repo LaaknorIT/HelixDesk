@@ -15,16 +15,16 @@ class WorkflowTransitionsTable
         return $table
             ->columns([
                 TextColumn::make('from_status')
-                    ->label('From')
+                    ->label(__('From'))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('to_status')
-                    ->label('To')
+                    ->label(__('To'))
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('required_permission')
-                    ->label('Permission')
-                    ->placeholder('Anyone (incl. end user)')
+                    ->label(__('Permission'))
+                    ->placeholder(__('Anyone (incl. end user)'))
                     ->toggleable(),
             ])
             ->defaultSort('from_status')

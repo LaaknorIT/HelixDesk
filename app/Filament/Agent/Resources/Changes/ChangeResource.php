@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\Changes\Pages\EditChange;
 use App\Filament\Agent\Resources\Changes\Pages\ListChanges;
 use App\Filament\Agent\Resources\Changes\Schemas\ChangeForm;
 use App\Filament\Agent\Resources\Changes\Tables\ChangesTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\Change;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -19,6 +20,8 @@ use UnitEnum;
 
 class ChangeResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = Change::class;
 
     protected static ?int $navigationSort = 20;

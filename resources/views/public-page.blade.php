@@ -115,7 +115,11 @@
             .contact dt { font-weight: 600; }
             .contact dd { margin: 0; color: var(--muted); overflow-wrap: anywhere; }
 
-            footer { padding: 2rem 0; color: var(--muted); font-size: 0.875rem; }
+            footer { padding: 2rem 0; color: var(--muted); font-size: 0.875rem; border-top: 1px solid var(--border); }
+            .footer-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem 1.5rem; }
+            .footer-row nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+
+            .button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         </style>
     </head>
     <body>
@@ -138,6 +142,10 @@
                 @if ($introduction)
                     <div class="intro">{!! $introduction !!}</div>
                 @endif
+
+                @unless ($workspaceUrl)
+                    <a class="button" href="{{ route('login') }}">{{ __('Sign in to report an issue') }}</a>
+                @endunless
             </section>
 
             @if ($page->hasPublicAnnouncement())
@@ -189,7 +197,21 @@
         </main>
 
         <footer>
-            <div class="wrap">{{ config('app.name', 'HelixDesk') }}</div>
+            <div class="wrap footer-row">
+                <span>{{ config('app.name', 'HelixDesk') }}</span>
+
+                <nav aria-label="{{ __('Footer') }}">
+                    @if ($workspaceUrl)
+                        <a href="{{ $workspaceUrl }}">{{ __('Go to your workspace') }}</a>
+                    @else
+                        <a href="{{ route('login') }}">{{ __('Sign in') }}</a>
+                    @endif
+
+                    @if ($page->hasPublicContact() && filled($page->contact_email))
+                        <a href="mailto:{{ $page->contact_email }}">{{ $page->contact_email }}</a>
+                    @endif
+                </nav>
+            </div>
         </footer>
     </body>
 </html>

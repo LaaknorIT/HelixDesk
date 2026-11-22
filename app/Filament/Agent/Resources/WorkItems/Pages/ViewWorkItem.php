@@ -2,6 +2,7 @@
 
 namespace App\Filament\Agent\Resources\WorkItems\Pages;
 
+use App\Enums\WorkItemPriority;
 use App\Filament\Agent\Resources\WorkItems\Schemas\WorkItemInfolist;
 use App\Filament\Agent\Resources\WorkItems\WorkItemResource;
 use App\Models\CannedResponse;
@@ -13,15 +14,17 @@ use App\Services\WorkItems\WorkItemCollaborationService;
 use App\Services\WorkItemWorkflowService;
 use App\Support\HelixdeskWorkItemAuthorization;
 use App\Support\WorkItemQueueScope;
+use App\Support\WorkItemStatusDisplay;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
-use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -70,7 +73,7 @@ class ViewWorkItem extends ViewRecord
 
     public function getTitle(): string|Htmlable
     {
-        return '#'.$this->getRecord()->getKey();
+        return '#'.$this->getRecord()->getKey().' · '.$this->getRecord()->title;
     }
 
     public function content(Schema $schema): Schema
@@ -101,33 +104,35 @@ class ViewWorkItem extends ViewRecord
     {
         return $schema
             ->components([
-                Section::make('Quick actions')
+                Section::make(__('Quick actions'))
                     ->schema([
+                        // Each change is saved right away, so there is no separate Apply button.
                         Select::make('to_status')
-                            ->label('Status')
-                            ->placeholder('Select status')
-                            ->options(fn (): array => $this->availableStatusOptions()),
+                            ->label(__('Change status'))
+                            ->placeholder(fn (): string => __('Now: :status', ['status' => WorkItemStatusDisplay::label($this->getRecord()->status)]))
+                            ->options(fn (): array => $this->availableStatusOptions())
+                            ->live()
+                            ->afterStateUpdated(fn () => $this->applyQuickActions()),
                         Select::make('priority')
-                            ->label('Priority')
+                            ->label(__('Priority'))
                             ->options(fn (): array => $this->priorityOptions())
-                            ->default(fn (): string => (string) $this->getRecord()->priority),
+                            ->selectablePlaceholder(false)
+                            ->live()
+                            ->afterStateUpdated(fn () => $this->applyQuickActions()),
                         Select::make('assigned_agent_id')
-                            ->label('Assign to')
-                            ->placeholder('Unassigned')
+                            ->label(__('Assigned to'))
+                            ->placeholder(__('Unassigned'))
                             ->options(fn (): array => $this->agentOptions())
-                            ->default(fn (): ?int => $this->getRecord()->assigned_agent_id),
-                        Actions::make([
-                            Action::make('applyQuickActions')
-                                ->label('Apply')
-                                ->action('applyQuickActions'),
-                        ]),
+                            ->searchable()
+                            ->live()
+                            ->afterStateUpdated(fn () => $this->applyQuickActions()),
                     ])
-                    ->columns(['default' => 1, 'sm' => 2, 'lg' => 4]),
-                Section::make('Compose response')
+                    ->columns(['default' => 1, 'sm' => 3]),
+                Section::make(__('Compose response'))
                     ->schema([
                         Select::make('canned_response_id')
-                            ->label('Canned response')
-                            ->placeholder('Insert a canned response…')
+                            ->label(__('Canned response'))
+                            ->placeholder(__('Insert a canned response…'))
                             ->options(fn (): array => $this->cannedResponseOptions())
                             ->searchable()
                             ->live()
@@ -148,19 +153,25 @@ class ViewWorkItem extends ViewRecord
                                 $current = rtrim((string) $get('body'));
                                 $set('body', $current === '' ? $text : $current."\n\n".$text);
                             }),
-                        Select::make('parent_message_id')
-                            ->label('Reply to')
-                            ->placeholder('Top-level reply')
-                            ->options(fn (): array => $this->replyTargetOptions()),
                         Textarea::make('body')
-                            ->label('Message')
-                            ->placeholder('Type your reply to the requester…')
-                            ->rows(4),
-                        Checkbox::make('is_internal')
-                            ->label('Internal note (not visible to requester)'),
+                            ->label(__('Message'))
+                            ->placeholder(__('Type your reply to the requester…'))
+                            ->required()
+                            ->rows(5),
+                        Grid::make(['default' => 1, 'sm' => 2])
+                            ->schema([
+                                Toggle::make('is_internal')
+                                    ->label(__('Internal note (not visible to requester)'))
+                                    ->live(),
+                                Select::make('status_after_reply')
+                                    ->label(__('Then set status to'))
+                                    ->placeholder(__('Keep current status'))
+                                    ->options(fn (): array => $this->availableStatusOptions()),
+                            ]),
                         Actions::make([
                             Action::make('sendReply')
-                                ->label('Send reply')
+                                ->label(fn (Get $get): string => $get('is_internal') ? __('Add internal note') : __('Send reply'))
+                                ->icon(Heroicon::OutlinedPaperAirplane)
                                 ->action('sendReply'),
                         ]),
                     ]),
@@ -170,29 +181,43 @@ class ViewWorkItem extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('takeTicket')
+                ->label(__('Take ticket'))
+                ->icon(Heroicon::OutlinedHandRaised)
+                ->visible(fn (): bool => $this->getRecord()->assigned_agent_id === null && $this->canUpdateWorkItem())
+                ->action(function (): void {
+                    $this->getRecord()->forceFill(['assigned_agent_id' => auth()->id()])->save();
+                    $this->getRecord()->refresh();
+                    $this->workZoneForm->fill($this->defaultWorkZoneState());
+
+                    Notification::make()
+                        ->title(__('The ticket is assigned to you'))
+                        ->success()
+                        ->send();
+                }),
             Action::make('watch')
-                ->label('Watch')
+                ->label(__('Watch'))
                 ->icon(Heroicon::OutlinedEye)
                 ->color('gray')
                 ->visible(fn (): bool => ! $this->isWatching())
                 ->action(fn () => $this->toggleWatch(true)),
             Action::make('unwatch')
-                ->label('Stop watching')
+                ->label(__('Stop watching'))
                 ->icon(Heroicon::OutlinedEyeSlash)
                 ->color('gray')
                 ->visible(fn (): bool => $this->isWatching())
                 ->action(fn () => $this->toggleWatch(false)),
             ActionGroup::make([
                 Action::make('manageWatchers')
-                    ->label('Watchers')
+                    ->label(__('Watchers'))
                     ->icon(Heroicon::OutlinedUserGroup)
-                    ->modalDescription('Watchers get customer replies and SLA warnings for this ticket.')
+                    ->modalDescription(__('Watchers get customer replies and SLA warnings for this ticket.'))
                     ->fillForm(fn (): array => [
                         'watcher_ids' => $this->getRecord()->watchers()->pluck('users.id')->all(),
                     ])
                     ->schema([
                         Select::make('watcher_ids')
-                            ->label('Watchers')
+                            ->label(__('Watchers'))
                             ->multiple()
                             ->searchable()
                             ->options(fn (): array => $this->agentOptions()),
@@ -200,32 +225,32 @@ class ViewWorkItem extends ViewRecord
                     ->visible(fn (): bool => $this->canUpdateWorkItem())
                     ->action(fn (array $data) => $this->syncWatchers(array_map('intval', $data['watcher_ids'] ?? []))),
                 Action::make('editCc')
-                    ->label('CC recipients')
+                    ->label(__('CC recipients'))
                     ->icon(Heroicon::OutlinedEnvelope)
-                    ->modalDescription('Public replies to the requester are also sent to these addresses.')
+                    ->modalDescription(__('Public replies to the requester are also sent to these addresses.'))
                     ->fillForm(fn (): array => ['cc_addresses' => $this->getRecord()->ccAddressList()])
                     ->schema([
                         TagsInput::make('cc_addresses')
-                            ->label('CC addresses')
-                            ->placeholder('name@example.com')
+                            ->label(__('CC addresses'))
+                            ->placeholder(__('name@example.com'))
                             ->nestedRecursiveRules(['email:rfc', 'max:255']),
                     ])
                     ->visible(fn (): bool => $this->canUpdateWorkItem())
                     ->action(fn (array $data) => $this->saveCcAddresses($data['cc_addresses'] ?? [])),
                 Action::make('linkTicket')
-                    ->label('Link ticket')
+                    ->label(__('Link ticket'))
                     ->icon(Heroicon::OutlinedLink)
                     ->schema([
-                        $this->ticketSelect('linked_work_item_id', 'Ticket'),
+                        $this->ticketSelect('linked_work_item_id', __('Ticket')),
                     ])
                     ->visible(fn (): bool => $this->canUpdateWorkItem())
                     ->action(fn (array $data) => $this->linkTicket((int) $data['linked_work_item_id'])),
                 Action::make('unlinkTicket')
-                    ->label('Remove link')
+                    ->label(__('Remove link'))
                     ->icon(Heroicon::OutlinedLinkSlash)
                     ->schema([
                         Select::make('linked_work_item_id')
-                            ->label('Ticket')
+                            ->label(__('Ticket'))
                             ->required()
                             ->options(fn (): array => $this->getRecord()->linkedWorkItems()
                                 ->mapWithKeys(fn (WorkItem $workItem): array => [$workItem->getKey() => static::ticketLabel($workItem)])
@@ -234,20 +259,20 @@ class ViewWorkItem extends ViewRecord
                     ->visible(fn (): bool => $this->canUpdateWorkItem() && $this->getRecord()->linkedWorkItems()->isNotEmpty())
                     ->action(fn (array $data) => $this->unlinkTicket((int) $data['linked_work_item_id'])),
                 Action::make('mergeTicket')
-                    ->label('Merge into another ticket')
+                    ->label(__('Merge into another ticket'))
                     ->icon(Heroicon::OutlinedArrowsPointingIn)
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->modalHeading('Merge this ticket')
-                    ->modalDescription('All messages move to the ticket you pick, and this ticket is closed. This cannot be undone.')
-                    ->modalSubmitActionLabel('Merge')
+                    ->modalHeading(__('Merge this ticket'))
+                    ->modalDescription(__('All messages move to the ticket you pick, and this ticket is closed. This cannot be undone.'))
+                    ->modalSubmitActionLabel(__('Merge'))
                     ->schema([
-                        $this->ticketSelect('target_work_item_id', 'Merge into'),
+                        $this->ticketSelect('target_work_item_id', __('Merge into')),
                     ])
                     ->visible(fn (): bool => $this->canUpdateWorkItem() && $this->getRecord()->merged_into_work_item_id === null)
                     ->action(fn (array $data) => $this->mergeInto((int) $data['target_work_item_id'])),
             ])
-                ->label('More')
+                ->label(__('More'))
                 ->icon(Heroicon::OutlinedEllipsisVertical)
                 ->button()
                 ->color('gray'),
@@ -290,7 +315,7 @@ class ViewWorkItem extends ViewRecord
             if ((int) ($record->assigned_agent_id ?? 0) !== (int) ($newAssignee ?? 0)) {
                 if (! $this->canUpdateWorkItem()) {
                     Notification::make()
-                        ->title('Not allowed to update this ticket')
+                        ->title(__('Not allowed to update this ticket'))
                         ->danger()
                         ->send();
 
@@ -305,7 +330,7 @@ class ViewWorkItem extends ViewRecord
 
         if ($updated) {
             Notification::make()
-                ->title('Ticket updated')
+                ->title(__('Ticket updated'))
                 ->success()
                 ->send();
         }
@@ -327,7 +352,7 @@ class ViewWorkItem extends ViewRecord
 
         if ($body === '') {
             Notification::make()
-                ->title('Message is required')
+                ->title(__('Message is required'))
                 ->danger()
                 ->send();
 
@@ -337,7 +362,7 @@ class ViewWorkItem extends ViewRecord
         $workflow = app(WorkItemWorkflowService::class);
         $record = $this->getRecord();
         $isInternal = (bool) ($data['is_internal'] ?? false);
-        $parentMessageId = filled($data['parent_message_id'] ?? null) ? (int) $data['parent_message_id'] : null;
+        $parentMessageId = null;
 
         if (! $isInternal && $this->warnAboutNewMessages($user)) {
             return;
@@ -353,11 +378,11 @@ class ViewWorkItem extends ViewRecord
             $queueLabel = $record->queue?->name ?? ('#'.$record->queue_id);
             $canOperate = $record->tenant_id !== null && $user->canOperateInTenant((int) $record->tenant_id);
             $body = $canOperate
-                ? "Your role needs work-item Update (or Admin) on queue \"{$queueLabel}\" under Administration → Roles → Work item permissions by queue."
-                : 'You do not have access to operate in this tenant. Global admins need an explicit Tenant Admin assignment for this tenant.';
+                ? __('Your role needs work item Update (or Admin) on queue ":queue" under Administration → Roles → Work item permissions by queue.', ['queue' => $queueLabel])
+                : __('You do not have access to operate in this tenant. Global admins need an explicit Tenant Admin assignment for this tenant.');
 
             Notification::make()
-                ->title($isInternal ? 'Not allowed to add an internal note' : 'Not allowed to reply on this ticket')
+                ->title($isInternal ? __('Not allowed to add an internal note') : __('Not allowed to reply on this ticket'))
                 ->body($body)
                 ->danger()
                 ->persistent()
@@ -366,7 +391,7 @@ class ViewWorkItem extends ViewRecord
             return;
         } catch (UnprocessableEntityHttpException|NotFoundHttpException $e) {
             Notification::make()
-                ->title('Could not save message')
+                ->title(__('Could not save message'))
                 ->body($e->getMessage())
                 ->danger()
                 ->send();
@@ -376,8 +401,8 @@ class ViewWorkItem extends ViewRecord
             report($e);
 
             Notification::make()
-                ->title('Could not save message')
-                ->body('An unexpected error occurred. Please try again or check the application log.')
+                ->title(__('Could not save message'))
+                ->body(__('An unexpected error occurred. Please try again or check the application log.'))
                 ->danger()
                 ->persistent()
                 ->send();
@@ -385,9 +410,29 @@ class ViewWorkItem extends ViewRecord
             return;
         }
 
+        $statusAfterReply = $data['status_after_reply'] ?? null;
+        $statusChanged = false;
+
+        if (filled($statusAfterReply) && $statusAfterReply !== $record->status) {
+            try {
+                $workflow->transition($record, (string) $statusAfterReply, $user);
+                $statusChanged = true;
+            } catch (\Throwable $e) {
+                Notification::make()
+                    ->title(__('The message was saved, but the status could not be changed'))
+                    ->body($e->getMessage())
+                    ->warning()
+                    ->send();
+            }
+        }
+
         Notification::make()
-            ->title($isInternal ? 'Internal note added' : 'Reply saved')
-            ->body($isInternal ? null : 'Outbound email will be sent in the background when configured.')
+            ->title($isInternal ? __('Internal note added') : __('Reply saved'))
+            ->body(match (true) {
+                $statusChanged => __('Status changed to :status.', ['status' => WorkItemStatusDisplay::label((string) $statusAfterReply)]),
+                $isInternal => null,
+                default => __('The requester gets it by email when email is set up for this queue.'),
+            })
             ->success()
             ->send();
 
@@ -396,8 +441,8 @@ class ViewWorkItem extends ViewRecord
         $this->workZoneForm->fill([
             ...$this->defaultWorkZoneState(),
             'body' => null,
-            'parent_message_id' => null,
             'is_internal' => false,
+            'status_after_reply' => null,
         ]);
     }
 
@@ -413,9 +458,9 @@ class ViewWorkItem extends ViewRecord
             'canned_response_id' => null,
             'priority' => $record->priority,
             'assigned_agent_id' => $record->assigned_agent_id,
-            'parent_message_id' => null,
             'body' => null,
             'is_internal' => false,
+            'status_after_reply' => null,
         ];
     }
 
@@ -450,41 +495,18 @@ class ViewWorkItem extends ViewRecord
     }
 
     /**
-     * @return array<int, string>
-     */
-    protected function replyTargetOptions(): array
-    {
-        /** @var WorkItem $record */
-        $record = $this->getRecord();
-
-        return $record->messages()
-            ->where('is_internal', false)
-            ->orderByDesc('created_at')
-            ->limit(50)
-            ->get()
-            ->mapWithKeys(fn ($message): array => [
-                $message->getKey() => '#'.$message->getKey().' '.mb_substr($message->body, 0, 60),
-            ])
-            ->all();
-    }
-
-    /**
-     * Tickets from the portal, the ticket list and monitoring use other priority names (Low, Medium, High,
-     * Critical), so keep the ticket's current value selectable or the form would refuse to submit.
+     * Priorities are normalized on save, but a value from before that migration or from an external system
+     * stays selectable so the form never refuses to submit.
      *
      * @return array<string, string>
      */
     protected function priorityOptions(): array
     {
-        $options = [
-            'normal' => 'Normal',
-            'high' => 'High',
-            'urgent' => 'Urgent',
-        ];
+        $options = WorkItemPriority::options();
         $current = (string) $this->getRecord()->priority;
 
         if ($current !== '' && ! array_key_exists($current, $options)) {
-            $options = [$current => ucfirst($current), ...$options];
+            $options = [$current => WorkItemPriority::labelFor($current), ...$options];
         }
 
         return $options;
@@ -510,13 +532,13 @@ class ViewWorkItem extends ViewRecord
         }
 
         $authors = $newMessages
-            ->map(fn (WorkItemMessage $message): string => $message->author?->name ?? 'Someone')
+            ->map(fn (WorkItemMessage $message): string => $message->author?->name ?? __('Someone'))
             ->unique()
             ->implode(', ');
 
         Notification::make()
-            ->title('New reply since you opened this ticket')
-            ->body("{$authors} added a message. Your reply was not sent; read the conversation, then send it again if it still fits.")
+            ->title(__('New reply since you opened this ticket'))
+            ->body(__(':authors added a message. Your reply was not sent; read the conversation, then send it again if it still fits.', ['authors' => $authors]))
             ->warning()
             ->persistent()
             ->send();
@@ -564,7 +586,7 @@ class ViewWorkItem extends ViewRecord
             ->label($label)
             ->required()
             ->searchable()
-            ->placeholder('Search by number or title')
+            ->placeholder(__('Search by number or title'))
             ->getSearchResultsUsing(fn (string $search): array => $this->searchTickets($search))
             ->getOptionLabelUsing(fn ($value): ?string => ($workItem = WorkItem::query()->find($value)) !== null
                 ? static::ticketLabel($workItem)
@@ -625,7 +647,7 @@ class ViewWorkItem extends ViewRecord
         $this->runCollaboration(function (WorkItemCollaborationService $service, User $user) use ($watch): string {
             $watch ? $service->watch($this->getRecord(), $user) : $service->unwatch($this->getRecord(), $user);
 
-            return $watch ? 'You are watching this ticket' : 'You stopped watching this ticket';
+            return $watch ? __('You are watching this ticket') : __('You stopped watching this ticket');
         });
     }
 
@@ -651,7 +673,7 @@ class ViewWorkItem extends ViewRecord
                 $service->watch($record, $user, $actor);
             }
 
-            return 'Watchers updated';
+            return __('Watchers updated');
         });
     }
 
@@ -663,7 +685,7 @@ class ViewWorkItem extends ViewRecord
         $this->runCollaboration(function (WorkItemCollaborationService $service, User $user) use ($addresses): string {
             $service->setCcAddresses($this->getRecord(), array_map('strval', $addresses), $user);
 
-            return 'CC recipients updated';
+            return __('CC recipients updated');
         });
     }
 
@@ -673,7 +695,7 @@ class ViewWorkItem extends ViewRecord
             $other = $this->findTicket($workItemId);
             $service->link($this->getRecord(), $other, $user);
 
-            return 'Linked to '.static::ticketLabel($other);
+            return __('Linked to :ticket', ['ticket' => static::ticketLabel($other)]);
         });
     }
 
@@ -683,7 +705,7 @@ class ViewWorkItem extends ViewRecord
             $other = $this->findTicket($workItemId);
             $service->unlink($this->getRecord(), $other, $user);
 
-            return 'Link removed';
+            return __('Link removed');
         });
     }
 
@@ -694,7 +716,7 @@ class ViewWorkItem extends ViewRecord
         $merged = $this->runCollaboration(function (WorkItemCollaborationService $service, User $user) use ($workItemId, &$target): string {
             $target = $service->merge($this->getRecord(), $this->findTicket($workItemId), $user);
 
-            return 'Merged into '.static::ticketLabel($target);
+            return __('Merged into :ticket', ['ticket' => static::ticketLabel($target)]);
         });
 
         if ($merged && $target !== null) {
@@ -709,7 +731,7 @@ class ViewWorkItem extends ViewRecord
             ->find($workItemId);
 
         if ($workItem === null) {
-            throw new NotFoundHttpException('Ticket not found.');
+            throw new NotFoundHttpException(__('Ticket not found.'));
         }
 
         return $workItem;
@@ -730,15 +752,15 @@ class ViewWorkItem extends ViewRecord
             $message = $callback(app(WorkItemCollaborationService::class), $user);
         } catch (AccessDeniedHttpException) {
             Notification::make()
-                ->title('Not allowed to update this ticket')
-                ->body('This needs work-item Update on the queues of the tickets involved.')
+                ->title(__('Not allowed to update this ticket'))
+                ->body(__('This needs work-item Update on the queues of the tickets involved.'))
                 ->danger()
                 ->send();
 
             return false;
         } catch (UnprocessableEntityHttpException|NotFoundHttpException $e) {
             Notification::make()
-                ->title('Could not update the ticket')
+                ->title(__('Could not update the ticket'))
                 ->body($e->getMessage())
                 ->danger()
                 ->send();

@@ -22,11 +22,11 @@ class SuppliersRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable(),
                 TextColumn::make('pivot.role')
-                    ->label('Role')
+                    ->label(__('Role'))
                     ->badge(),
                 TextColumn::make('pivot.notes')
-                    ->label('Notes')
-                    ->placeholder('—')
+                    ->label(__('Notes'))
+                    ->placeholder(__('—'))
                     ->limit(40),
             ])
             ->headerActions([

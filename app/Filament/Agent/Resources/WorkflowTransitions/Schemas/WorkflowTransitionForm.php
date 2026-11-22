@@ -15,19 +15,19 @@ class WorkflowTransitionForm
         return $schema
             ->components([
                 Select::make('from_status')
-                    ->label('From')
+                    ->label(__('From'))
                     ->options(fn (): array => static::statusOptions())
                     ->required()
                     ->searchable(),
                 Select::make('to_status')
-                    ->label('To')
+                    ->label(__('To'))
                     ->options(fn (): array => static::statusOptions())
                     ->required()
                     ->searchable(),
                 TextInput::make('required_permission')
-                    ->label('Required permission')
-                    ->helperText('Leave empty to allow end users (e.g. close). Agents typically need work_item.update.')
-                    ->placeholder('work_item.update')
+                    ->label(__('Required permission'))
+                    ->helperText(__('Leave empty to allow end users (e.g. close). Agents typically need work_item.update.'))
+                    ->placeholder(__('work_item.update'))
                     ->maxLength(255)
                     ->nullable(),
             ]);

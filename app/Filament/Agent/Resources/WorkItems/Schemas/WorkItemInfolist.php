@@ -3,12 +3,15 @@
 namespace App\Filament\Agent\Resources\WorkItems\Schemas;
 
 use App\Enums\OrganizationType;
+use App\Enums\WorkItemPriority;
 use App\Filament\Agent\Resources\WorkItems\Pages\ViewWorkItem;
 use App\Filament\Agent\Resources\WorkItems\RelationManagers\AssetsRelationManager;
 use App\Filament\Agent\Resources\WorkItems\RelationManagers\DocumentsRelationManager;
+use App\Filament\Agent\Resources\WorkItems\Tables\WorkItemsTable;
 use App\Filament\Agent\Resources\WorkItems\WorkItemResource;
 use App\Livewire\WorkItemViewers;
 use App\Models\WorkItem;
+use App\Support\WorkItemStatusDisplay;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -49,85 +52,102 @@ class WorkItemInfolist
             Livewire::make(WorkItemViewers::class, ['workItemId' => (int) $page->getRecord()->getKey()])
                 ->key('work-item-viewers')
                 ->columnSpanFull(),
-            Callout::make(fn (WorkItem $record): string => 'Merged into #'.$record->merged_into_work_item_id)
-                ->description('This ticket was merged. New messages and email replies go to the other ticket.')
+            Callout::make(fn (WorkItem $record): string => __('Merged into #:id', ['id' => $record->merged_into_work_item_id]))
+                ->description(__('This ticket was merged. New messages and email replies go to the other ticket.'))
                 ->info()
                 ->icon('heroicon-o-arrows-pointing-in')
                 ->visible(fn (WorkItem $record): bool => $record->merged_into_work_item_id !== null)
                 ->actions([
                     Action::make('openMergedInto')
-                        ->label('Open ticket')
+                        ->label(__('Open ticket'))
                         ->link()
                         ->url(fn (WorkItem $record): string => WorkItemResource::getUrl('view', ['record' => $record->merged_into_work_item_id])),
                 ])
                 ->columnSpanFull(),
             Section::make()
                 ->schema([
-                    TextEntry::make('id')
-                        ->label('#')
-                        ->formatStateUsing(fn (int|string $state): string => '#'.$state)
-                        ->weight(FontWeight::SemiBold),
-                    TextEntry::make('title')
-                        ->hiddenLabel()
-                        ->weight(FontWeight::SemiBold)
-                        ->columnSpanFull(),
-                    TextEntry::make('status')->badge(),
-                    TextEntry::make('priority')->badge(),
+                    TextEntry::make('status')
+                        ->label(__('Status'))
+                        ->badge()
+                        ->formatStateUsing(fn (?string $state): string => WorkItemStatusDisplay::label($state))
+                        ->color(fn (?string $state): string|array => WorkItemStatusDisplay::color($state)),
+                    TextEntry::make('priority')
+                        ->label(__('Priority'))
+                        ->badge()
+                        ->formatStateUsing(fn (?string $state): string => WorkItemPriority::labelFor($state))
+                        ->color(fn (?string $state): string => WorkItemPriority::colorFor($state)),
                     TextEntry::make('type')
-                        ->badge()
-                        ->formatStateUsing(fn ($state): string => is_object($state) ? $state->name : (string) $state),
-                    TextEntry::make('queue.name')
-                        ->label('Queue')
-                        ->badge()
-                        ->placeholder('—'),
+                        ->label(__('Type'))
+                        ->badge(),
                     TextEntry::make('assignedAgent.name')
-                        ->label('Assigned')
-                        ->formatStateUsing(fn (?string $state): string => filled($state) ? 'Assigned: '.$state : 'Unassigned')
-                        ->color('gray'),
+                        ->label(__('Assigned to'))
+                        ->placeholder(__('Unassigned')),
+                    TextEntry::make('reportedBy.name')
+                        ->label(__('Requester'))
+                        ->placeholder(__('Unknown')),
+                    TextEntry::make('organization.name')
+                        ->label(__('Customer'))
+                        ->placeholder(__('—')),
+                    TextEntry::make('queue.name')
+                        ->label(__('Queue'))
+                        ->placeholder(__('—')),
+                    TextEntry::make('sla_due')
+                        ->label(__('SLA due'))
+                        ->state(fn (WorkItem $record): ?string => WorkItemsTable::nextSlaDeadline($record)?->toIso8601String())
+                        ->dateTime()
+                        ->since()
+                        ->dateTimeTooltip()
+                        ->placeholder(__('—')),
                 ])
-                ->columns(['default' => 2, 'sm' => 3])
+                ->inlineLabel(false)
+                ->columns(['default' => 2, 'sm' => 4])
                 ->columnSpanFull(),
-            EmbeddedSchema::make('workZoneForm'),
-            Section::make('Conversation')
+            Section::make(__('Conversation'))
                 ->schema([
-                    RepeatableEntry::make('threaded_messages')
-                        ->label('')
+                    RepeatableEntry::make('conversation')
+                        ->hiddenLabel()
                         ->state(function (WorkItem $record): array {
                             $messages = $record->messages()
                                 ->with('author')
                                 ->orderBy('created_at')
                                 ->get();
 
-                            return WorkItemResource::flattenThreadedMessages(
-                                $messages,
-                                true,
-                                $record->reported_by_user_id,
-                            );
+                            return WorkItemResource::conversationEntries($record, $messages, true);
                         })
                         ->schema([
                             TextEntry::make('author_name')
                                 ->hiddenLabel()
-                                ->weight(FontWeight::SemiBold),
+                                ->weight(FontWeight::SemiBold)
+                                ->inlineLabel(false),
                             TextEntry::make('author_role')
                                 ->hiddenLabel()
-                                ->color('gray'),
+                                ->color('gray')
+                                ->inlineLabel(false),
                             TextEntry::make('message_type')
                                 ->hiddenLabel()
                                 ->badge()
-                                ->color(fn (?string $state): string => $state === 'Internal note' ? 'warning' : 'gray'),
+                                ->color(fn (?string $state): string => match ($state) {
+                                    __('Internal note') => 'warning',
+                                    __('Request') => 'info',
+                                    default => 'gray',
+                                })
+                                ->inlineLabel(false),
                             TextEntry::make('created_at')
                                 ->hiddenLabel()
                                 ->dateTime()
-                                ->color('gray'),
+                                ->color('gray')
+                                ->inlineLabel(false),
                             TextEntry::make('body')
                                 ->hiddenLabel()
                                 ->columnSpanFull()
+                                ->inlineLabel(false)
                                 ->prose(),
                         ])
-                        ->columns(4)
+                        ->columns(['default' => 2, 'md' => 4])
                         ->contained(true),
                 ])
                 ->columnSpanFull(),
+            EmbeddedSchema::make('workZoneForm'),
         ];
     }
 
@@ -137,29 +157,29 @@ class WorkItemInfolist
     private static function metadataSidebarComponents(ViewWorkItem $page): array
     {
         return [
-            Section::make('Metadata')
+            Section::make(__('Metadata'))
                 ->schema([
                     Tabs::make()
                         ->livewireProperty('activeMetaTab')
                         ->contained(false)
                         ->tabs([
                             Tab::make('details')
-                                ->label('Details')
+                                ->label(__('Details'))
                                 ->schema(static::detailsTabSchema()),
                             Tab::make('requester')
-                                ->label('Requester')
+                                ->label(__('Requester'))
                                 ->schema(static::requesterTabSchema()),
                             Tab::make('routing')
-                                ->label('Routing')
+                                ->label(__('Routing'))
                                 ->schema(static::routingTabSchema()),
                             Tab::make('relations')
-                                ->label('Relations')
+                                ->label(__('Relations'))
                                 ->schema(static::relationsTabSchema($page)),
                             Tab::make('email')
-                                ->label('Email')
+                                ->label(__('Email'))
                                 ->schema(static::emailTabSchema()),
                             Tab::make('activity')
-                                ->label('Activity')
+                                ->label(__('Activity'))
                                 ->schema(static::activityTabSchema()),
                         ]),
                 ])
@@ -173,14 +193,9 @@ class WorkItemInfolist
     private static function detailsTabSchema(): array
     {
         return [
-            TextEntry::make('type')
-                ->label('Type')
-                ->formatStateUsing(fn ($state): string => is_object($state) ? $state->name : (string) $state),
-            TextEntry::make('priority')->label('Priority'),
-            TextEntry::make('status')->label('Status'),
-            TextEntry::make('category_id')->label('Category')->placeholder('—'),
+            TextEntry::make('category.name')->label(__('Category'))->placeholder(__('No category')),
             TextEntry::make('requester_department')
-                ->label('Department')
+                ->label(__('Department'))
                 ->state(function (WorkItem $record): string {
                     $organization = $record->reportedBy?->organization;
 
@@ -194,17 +209,15 @@ class WorkItemInfolist
 
                     return '—';
                 }),
-            TextEntry::make('opened_at')->label('Opened')->dateTime()->placeholder('—'),
-            TextEntry::make('resolved_at')->label('Resolved')->dateTime()->placeholder('—'),
-            TextEntry::make('closed_at')->label('Closed')->dateTime()->placeholder('—'),
-            TextEntry::make('assignedAgent.name')->label('Assigned to')->placeholder('—'),
+            TextEntry::make('opened_at')->label(__('Opened'))->dateTime()->placeholder(__('—')),
+            TextEntry::make('resolved_at')->label(__('Resolved'))->dateTime()->placeholder(__('—')),
+            TextEntry::make('closed_at')->label(__('Closed'))->dateTime()->placeholder(__('—')),
             TextEntry::make('watcher_names')
-                ->label('Watchers')
+                ->label(__('Watchers'))
                 ->state(fn (WorkItem $record): string => $record->watchers()->orderBy('name')->pluck('name')->implode(', ') ?: '—'),
             TextEntry::make('cc_list')
-                ->label('CC')
+                ->label(__('CC'))
                 ->state(fn (WorkItem $record): string => implode(', ', $record->ccAddressList()) ?: '—'),
-            TextEntry::make('description')->label('Description')->placeholder('—')->columnSpanFull(),
         ];
     }
 
@@ -214,11 +227,11 @@ class WorkItemInfolist
     private static function requesterTabSchema(): array
     {
         return [
-            TextEntry::make('reportedBy.name')->label('Name')->placeholder('Unknown'),
-            TextEntry::make('reportedBy.email')->label('Email')->placeholder('Unknown'),
-            TextEntry::make('organization.name')->label('Organization')->placeholder('—'),
+            TextEntry::make('reportedBy.name')->label(__('Name'))->placeholder(__('Unknown')),
+            TextEntry::make('reportedBy.email')->label(__('Email'))->placeholder(__('Unknown')),
+            TextEntry::make('organization.name')->label(__('Organization'))->placeholder(__('—')),
             TextEntry::make('previous_ticket_count')
-                ->label('Previous tickets')
+                ->label(__('Previous tickets'))
                 ->state(function (WorkItem $record): int {
                     return WorkItem::query()
                         ->where('reported_by_user_id', $record->reported_by_user_id)
@@ -234,12 +247,12 @@ class WorkItemInfolist
     private static function routingTabSchema(): array
     {
         return [
-            TextEntry::make('queue.name')->label('Queue')->placeholder('—'),
+            TextEntry::make('queue.name')->label(__('Queue'))->placeholder(__('—')),
             TextEntry::make('source')
-                ->label('Source')
-                ->formatStateUsing(fn ($state): string => is_object($state) ? $state->name : (string) $state),
-            TextEntry::make('organization.name')->label('Organization')->placeholder('—'),
-            TextEntry::make('tenant.name')->label('Tenant')->placeholder('—'),
+                ->label(__('Source'))
+                ->placeholder(__('—')),
+            TextEntry::make('organization.name')->label(__('Organization'))->placeholder(__('—')),
+            TextEntry::make('tenant.name')->label(__('Tenant'))->placeholder(__('—')),
         ];
     }
 
@@ -260,17 +273,17 @@ class WorkItemInfolist
             Livewire::make(DocumentsRelationManager::class, $managerData)
                 ->key(DocumentsRelationManager::class),
             TextEntry::make('linked_tickets')
-                ->label('Linked tickets')
+                ->label(__('Linked tickets'))
                 ->state(fn (WorkItem $record): array => $record->linkedWorkItems()
                     ->map(fn (WorkItem $linked): string => '<a class="fi-link" href="'.e(WorkItemResource::getUrl('view', ['record' => $linked->getKey()])).'">'
-                        .e(ViewWorkItem::ticketLabel($linked)).'</a> <span class="fi-color-gray">('.e((string) $linked->status).')</span>')
+                        .e(ViewWorkItem::ticketLabel($linked)).'</a> <span class="fi-color-gray">('.e(WorkItemStatusDisplay::label($linked->status)).')</span>')
                     ->all())
                 ->html()
                 ->listWithLineBreaks()
-                ->placeholder('—')
+                ->placeholder(__('—'))
                 ->columnSpanFull(),
             TextEntry::make('linked_problems')
-                ->label('Linked problems')
+                ->label(__('Linked problems'))
                 ->state(function (WorkItem $record): string {
                     $titles = $record->problems()->pluck('title');
 
@@ -278,7 +291,7 @@ class WorkItemInfolist
                 })
                 ->columnSpanFull(),
             TextEntry::make('linked_monitoring_events')
-                ->label('Monitoring events')
+                ->label(__('Monitoring events'))
                 ->state(function (WorkItem $record): string {
                     $summaries = $record->monitoringEvents()
                         ->get()
@@ -296,22 +309,22 @@ class WorkItemInfolist
     private static function emailTabSchema(): array
     {
         return [
-            TextEntry::make('mailAccount.email_address')->label('Mail account')->placeholder('—'),
-            TextEntry::make('public_id')->label('Mail reference')->placeholder('—'),
-            TextEntry::make('inbound_message_id')->label('Inbound message ID')->placeholder('—'),
-            TextEntry::make('title')->label('Thread subject'),
+            TextEntry::make('mailAccount.email_address')->label(__('Mail account'))->placeholder(__('—')),
+            TextEntry::make('public_id')->label(__('Mail reference'))->placeholder(__('—')),
+            TextEntry::make('inbound_message_id')->label(__('Inbound message ID'))->placeholder(__('—')),
+            TextEntry::make('title')->label(__('Thread subject')),
             TextEntry::make('last_inbound_at')
-                ->label('Last inbound')
+                ->label(__('Last inbound'))
                 ->state(function (WorkItem $record): ?string {
                     $message = $record->messages()
                         ->where('is_internal', false)
                         ->orderByDesc('created_at')
                         ->first();
 
-                    return $message?->created_at?->toDateTimeString();
+                    return $message?->created_at?->toIso8601String();
                 })
                 ->dateTime()
-                ->placeholder('—'),
+                ->placeholder(__('—')),
         ];
     }
 
@@ -325,9 +338,9 @@ class WorkItemInfolist
                 ->label('')
                 ->state(fn (WorkItem $record): array => WorkItemResource::buildActivityTimeline($record))
                 ->schema([
-                    TextEntry::make('when')->label('When')->dateTime(),
-                    TextEntry::make('who')->label('Who'),
-                    TextEntry::make('event')->label('Event')->columnSpanFull(),
+                    TextEntry::make('when')->label(__('When'))->dateTime(),
+                    TextEntry::make('who')->label(__('Who')),
+                    TextEntry::make('event')->label(__('Event'))->columnSpanFull(),
                 ])
                 ->columns(2)
                 ->contained(false),

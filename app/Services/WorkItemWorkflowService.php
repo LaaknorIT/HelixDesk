@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\WorkItemPriority;
 use App\Enums\WorkItemSource;
 use App\Enums\WorkItemType;
 use App\Jobs\SendWorkItemReplyMailJob;
@@ -224,16 +225,18 @@ class WorkItemWorkflowService
             }
         }
 
+        $requester = $this->resolveRequester($data['reported_by_user_id'] ?? null, $user, (int) $tenantId);
+
         $workItem = WorkItem::query()->create([
             'tenant_id' => $tenantId,
-            'organization_id' => $data['organization_id'] ?? $user->organization_id,
-            'reported_by_user_id' => $user->id,
+            'organization_id' => $data['organization_id'] ?? $requester->organization_id,
+            'reported_by_user_id' => $requester->id,
             'assigned_agent_id' => $data['assigned_agent_id'] ?? null,
             'queue_id' => $queueId,
             'type' => $data['type'] ?? WorkItemType::Incident,
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
-            'priority' => $data['priority'] ?? 'normal',
+            'priority' => $data['priority'] ?? WorkItemPriority::Normal->value,
             'category_id' => $data['category_id'] ?? null,
             'status' => 'New',
             'source' => WorkItemSource::Portal,
@@ -246,6 +249,27 @@ class WorkItemWorkflowService
         $this->slaTimerService->startTimers($workItem);
 
         return $workItem->fresh() ?? $workItem;
+    }
+
+    /**
+     * Staff may register a ticket on behalf of someone in the same tenant; everyone else reports for themselves.
+     */
+    private function resolveRequester(mixed $requesterId, User $user, int $tenantId): User
+    {
+        if (blank($requesterId) || $user->type === 'end_user' || (int) $requesterId === (int) $user->getKey()) {
+            return $user;
+        }
+
+        $requester = User::query()
+            ->whereKey((int) $requesterId)
+            ->where('tenant_id', $tenantId)
+            ->first();
+
+        if ($requester === null) {
+            throw new UnprocessableEntityHttpException('The requester does not belong to this tenant.');
+        }
+
+        return $requester;
     }
 
     public function addMessage(

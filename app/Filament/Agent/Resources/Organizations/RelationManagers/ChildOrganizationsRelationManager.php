@@ -32,7 +32,7 @@ class ChildOrganizationsRelationManager extends RelationManager
             Hidden::make('parent_id')
                 ->default(fn (): int => $this->ownerRecord->getKey()),
             Select::make('type')
-                ->label('Type')
+                ->label(__('Type'))
                 ->options(fn (): array => collect(OrganizationType::allowedForParent($this->ownerRecord->type))
                     ->mapWithKeys(fn (OrganizationType $type): array => [$type->value => $type->label()])
                     ->all())
@@ -47,11 +47,11 @@ class ChildOrganizationsRelationManager extends RelationManager
                 ->maxLength(64)
                 ->default(null),
             Toggle::make('is_billable')
-                ->label('Billable customer')
+                ->label(__('Billable customer'))
                 ->visible(fn (Get $get): bool => ($get('type') ?? OrganizationType::Customer->value) === OrganizationType::Customer->value)
                 ->default(true),
             TextInput::make('external_reference')
-                ->label('External reference')
+                ->label(__('External reference'))
                 ->maxLength(255)
                 ->default(null),
         ]);
@@ -68,7 +68,7 @@ class ChildOrganizationsRelationManager extends RelationManager
                     ->badge()
                     ->formatStateUsing(fn (OrganizationType $state): string => $state->label()),
                 TextColumn::make('external_reference')
-                    ->placeholder('—'),
+                    ->placeholder(__('—')),
             ])
             ->headerActions([
                 CreateAction::make()

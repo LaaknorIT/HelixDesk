@@ -19,12 +19,12 @@ class EditChange extends EditRecord
     {
         return [
             Action::make('transition')
-                ->label('Update status')
+                ->label(__('Update status'))
                 ->icon('heroicon-o-arrow-path')
                 ->visible(fn (): bool => Auth::user()?->hasAnyPermission(['change.update', 'change.approve', 'change.admin']) === true)
                 ->form([
                     Select::make('to_status')
-                        ->label('To status')
+                        ->label(__('To status'))
                         ->required()
                         ->options(function (): array {
                             /** @var Change $record */

@@ -21,7 +21,7 @@ class OrganizationTree extends TreePage
 
     public static function getNavigationLabel(): string
     {
-        return (string) config('helixdesk.organizations.navigation_label', 'Customers');
+        return __((string) config('helixdesk.organizations.navigation_label', 'Customers'));
     }
 
     public function getTitle(): string
@@ -41,27 +41,30 @@ class OrganizationTree extends TreePage
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()
+            $this->getCreateAction()
                 ->label(__('New customer'))
+                ->icon('heroicon-o-plus')
                 ->visible(fn (): bool => OrganizationResource::canCreate()),
             Action::make('tableView')
                 ->label(__('Table view'))
+                ->color('gray')
                 ->icon('heroicon-o-table-cells')
                 ->url(fn (): string => OrganizationResource::getUrl('list')),
         ];
     }
 
+    /**
+     * "New customer" sits in the page header, so the tree toolbar does not repeat it.
+     */
     protected function getTreeToolbarActions(): array
     {
-        return [
-            $this->getCreateAction(),
-        ];
+        return [];
     }
 
     protected function getTreeActions(): array
     {
+        // "Manage" opens the full customer page, so a separate quick-edit icon would only add a second way to edit.
         return [
-            $this->getEditAction(),
             TreeAction::make('manage')
                 ->label(__('Manage'))
                 ->icon('heroicon-o-arrow-top-right-on-square')
@@ -99,6 +102,7 @@ class OrganizationTree extends TreePage
     {
         return parent::configureDeleteAction($action)
             ->requiresConfirmation()
+            ->tooltip(__('Delete customer'))
             ->modalHeading(__('Delete customer'))
             ->modalDescription(__('This will permanently delete this organization and all of its child nodes.'));
     }

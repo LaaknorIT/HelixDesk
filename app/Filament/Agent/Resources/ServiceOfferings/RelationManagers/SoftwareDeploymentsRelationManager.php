@@ -24,9 +24,9 @@ class SoftwareDeploymentsRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable(),
                 TextColumn::make('softwareProduct.name')
-                    ->label('Product'),
+                    ->label(__('Product')),
                 TextColumn::make('organization.name')
-                    ->label('Organization'),
+                    ->label(__('Organization')),
                 TextColumn::make('status')
                     ->badge(),
             ])

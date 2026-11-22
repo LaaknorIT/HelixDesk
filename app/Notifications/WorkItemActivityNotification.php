@@ -62,8 +62,8 @@ class WorkItemActivityNotification extends Notification implements ShouldQueue
         }
 
         return $mail
-            ->action('Open ticket', $content->url)
-            ->salutation('You can change which notifications you get under Notification settings in HelixDesk.');
+            ->action(__('Open ticket'), $content->url)
+            ->salutation(__('You can change which notifications you get under Notification settings in HelixDesk.'));
     }
 
     /**
@@ -79,7 +79,7 @@ class WorkItemActivityNotification extends Notification implements ShouldQueue
             ->icon($this->icon())
             ->actions([
                 Action::make('open')
-                    ->label('Open ticket')
+                    ->label(__('Open ticket'))
                     ->url($content->url)
                     ->markAsRead(),
             ])

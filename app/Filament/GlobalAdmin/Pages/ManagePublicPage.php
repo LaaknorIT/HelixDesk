@@ -2,6 +2,7 @@
 
 namespace App\Filament\GlobalAdmin\Pages;
 
+use App\Filament\Concerns\TranslatesPageLabels;
 use App\Models\PublicPageSetting;
 use App\Models\User;
 use BackedEnum;
@@ -29,6 +30,8 @@ use Illuminate\Support\Facades\Auth;
  */
 class ManagePublicPage extends Page
 {
+    use TranslatesPageLabels;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedGlobeAlt;
 
     protected static ?string $navigationLabel = 'Public front page';
@@ -71,8 +74,8 @@ class ManagePublicPage extends Page
     {
         return $schema
             ->components([
-                Section::make('Welcome')
-                    ->description('Always shown, together with the sign-in button.')
+                Section::make(__('Welcome'))
+                    ->description(__('Always shown, together with the sign-in button.'))
                     ->schema([
                         TextInput::make('headline')
                             ->required()
@@ -81,42 +84,42 @@ class ManagePublicPage extends Page
                             ->toolbarButtons([['bold', 'italic', 'link'], ['bulletList', 'orderedList']])
                             ->maxLength(5000),
                     ]),
-                Section::make('Announcement')
-                    ->description('A highlighted notice, for example planned maintenance or an ongoing outage.')
+                Section::make(__('Announcement'))
+                    ->description(__('A highlighted notice, for example planned maintenance or an ongoing outage.'))
                     ->schema([
                         Toggle::make('show_announcement')
-                            ->label('Show on the public page')
+                            ->label(__('Show on the public page'))
                             ->live(),
                         TextInput::make('announcement_title')
-                            ->label('Title')
+                            ->label(__('Title'))
                             ->maxLength(255)
                             ->required(fn (Get $get): bool => (bool) $get('show_announcement') && blank($get('announcement_body'))),
                         MarkdownEditor::make('announcement_body')
-                            ->label('Text')
+                            ->label(__('Text'))
                             ->toolbarButtons([['bold', 'italic', 'link']])
                             ->maxLength(5000),
                     ]),
-                Section::make('Contact details')
-                    ->description('Only shown when switched on. Leave a field empty to hide it.')
+                Section::make(__('Contact details'))
+                    ->description(__('Only shown when switched on. Leave a field empty to hide it.'))
                     ->schema([
                         Toggle::make('show_contact')
-                            ->label('Show on the public page'),
+                            ->label(__('Show on the public page')),
                         TextInput::make('contact_email')
-                            ->label('E-mail')
+                            ->label(__('E-mail'))
                             ->email()
                             ->maxLength(255),
                         TextInput::make('contact_phone')
-                            ->label('Phone')
+                            ->label(__('Phone'))
                             ->tel()
                             ->maxLength(50),
                         TextInput::make('contact_hours')
-                            ->label('Opening hours')
-                            ->placeholder('Mon–Fri 08:00–16:00')
+                            ->label(__('Opening hours'))
+                            ->placeholder(__('Mon–Fri 08:00–16:00'))
                             ->maxLength(255),
                     ])
                     ->columns(2),
-                Section::make('Sections')
-                    ->description('Information blocks shown below the welcome text. Hidden sections are kept so you can publish them later.')
+                Section::make(__('Sections'))
+                    ->description(__('Information blocks shown below the welcome text. Hidden sections are kept so you can publish them later.'))
                     ->schema([
                         Repeater::make('sections')
                             ->hiddenLabel()
@@ -128,13 +131,13 @@ class ManagePublicPage extends Page
                                     ->toolbarButtons([['bold', 'italic', 'link'], ['bulletList', 'orderedList']])
                                     ->maxLength(5000),
                                 Toggle::make('is_public')
-                                    ->label('Public')
+                                    ->label(__('Public'))
                                     ->default(true),
                             ])
                             ->itemLabel(fn (array $state): ?string => filled($state['title'] ?? null)
                                 ? $state['title'].(($state['is_public'] ?? false) ? '' : ' (hidden)')
                                 : null)
-                            ->addActionLabel('Add section')
+                            ->addActionLabel(__('Add section'))
                             ->reorderableWithButtons()
                             ->collapsible()
                             ->defaultItems(0),
@@ -153,10 +156,10 @@ class ManagePublicPage extends Page
                     ->footer([
                         Actions::make([
                             Action::make('save')
-                                ->label('Save')
+                                ->label(__('Save'))
                                 ->submit('save'),
                             Action::make('view')
-                                ->label('View public page')
+                                ->label(__('View public page'))
                                 ->color('gray')
                                 ->url(route('home'))
                                 ->openUrlInNewTab(),
@@ -184,7 +187,7 @@ class ManagePublicPage extends Page
         $page->fill($state)->save();
 
         Notification::make()
-            ->title('Public front page saved')
+            ->title(__('Public front page saved'))
             ->success()
             ->send();
     }

@@ -23,12 +23,12 @@ class DeploymentsRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable(),
                 TextColumn::make('organization.name')
-                    ->label('Organization'),
+                    ->label(__('Organization')),
                 TextColumn::make('status')
                     ->badge(),
                 TextColumn::make('environment')
                     ->badge()
-                    ->placeholder('—'),
+                    ->placeholder(__('—')),
             ])
             ->headerActions([
                 CreateAction::make()

@@ -2,6 +2,7 @@
 
 namespace App\Filament\GlobalAdmin\Resources\Tenants;
 
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Filament\GlobalAdmin\Resources\Tenants\Pages\CreateTenant;
 use App\Filament\GlobalAdmin\Resources\Tenants\Pages\EditTenant;
 use App\Filament\GlobalAdmin\Resources\Tenants\Pages\ListTenants;
@@ -17,6 +18,8 @@ use Filament\Tables\Table;
 
 class TenantResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = Tenant::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;

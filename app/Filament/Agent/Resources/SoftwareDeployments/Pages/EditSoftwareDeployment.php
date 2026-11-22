@@ -17,7 +17,7 @@ class EditSoftwareDeployment extends EditRecord
     {
         return [
             Action::make('partnerDocumentation')
-                ->label('Partner / product documentation')
+                ->label(__('Partner / product documentation'))
                 ->icon('heroicon-o-book-open')
                 ->url(function (): ?string {
                     /** @var SoftwareDeployment $record */

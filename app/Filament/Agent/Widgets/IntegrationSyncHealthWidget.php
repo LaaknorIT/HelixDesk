@@ -15,6 +15,11 @@ class IntegrationSyncHealthWidget extends StatsOverviewWidget
 {
     protected static ?int $sort = 2;
 
+    protected function getHeading(): ?string
+    {
+        return __('Integrations and assets');
+    }
+
     protected function getStats(): array
     {
         $tenant = Filament::getTenant();
@@ -43,16 +48,16 @@ class IntegrationSyncHealthWidget extends StatsOverviewWidget
             ->count();
 
         return [
-            Stat::make('Integrations with sync errors', (string) $syncErrors)
-                ->description($syncErrors === 0 ? 'All integrations healthy' : 'Review organization integration settings')
+            Stat::make(__('Integrations with sync errors'), (string) $syncErrors)
+                ->description($syncErrors === 0 ? __('All integrations healthy') : __('Review organization integration settings'))
                 ->color($syncErrors === 0 ? 'success' : 'danger'),
-            Stat::make('Last integration sync', $lastSync?->diffForHumans() ?? 'Never')
-                ->description('Most recent successful sync across integrations'),
-            Stat::make('Open identity ambiguities', (string) $openAmbiguities)
-                ->description('Assets awaiting manual identity resolution')
+            Stat::make(__('Last integration sync'), $lastSync?->diffForHumans() ?? __('Never'))
+                ->description(__('Most recent successful sync across integrations')),
+            Stat::make(__('Open identity ambiguities'), (string) $openAmbiguities)
+                ->description(__('Assets awaiting manual identity resolution'))
                 ->color($openAmbiguities === 0 ? 'success' : 'warning'),
-            Stat::make('Non-compliant patch assets', (string) $nonCompliantPatches)
-                ->description('Assets missing critical or other updates'),
+            Stat::make(__('Non-compliant patch assets'), (string) $nonCompliantPatches)
+                ->description(__('Assets missing critical or other updates')),
         ];
     }
 }

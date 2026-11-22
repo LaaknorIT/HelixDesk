@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\DashboardLayouts\Pages\EditDashboardLayout;
 use App\Filament\Agent\Resources\DashboardLayouts\Pages\ListDashboardLayouts;
 use App\Filament\Agent\Resources\DashboardLayouts\Schemas\DashboardLayoutForm;
 use App\Filament\Agent\Resources\DashboardLayouts\Tables\DashboardLayoutsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\DashboardLayout;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -18,6 +19,8 @@ use UnitEnum;
 
 class DashboardLayoutResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = DashboardLayout::class;
 
     protected static ?string $navigationLabel = 'Dashboard layouts';

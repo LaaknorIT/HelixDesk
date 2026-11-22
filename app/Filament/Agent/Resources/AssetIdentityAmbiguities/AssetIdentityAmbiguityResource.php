@@ -5,6 +5,7 @@ namespace App\Filament\Agent\Resources\AssetIdentityAmbiguities;
 use App\Filament\Agent\Resources\AssetIdentityAmbiguities\Pages\ListAssetIdentityAmbiguities;
 use App\Filament\Agent\Resources\AssetIdentityAmbiguities\Pages\ViewAssetIdentityAmbiguity;
 use App\Filament\Agent\Resources\AssetIdentityAmbiguities\Tables\AssetIdentityAmbiguitiesTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\AssetIdentityAmbiguity;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -17,13 +18,15 @@ use UnitEnum;
 
 class AssetIdentityAmbiguityResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = AssetIdentityAmbiguity::class;
 
     protected static ?string $navigationLabel = 'Identity ambiguities';
 
-    protected static ?string $modelLabel = 'Identity ambiguity';
+    protected static ?string $modelLabel = 'identity ambiguity';
 
-    protected static ?string $pluralModelLabel = 'Identity ambiguities';
+    protected static ?string $pluralModelLabel = 'identity ambiguities';
 
     protected static ?int $navigationSort = 33;
 

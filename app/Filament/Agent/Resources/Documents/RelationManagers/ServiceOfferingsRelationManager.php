@@ -26,7 +26,7 @@ class ServiceOfferingsRelationManager extends RelationManager
                 TextColumn::make('kind')
                     ->badge(),
                 TextColumn::make('organization.name')
-                    ->label('Organization'),
+                    ->label(__('Organization')),
             ])
             ->headerActions([
                 AttachAction::make()
