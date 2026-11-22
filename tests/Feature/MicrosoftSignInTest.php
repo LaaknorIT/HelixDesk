@@ -25,18 +25,18 @@ class MicrosoftSignInTest extends TestCase
 
     public function test_login_page_offers_microsoft_sign_in_only_when_an_entra_integration_exists(): void
     {
-        $this->get('/end-user/login')->assertOk()->assertDontSee('Sign in with Microsoft');
+        $this->get('/login')->assertOk()->assertDontSee('Sign in with Microsoft');
 
         $this->syncedEndUser();
 
-        $this->get('/end-user/login')->assertOk()->assertSee('Sign in with Microsoft');
+        $this->get('/login')->assertOk()->assertSee('Sign in with Microsoft');
     }
 
     public function test_synced_user_is_sent_to_their_own_entra_tenant(): void
     {
         [$user, $integration] = $this->syncedEndUser();
 
-        Filament::setCurrentPanel('end-user');
+        Filament::setCurrentPanel(Login::SHARED_PANEL);
 
         Livewire::test(Login::class)
             ->set('data.email', $user->email)
@@ -68,7 +68,7 @@ class MicrosoftSignInTest extends TestCase
             'type' => 'end_user',
         ]);
 
-        Filament::setCurrentPanel('end-user');
+        Filament::setCurrentPanel(Login::SHARED_PANEL);
 
         foreach (['nobody@example.test', $localUser->email] as $email) {
             Livewire::test(Login::class)
@@ -86,7 +86,7 @@ class MicrosoftSignInTest extends TestCase
         [$user, $integration] = $this->syncedEndUser();
         $integration->update(['enabled' => false]);
 
-        Filament::setCurrentPanel('end-user');
+        Filament::setCurrentPanel(Login::SHARED_PANEL);
 
         Livewire::test(Login::class)
             ->set('data.email', $user->email)
@@ -121,7 +121,7 @@ class MicrosoftSignInTest extends TestCase
             'panel' => 'end-user',
         ]])
             ->get(route('auth.microsoft.callback', ['code' => 'code', 'state' => 'state']))
-            ->assertRedirect();
+            ->assertRedirect(url('/end-user/'.$user->tenant->slug));
 
         $this->assertAuthenticatedAs($user);
         $this->assertNull(session(EntraSignInService::SESSION_KEY));
@@ -133,7 +133,7 @@ class MicrosoftSignInTest extends TestCase
         $user->update(['type' => 'agent']);
         $this->fakeMicrosoftAccount(self::OBJECT_ID);
 
-        Filament::setCurrentPanel('agent');
+        Filament::setCurrentPanel(Login::SHARED_PANEL);
 
         Livewire::test(Login::class)
             ->set('data.email', $user->email)
@@ -141,13 +141,15 @@ class MicrosoftSignInTest extends TestCase
             ->assertHasNoErrors()
             ->assertRedirect(route('auth.microsoft.redirect'));
 
+        $this->assertSame('agent', session(EntraSignInService::SESSION_KEY)['panel']);
+
         $this->withSession([EntraSignInService::SESSION_KEY => [
             'user_id' => $user->getKey(),
             'integration_id' => (string) $integration->getKey(),
             'panel' => 'agent',
         ]])
             ->get(route('auth.microsoft.callback', ['code' => 'code', 'state' => 'state']))
-            ->assertRedirect();
+            ->assertRedirect(url('/agent/'.$user->tenant->slug));
 
         $this->assertAuthenticatedAs($user);
         $this->assertNull($user->fresh()->password);
@@ -164,7 +166,7 @@ class MicrosoftSignInTest extends TestCase
             'panel' => 'end-user',
         ]])
             ->get(route('auth.microsoft.callback', ['code' => 'code', 'state' => 'state']))
-            ->assertRedirect(route('filament.end-user.auth.login'));
+            ->assertRedirect(route('login'));
 
         $this->assertGuest();
     }
