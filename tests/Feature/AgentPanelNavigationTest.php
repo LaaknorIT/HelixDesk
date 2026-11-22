@@ -154,7 +154,7 @@ class AgentPanelNavigationTest extends TestCase
             );
 
             $this->assertSame(
-                ['Assets', 'Service offerings', 'Suppliers', 'Identity ambiguities', 'Software products', 'Software deployments', 'Monitoring events'],
+                ['Assets', 'Service offerings', 'Suppliers', 'Identity ambiguities', 'Software products', 'Software deployments', 'Monitoring events', 'Device coverage'],
                 $this->navigationItemLabelsForGroup($navigation, 'Infrastructure'),
             );
 
