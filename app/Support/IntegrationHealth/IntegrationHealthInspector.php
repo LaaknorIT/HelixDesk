@@ -5,6 +5,9 @@ namespace App\Support\IntegrationHealth;
 use App\Enums\IntegrationHealthSeverity;
 use App\Enums\IntegrationHealthStatus;
 use App\Models\OrganizationIntegration;
+use App\Services\DeviceCoverageService;
+use App\Support\DeviceCoverage\CoverageRules;
+use App\Support\DeviceSourceCatalog;
 use App\Support\IntegrationCatalog;
 use App\Support\IntegrationType;
 use App\Support\MicrosoftEntraIntegrationCatalog;
@@ -54,6 +57,7 @@ final class IntegrationHealthInspector
             ...self::permissionIssues($integration, $config, $metadata),
             ...self::scopeWarningIssues($integration, $metadata),
             ...self::staleSyncIssues($integration, $config),
+            ...self::coverageIssues($integration),
         ];
 
         $status = IntegrationHealthStatus::Healthy;
@@ -302,6 +306,51 @@ final class IntegrationHealthInspector
             ]),
             occurredAt: $integration->last_sync_at,
         )];
+    }
+
+    /**
+     * Devices that other sources see as active but that this integration's sources do not report, per coverage
+     * rule. The organization's coverage summary is cached briefly so listing many integrations stays cheap.
+     *
+     * @return list<IntegrationHealthIssue>
+     */
+    private static function coverageIssues(OrganizationIntegration $integration): array
+    {
+        $ownSources = DeviceSourceCatalog::enabledFor($integration);
+        if ($ownSources === []) {
+            return [];
+        }
+
+        $missing = DeviceCoverageService::cachedMissingCounts((int) $integration->tenant_id, (int) $integration->organization_id);
+        $ownRoles = [];
+        foreach ($ownSources as $key) {
+            foreach (DeviceSourceCatalog::find($key)['roles'] ?? [] as $role) {
+                $ownRoles[] = $role;
+            }
+        }
+
+        $issues = [];
+        foreach ($missing as $ruleKey => $count) {
+            $rule = CoverageRules::find($ruleKey);
+            if ($rule === null || $count < 1 || array_intersect(
+                array_map(fn ($role) => $role->value, $rule->expectIn),
+                array_map(fn ($role) => $role->value, $ownRoles),
+            ) === []) {
+                continue;
+            }
+
+            $issues[] = new IntegrationHealthIssue(
+                code: 'coverage_gap',
+                severity: IntegrationHealthSeverity::Warning,
+                title: trans_choice('{1} 1 active device is missing here|[2,*] :count active devices are missing here', $count),
+                detail: __(':rule: :cause Open Device coverage to see which devices.', [
+                    'rule' => $rule->name,
+                    'cause' => $rule->likelyCause,
+                ]),
+            );
+        }
+
+        return $issues;
     }
 
     private static function parseDate(mixed $value): ?Carbon

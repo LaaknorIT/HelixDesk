@@ -268,6 +268,7 @@ A finding comes from a **rule**: *devices that are active in a source with role 
 | --------------- | --------- | ------------------------------- |
 | **On-prem directory → cloud directory** | Active Windows workstation in AD, not in Entra (both role `directory`; AD flagged `on_premises`) | Hybrid join not configured, or the OU is not in Entra Connect's sync scope |
 | **Directory → device management** | Active workstation in a `directory` source, not in any `device_management` source | Missing Intune license for the primary user, enrollment GPO not applied, or enrollment failed |
+| **Remote management → device management** | Active workstation in a `remote_management` source (Windows/macOS), not in any `device_management` source | The device has an RMM agent but is not enrolled, often a missing license |
 | **Device management → remote management** | Active device in a `device_management` source (Windows/macOS), not in any `remote_management` source | RMM agent not deployed (e.g. missing from the Intune app assignment) |
 | **Any → endpoint security** | Active workstation or server in any source, not in any `endpoint_security` source | Onboarding package not deployed; for servers, Defender for Servers not enabled |
 | **Discovered, unmanaged** | A source reports a discovered-only device (e.g. Defender `CanBeOnboarded`), no other source knows it | Unknown device on the network |
@@ -286,6 +287,8 @@ Rule definition (stored in `device_coverage_rules`, tenant scoped, optionally or
   "severity": "warning"
 }
 ```
+
+Phase 2 ships the rules *Directory → device management*, *Remote management → device management*, *Device management → remote management* and *Any → endpoint security* (`App\Support\DeviceCoverage\CoverageRules`). The remaining rules above need the stale/discovered states and come with phase 5.
 
 **License hint (later):** when Entra users are synced, the rule *Directory → device management* can check whether the device's last signed-in user has a license that contains the Intune service plan (`assignedLicenses` / `INTUNE_A`). The finding then says "User has no Intune license" instead of listing all possible causes.
 

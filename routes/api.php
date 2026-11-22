@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AssetController;
+use App\Http\Controllers\Api\V1\DeviceCoverageController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\MonitoringEventController;
 use App\Http\Controllers\Api\V1\ServiceOfferingController;
@@ -26,6 +27,7 @@ Route::prefix('v1')->middleware('auth')->group(function (): void {
     Route::get('assets', [AssetController::class, 'index']);
     Route::post('assets', [AssetController::class, 'store']);
     Route::get('assets/{asset}', [AssetController::class, 'show']);
+    Route::get('device-coverage', [DeviceCoverageController::class, 'index']);
 
     Route::get('suppliers', [SupplierController::class, 'index']);
     Route::post('suppliers', [SupplierController::class, 'store']);
