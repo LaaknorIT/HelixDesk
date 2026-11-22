@@ -66,6 +66,7 @@ final class OrganizationIntegrationOptions
             OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA => trim((string) ($config['azure_tenant_id'] ?? '')),
             OrganizationIntegrationSettings::TYPE_GOOGLE_WORKSPACE => trim((string) ($config['customer_domain'] ?? '')),
             OrganizationIntegrationSettings::TYPE_ACTION1 => trim((string) ($config['action1_organization_id'] ?? '')),
+            OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY => trim((string) ($config['domain_fqdn'] ?? '')),
             default => '',
         };
 

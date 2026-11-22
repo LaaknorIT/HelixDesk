@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\ActiveDirectoryCollectorController;
 use App\Http\Controllers\Api\V1\AssetController;
 use App\Http\Controllers\Api\V1\DeviceCoverageController;
 use App\Http\Controllers\Api\V1\DocumentController;
@@ -8,7 +9,9 @@ use App\Http\Controllers\Api\V1\ServiceOfferingController;
 use App\Http\Controllers\Api\V1\SupplierController;
 use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\WorkItemController;
+use App\Http\Middleware\AuthenticateCollector;
 use App\Http\Middleware\EnsureGlobalAdmin;
+use App\Support\IntegrationType;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->middleware('auth')->group(function (): void {
@@ -49,3 +52,17 @@ Route::prefix('v1')->middleware('auth')->group(function (): void {
     Route::post('documents', [DocumentController::class, 'store']);
     Route::get('documents/{document}', [DocumentController::class, 'show']);
 });
+
+/*
+ * On-premises collectors authenticate with their integration's collector key, not a user session.
+ */
+Route::prefix('v1/collectors/active-directory/{integration}')
+    ->middleware([AuthenticateCollector::class.':'.IntegrationType::ACTIVE_DIRECTORY, 'throttle:120,1'])
+    ->whereUuid('integration')
+    ->group(function (): void {
+        Route::get('config', [ActiveDirectoryCollectorController::class, 'config']);
+        Route::post('heartbeat', [ActiveDirectoryCollectorController::class, 'heartbeat']);
+        Route::post('runs', [ActiveDirectoryCollectorController::class, 'startRun']);
+        Route::post('runs/{run}/objects', [ActiveDirectoryCollectorController::class, 'storeObjects'])->whereUuid('run');
+        Route::post('runs/{run}/complete', [ActiveDirectoryCollectorController::class, 'completeRun'])->whereUuid('run');
+    });

@@ -440,6 +440,45 @@ final class OrganizationIntegrationRepository
     /**
      * @param  array<string, mixed>  $formData
      */
+    public function createActiveDirectoryFromForm(Organization $organization, array $formData): OrganizationIntegration
+    {
+        OrganizationIntegrationSettings::validateActiveDirectoryFormDataForSave($formData);
+
+        return $this->createFromConfig(
+            $organization,
+            IntegrationType::ACTIVE_DIRECTORY,
+            OrganizationIntegrationSettings::activeDirectoryFormDataToConfig($formData),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $formData
+     */
+    public function updateActiveDirectoryFromForm(
+        Organization $organization,
+        string $integrationId,
+        array $formData,
+    ): OrganizationIntegration {
+        OrganizationIntegrationSettings::validateActiveDirectoryFormDataForSave($formData);
+
+        $integration = $this->findModel($organization, $integrationId);
+        if ($integration === null) {
+            abort(404);
+        }
+
+        $integration = $this->updateFromConfig(
+            $integration,
+            OrganizationIntegrationSettings::activeDirectoryFormDataToConfig($formData, $integration->mergedConfig()),
+        );
+        $integration->sync_interval_hours = (int) ($integration->config['sync_interval_hours'] ?? 4);
+        $integration->save();
+
+        return $integration;
+    }
+
+    /**
+     * @param  array<string, mixed>  $formData
+     */
     public function createGoogleWorkspaceFromForm(Organization $organization, array $formData): OrganizationIntegration
     {
         OrganizationIntegrationSettings::validateGoogleWorkspaceFormDataForSave($formData);

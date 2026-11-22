@@ -5,6 +5,7 @@ namespace App\Support\IntegrationHealth;
 use App\Enums\IntegrationHealthSeverity;
 use App\Enums\IntegrationHealthStatus;
 use App\Models\OrganizationIntegration;
+use App\Services\ActiveDirectory\CollectorKeyService;
 use App\Services\DeviceCoverageService;
 use App\Support\DeviceCoverage\CoverageRules;
 use App\Support\DeviceSourceCatalog;
@@ -58,6 +59,7 @@ final class IntegrationHealthInspector
             ...self::scopeWarningIssues($integration, $metadata),
             ...self::staleSyncIssues($integration, $config),
             ...self::coverageIssues($integration),
+            ...self::collectorIssues($integration),
         ];
 
         $status = IntegrationHealthStatus::Healthy;
@@ -306,6 +308,74 @@ final class IntegrationHealthInspector
             ]),
             occurredAt: $integration->last_sync_at,
         )];
+    }
+
+    /**
+     * Push-based integrations (the Active Directory collector): no key yet, never reported, or silent for too long.
+     *
+     * @return list<IntegrationHealthIssue>
+     */
+    private static function collectorIssues(OrganizationIntegration $integration): array
+    {
+        if ($integration->type !== IntegrationType::ACTIVE_DIRECTORY) {
+            return [];
+        }
+
+        if (! app(CollectorKeyService::class)->hasKey($integration)) {
+            return [new IntegrationHealthIssue(
+                code: 'collector_key_missing',
+                severity: IntegrationHealthSeverity::Error,
+                title: __('Collector key not created'),
+                detail: __('Open the integration and choose "Create collector key", then install the collector on a domain-joined machine.'),
+            )];
+        }
+
+        $intervalHours = max(1, (int) ($integration->sync_interval_hours ?? $integration->mergedConfig()['sync_interval_hours'] ?? 4));
+        $staleAfterHours = $intervalHours * self::STALE_SYNC_MULTIPLIER;
+        $collector = is_array($integration->healthMetadata()['collector'] ?? null) ? $integration->healthMetadata()['collector'] : [];
+        $lastContact = collect([
+            self::parseDate($collector['last_heartbeat_at'] ?? null),
+            $integration->last_sync_at,
+        ])->filter()->sortDesc()->first();
+
+        if ($lastContact === null) {
+            if ($integration->created_at !== null && $integration->created_at->gt(now()->subHours($staleAfterHours))) {
+                return [];
+            }
+
+            return [new IntegrationHealthIssue(
+                code: 'collector_never_reported',
+                severity: IntegrationHealthSeverity::Warning,
+                title: __('The collector has not reported yet'),
+                detail: __('Install the collector on a domain-joined machine and check that it can reach HelixDesk over HTTPS.'),
+            )];
+        }
+
+        $issues = [];
+        if ($lastContact->lt(now()->subHours($staleAfterHours))) {
+            $issues[] = new IntegrationHealthIssue(
+                code: 'collector_silent',
+                severity: IntegrationHealthSeverity::Error,
+                title: __('The collector has stopped reporting'),
+                detail: __('The collector on :host last reported :ago. Check that the scheduled task is still running and that the machine can reach HelixDesk.', [
+                    'host' => (string) ($collector['host'] ?? __('the collector machine')),
+                    'ago' => $lastContact->diffForHumans(),
+                ]),
+                occurredAt: $lastContact,
+            );
+        }
+
+        $collectorError = trim((string) ($collector['last_error'] ?? ''));
+        if ($collectorError !== '') {
+            $issues[] = new IntegrationHealthIssue(
+                code: 'collector_error',
+                severity: IntegrationHealthSeverity::Warning,
+                title: __('The collector reported an error'),
+                detail: IntegrationErrorExplainer::summary($collectorError, 400),
+            );
+        }
+
+        return $issues;
     }
 
     /**

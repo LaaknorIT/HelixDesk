@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\Action1ApiRegion;
+use App\Models\AssetSourceRecord;
 use App\Models\Organization;
 use App\Models\OrganizationIntegration;
 use App\Repositories\OrganizationIntegrationRepository;
@@ -16,6 +17,11 @@ final class OrganizationIntegrationSettings
     public const TYPE_GOOGLE_WORKSPACE = IntegrationType::GOOGLE_WORKSPACE;
 
     public const TYPE_ACTION1 = IntegrationType::ACTION1;
+
+    public const TYPE_ACTIVE_DIRECTORY = IntegrationType::ACTIVE_DIRECTORY;
+
+    /** Active Directory replicates lastLogonTimestamp only every 9–14 days, so shorter windows give false "stale". */
+    public const ACTIVE_DIRECTORY_MIN_ACTIVE_DAYS = 21;
 
     /**
      * @return list<string>
@@ -560,6 +566,90 @@ final class OrganizationIntegrationSettings
                 'security_work_items' => (bool) ($data['entra_scope_security_work_items'] ?? false),
                 'mail' => (bool) ($data['entra_scope_mail'] ?? false),
             ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function blankActiveDirectoryFormFields(): array
+    {
+        return [
+            'ad_domain_fqdn' => '',
+            'ad_search_bases' => '',
+            'ad_excluded_ous' => '',
+            'ad_active_threshold_days' => AssetSourceRecord::DEFAULT_ACTIVE_THRESHOLD_DAYS,
+            'ad_create_assets' => 'active_only',
+            'ad_sync_interval_hours' => 4,
+            'ad_enabled' => true,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>
+     */
+    public static function activeDirectoryConfigToFormFields(array $config): array
+    {
+        return [
+            'ad_domain_fqdn' => (string) ($config['domain_fqdn'] ?? ''),
+            'ad_search_bases' => implode("\n", (array) ($config['search_bases'] ?? [])),
+            'ad_excluded_ous' => implode("\n", (array) ($config['excluded_ous'] ?? [])),
+            'ad_active_threshold_days' => (int) ($config['active_threshold_days'] ?? AssetSourceRecord::DEFAULT_ACTIVE_THRESHOLD_DAYS),
+            'ad_create_assets' => (string) ($config['create_assets'] ?? 'active_only'),
+            'ad_sync_interval_hours' => (int) ($config['sync_interval_hours'] ?? 4),
+            'ad_enabled' => (bool) ($config['enabled'] ?? false),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public static function validateActiveDirectoryFormDataForSave(array $data): void
+    {
+        $errors = [];
+
+        $domain = trim((string) ($data['ad_domain_fqdn'] ?? ''));
+        if ($domain === '' || ! preg_match('/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i', $domain)) {
+            $errors['ad_domain_fqdn'] = __('Enter the domain name, for example corp.example.com.');
+        }
+
+        $threshold = (int) ($data['ad_active_threshold_days'] ?? 0);
+        if ($threshold < self::ACTIVE_DIRECTORY_MIN_ACTIVE_DAYS) {
+            $errors['ad_active_threshold_days'] = __('Use at least :days days. Active Directory only updates the last logon time every 9 to 14 days.', ['days' => self::ACTIVE_DIRECTORY_MIN_ACTIVE_DAYS]);
+        }
+
+        if (! in_array($data['ad_create_assets'] ?? null, ['active_only', 'all', 'never'], true)) {
+            $errors['ad_create_assets'] = __('Choose when computers become assets.');
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>|null  $previousConfig
+     * @return array<string, mixed>
+     */
+    public static function activeDirectoryFormDataToConfig(array $data, ?array $previousConfig = null): array
+    {
+        $lines = fn (mixed $value): array => array_values(array_filter(array_map(
+            'trim',
+            preg_split('/\R/', (string) $value) ?: [],
+        ), fn (string $line): bool => $line !== ''));
+
+        return [
+            'enabled' => (bool) ($data['ad_enabled'] ?? false),
+            'domain_fqdn' => mb_strtolower(trim((string) ($data['ad_domain_fqdn'] ?? ''))),
+            'search_bases' => $lines($data['ad_search_bases'] ?? ''),
+            'excluded_ous' => $lines($data['ad_excluded_ous'] ?? ''),
+            'active_threshold_days' => max(self::ACTIVE_DIRECTORY_MIN_ACTIVE_DAYS, (int) ($data['ad_active_threshold_days'] ?? AssetSourceRecord::DEFAULT_ACTIVE_THRESHOLD_DAYS)),
+            'create_assets' => (string) ($data['ad_create_assets'] ?? 'active_only'),
+            'sync_interval_hours' => max(1, (int) ($data['ad_sync_interval_hours'] ?? 4)),
+            'scopes' => ['computers' => true],
+            'mode' => 'collector',
         ];
     }
 

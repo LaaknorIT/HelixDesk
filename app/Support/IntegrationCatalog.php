@@ -106,6 +106,30 @@ final class IntegrationCatalog
                     ],
                 ],
             ],
+            IntegrationType::ACTIVE_DIRECTORY => [
+                'type' => IntegrationType::ACTIVE_DIRECTORY,
+                'name' => __('Active Directory (on-premises)'),
+                'vendor' => __('Microsoft'),
+                'summary' => __('A small PowerShell collector on the customer network sends computer objects from Active Directory to HelixDesk over HTTPS. No VPN or inbound firewall rules.'),
+                'categories' => [self::CATEGORY_IDENTITY],
+                'icon' => Heroicon::OutlinedServerStack,
+                'setup_minutes' => 15,
+                'requirements' => [
+                    __('A domain-joined Windows machine that can reach HelixDesk over HTTPS'),
+                    __('A domain account (or gMSA) that can read computer objects; a normal domain user is enough'),
+                ],
+                'capabilities' => [
+                    'computers' => __('Computers with last logon, operating system and OU'),
+                ],
+                'docs_url' => null,
+                'device_sources' => [
+                    DeviceSourceKey::ACTIVE_DIRECTORY => [
+                        'label' => __('Active Directory'),
+                        'roles' => [DeviceSourceRole::Directory],
+                        'scope' => 'computers',
+                    ],
+                ],
+            ],
             IntegrationType::GOOGLE_WORKSPACE => [
                 'type' => IntegrationType::GOOGLE_WORKSPACE,
                 'name' => __('Google Workspace'),

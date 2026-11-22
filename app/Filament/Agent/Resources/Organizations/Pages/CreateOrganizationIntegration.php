@@ -6,10 +6,12 @@ use App\Filament\Agent\Resources\Organizations\Concerns\HandlesAction1Integratio
 use App\Filament\Agent\Resources\Organizations\Concerns\HandlesMicrosoftEntraIntegrationSave;
 use App\Filament\Agent\Resources\Organizations\OrganizationResource;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationAction1SettingsSchema;
+use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationActiveDirectorySettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationEntraSettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationGoogleWorkspaceSettingsSchema;
 use App\Repositories\OrganizationIntegrationRepository;
 use App\Support\OrganizationIntegrationSettings;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
@@ -22,6 +24,8 @@ class CreateOrganizationIntegration extends EditRecord
     protected static string $resource = OrganizationResource::class;
 
     public string $integrationType = OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA;
+
+    protected ?string $savedActiveDirectoryIntegrationId = null;
 
     public function mount(int|string $record): void
     {
@@ -38,6 +42,7 @@ class CreateOrganizationIntegration extends EditRecord
         return match ($this->integrationType) {
             OrganizationIntegrationSettings::TYPE_ACTION1 => OrganizationAction1SettingsSchema::configure($schema),
             OrganizationIntegrationSettings::TYPE_GOOGLE_WORKSPACE => OrganizationGoogleWorkspaceSettingsSchema::configure($schema),
+            OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY => OrganizationActiveDirectorySettingsSchema::configure($schema),
             default => OrganizationEntraSettingsSchema::configure($schema),
         };
     }
@@ -68,6 +73,7 @@ class CreateOrganizationIntegration extends EditRecord
         $blankFields = match ($this->integrationType) {
             OrganizationIntegrationSettings::TYPE_ACTION1 => OrganizationIntegrationSettings::blankAction1FormFields(),
             OrganizationIntegrationSettings::TYPE_GOOGLE_WORKSPACE => OrganizationIntegrationSettings::blankGoogleWorkspaceFormFields(),
+            OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY => OrganizationIntegrationSettings::blankActiveDirectoryFormFields(),
             default => OrganizationIntegrationSettings::blankEntraFormFields(),
         };
 
@@ -92,6 +98,17 @@ class CreateOrganizationIntegration extends EditRecord
             );
 
             $this->savedAction1IntegrationId = (string) $integration->getKey();
+
+            return [];
+        }
+
+        if ($this->integrationType === OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY) {
+            $integration = app(OrganizationIntegrationRepository::class)->createActiveDirectoryFromForm(
+                $this->record,
+                $data,
+            );
+
+            $this->savedActiveDirectoryIntegrationId = (string) $integration->getKey();
 
             return [];
         }
@@ -129,11 +146,34 @@ class CreateOrganizationIntegration extends EditRecord
             return;
         }
 
+        if ($this->integrationType === OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY) {
+            return;
+        }
+
         $this->queueMicrosoftEntraSyncIfReady();
+    }
+
+    protected function getSavedNotification(): ?Notification
+    {
+        if ($this->integrationType === OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY) {
+            return Notification::make()
+                ->success()
+                ->title(__('Active Directory integration created'))
+                ->body(__('Next, create the collector key and download the collector script on this page.'));
+        }
+
+        return parent::getSavedNotification();
     }
 
     protected function getRedirectUrl(): ?string
     {
+        if ($this->integrationType === OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY && $this->savedActiveDirectoryIntegrationId !== null) {
+            return static::getResource()::getUrl('settings.integrations.edit', [
+                'record' => $this->getRecord(),
+                'integration' => $this->savedActiveDirectoryIntegrationId,
+            ]);
+        }
+
         return static::getResource()::getUrl('settings', ['record' => $this->getRecord()]);
     }
 }
