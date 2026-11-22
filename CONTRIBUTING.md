@@ -8,7 +8,7 @@ Thanks for helping make HelixDesk a good open source tool for IT departments and
 - **Security problems:** do not open a public issue. Follow [SECURITY.md](SECURITY.md).
 - Never paste passwords, API keys, mailbox contents or customer data into an issue.
 
-Check [`docs/roadmap.md`](docs/roadmap.md) first: your idea may already be planned.
+Check the [roadmap issues](https://github.com/LaaknorIT/HelixDesk/issues?q=is%3Aissue+label%3Aroadmap) first: your idea may already be planned.
 
 ## Development setup
 

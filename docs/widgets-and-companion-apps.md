@@ -1,12 +1,12 @@
 # Widgets and companion apps
 
-Design for the roadmap items **API tokens and widget API** (Release 4) and **Widgets and companion apps** (Priority 2) in [`roadmap.md`](roadmap.md). The goal is that agents and end users can see their most important tickets, tasks and projects from their **own HelixDesk installation** without opening the web app: in the browser, on the desktop (Windows, macOS, Linux) and on the phone (Android, iOS).
+Design for the roadmap items **API tokens and widget API** ([#36](https://github.com/LaaknorIT/HelixDesk/issues/36), Release 4) and **Widgets and companion apps** ([#38](https://github.com/LaaknorIT/HelixDesk/issues/38), Priority 2). The goal is that agents and end users can see their most important tickets, tasks and projects from their **own HelixDesk installation** without opening the web app: in the browser, on the desktop (Windows, macOS, Linux) and on the phone (Android, iOS).
 
 Because HelixDesk is self-hosted, every client connects to **any instance URL** the user enters. There is no central cloud service.
 
 ## Content
 
-- Counts: my open tickets, unassigned tickets in my queues, SLA close to breach, SLA breached, my tasks (`WorkItemType::Task`), and later my projects (see the project module in the roadmap).
+- Counts: my open tickets, unassigned tickets in my queues, SLA close to breach, SLA breached, my tasks (`WorkItemType::Task`), and later my projects (see the project module, [#37](https://github.com/LaaknorIT/HelixDesk/issues/37)).
 - Short lists ("feeds") the user picks per widget, for example *My tickets*, *Queue: Service desk*, *SLA at risk*, *My tasks*.
 - Tapping a row opens the item in HelixDesk.
 

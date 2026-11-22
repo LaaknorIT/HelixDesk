@@ -1,6 +1,6 @@
 # Agent productivity
 
-Design for the Release 1 roadmap item **Agent productivity** ([`roadmap.md`](roadmap.md)): canned responses, merging and linking tickets, watchers and CC, and a collision warning. Everything lives on the agent ticket page.
+Design for the Release 1 roadmap item **Agent productivity** ([#23](https://github.com/LaaknorIT/HelixDesk/issues/23)): canned responses, merging and linking tickets, watchers and CC, and a collision warning. Everything lives on the agent ticket page.
 
 ## Canned responses
 

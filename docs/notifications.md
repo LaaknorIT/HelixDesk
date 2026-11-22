@@ -1,6 +1,6 @@
 # Agent notifications
 
-Design for the Release 1 roadmap item **Notifications** ([`roadmap.md`](roadmap.md)). It covers notifications to **agents** about tickets. Mail to customers is unchanged and stays with the ticket email channel ([`email-handling.md`](email-handling.md)).
+Design for the Release 1 roadmap item **Notifications** ([#22](https://github.com/LaaknorIT/HelixDesk/issues/22)). It covers notifications to **agents** about tickets. Mail to customers is unchanged and stays with the ticket email channel ([`email-handling.md`](email-handling.md)).
 
 ## Events
 

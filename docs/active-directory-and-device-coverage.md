@@ -9,7 +9,7 @@ This document designs two related features:
 
 It builds on the multi-source CMDB in [`integrations.md`](integrations.md) (`organization_integrations`, `asset_external_identifiers`, `AssetReconciliationService`), the integration gallery and health warnings (`IntegrationCatalog`, `IntegrationHealthInspector`), and the planned Sanctum tokens in [`widgets-and-companion-apps.md`](widgets-and-companion-apps.md).
 
-**Related docs:** [`integrations.md`](integrations.md) §4–§6 and §12, [`roadmap.md`](roadmap.md) Priority 2, [`technical-architecture.md`](technical-architecture.md).
+**Related docs:** [`integrations.md`](integrations.md) §4–§6 and §12, roadmap issues [#40](https://github.com/LaaknorIT/HelixDesk/issues/40) and [#41](https://github.com/LaaknorIT/HelixDesk/issues/41), [`technical-architecture.md`](technical-architecture.md).
 
 ---
 
@@ -131,7 +131,7 @@ The coverage report treats each of these as a **separate source**. Intune and De
 | Defender for Endpoint | `microsoft_defender` (new) | Onboarded to Defender (EDR/AV) | `lastSeen` | `DefenderMachineId`, `aadDeviceId`, hostname, MAC |
 | Action1 | `action1` (exists) | RMM / patch agent installed | `last_seen` | `Action1EndpointId`, serial, MAC, hostname |
 
-Future sources plug into the same table: Tactical RMM, NinjaOne, Datto RMM (roadmap Priority 2), Google Workspace endpoint management (ChromeOS and Windows devices), Jamf.
+Future sources plug into the same table: Tactical RMM, NinjaOne, Datto RMM ([#39](https://github.com/LaaknorIT/HelixDesk/issues/39)), Google Workspace endpoint management (ChromeOS and Windows devices), Jamf.
 
 ### 3.1 Microsoft Defender for Endpoint as its own integration
 
@@ -275,7 +275,7 @@ Rule definition (stored in `device_coverage_rules`, tenant scoped, optionally or
 - A nightly job (`ComputeDeviceCoverageJob`, per organization, after syncs) writes `device_coverage_findings` with `first_detected_at` and `resolved_at`. That gives **trends** ("Intune coverage went from 71 % to 94 % this quarter") and lets the report show how long a gap has existed.
 - **Exceptions:** an agent can accept a finding with a reason and an optional expiry date (lab PC, kiosk, device being retired). Accepted findings are hidden from the default view and the tiles, and are written to the activity log.
 - **Integration health:** the gallery and the organization's integration page show a warning such as "14 active AD computers are not in Intune", linking to the filtered report. This reuses `IntegrationHealthIssue` with a new *coverage* kind.
-- **Tickets (optional, per rule):** create or update **one** ticket per organization and rule listing the devices, instead of one ticket per device. This fits the planned recurring tickets (roadmap Release 2) and the monthly MSP customer report (Release 3).
+- **Tickets (optional, per rule):** create or update **one** ticket per organization and rule listing the devices, instead of one ticket per device. This fits the planned recurring tickets ([#28](https://github.com/LaaknorIT/HelixDesk/issues/28)) and the monthly MSP customer report ([#32](https://github.com/LaaknorIT/HelixDesk/issues/32)).
 - **Dashboard widget:** coverage per rule, using the widget API from `widgets-and-companion-apps.md`.
 
 ---
