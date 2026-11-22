@@ -101,11 +101,13 @@ class OutboundWorkItemMailService
             : null;
         $fromName = $author->name;
         $outboundProtocol = $mailAccount->outbound_protocol?->value;
+        $cc = $workItem->ccAddressList();
 
         $this->mailLogger->info($mailAccount, 'Attempting outbound work item reply mail.', [
             'work_item_id' => $workItem->getKey(),
             'work_item_message_id' => $message->getKey(),
             'to' => $recipient->email,
+            'cc' => $cc,
             'from' => $fromAddress,
             'reply_to' => $replyTo,
             'subject' => $subject,
@@ -128,6 +130,7 @@ class OutboundWorkItemMailService
                     inReplyTo: $inReplyTo,
                     references: $references,
                     replyTo: $replyTo,
+                    cc: $cc,
                 );
             } elseif ($mailAccount->outbound_protocol === MailOutboundProtocol::GoogleGmailApi) {
                 $this->mailLogger->warning($mailAccount, 'Google Workspace Gmail API outbound mail is not implemented yet.', [
@@ -149,6 +152,7 @@ class OutboundWorkItemMailService
                     messageId: $messageId,
                     message: $message,
                     replyTo: $replyTo,
+                    cc: $cc,
                 );
             }
         } catch (Throwable $e) {
@@ -168,6 +172,7 @@ class OutboundWorkItemMailService
             'email_references' => $references,
             'from_address' => $fromAddress,
             'to_addresses' => [$recipient->email],
+            'cc_addresses' => $cc === [] ? null : $cc,
             'mail_account_id' => $mailAccount->getKey(),
             'email_sent_at' => now(),
         ]);
@@ -310,6 +315,9 @@ class OutboundWorkItemMailService
         return implode(' ', $refs);
     }
 
+    /**
+     * @param  list<string>  $cc
+     */
     private function sendViaSmtp(
         MailAccount $mailAccount,
         string $to,
@@ -322,6 +330,7 @@ class OutboundWorkItemMailService
         string $messageId,
         WorkItemMessage $message,
         ?string $replyTo = null,
+        array $cc = [],
     ): void {
         $settings = is_array($mailAccount->connection_settings) ? $mailAccount->connection_settings : [];
         $mailerName = 'mail_account_'.$mailAccount->getKey();
@@ -349,11 +358,15 @@ class OutboundWorkItemMailService
             $messageId,
             $message,
             $replyTo,
+            $cc,
         ): void {
             $symfony = $laravelMessage->getSymfonyMessage();
             if ($symfony instanceof Email) {
                 $symfony->from(new Address($fromAddress, $fromName));
                 $symfony->to($to);
+                if ($cc !== []) {
+                    $symfony->cc(...$cc);
+                }
                 $symfony->subject($subject);
                 $symfony->text($body);
                 $symfony->getHeaders()->addIdHeader('Message-ID', trim($messageId, '<>'));
@@ -376,6 +389,9 @@ class OutboundWorkItemMailService
         });
     }
 
+    /**
+     * @param  list<string>  $cc
+     */
     private function sendViaGraph(
         MailAccount $mailAccount,
         string $to,
@@ -386,6 +402,7 @@ class OutboundWorkItemMailService
         ?string $inReplyTo,
         ?string $references,
         ?string $replyTo = null,
+        array $cc = [],
     ): void {
         $creds = $this->entraResolver->resolve($mailAccount);
         $client = new MicrosoftGraphHttpClient(
@@ -435,6 +452,13 @@ class OutboundWorkItemMailService
             ],
             'saveToSentItems' => true,
         ];
+
+        if ($cc !== []) {
+            $payload['message']['ccRecipients'] = array_map(
+                fn (string $address): array => ['emailAddress' => ['address' => $address]],
+                $cc,
+            );
+        }
 
         if ($replyTo !== null && trim($replyTo) !== '') {
             $payload['message']['replyTo'] = [

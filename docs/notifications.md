@@ -8,8 +8,8 @@ Design for the Release 1 roadmap item **Notifications** ([`roadmap.md`](roadmap.
 |-------|------------|-----------------|
 | **New ticket** | A work item is created from any source (portal, agent panel, API, email, monitoring, automation). | Agents who can read the ticket's queue. |
 | **Assigned** | `assigned_agent_id` is set or changed. | The new assignee, unless they assigned it to themselves. |
-| **Customer reply** | The requester adds a public message by email or in the portal. | The assignee, or the queue's agents when the ticket is unassigned. |
-| **SLA at risk** | First response or resolution is due within the warning window (default 30 minutes) and the SLA is not paused. Sent once per target. | The assignee, or the queue's agents when the ticket is unassigned. |
+| **Customer reply** | The requester adds a public message by email or in the portal. | The assignee, or the queue's agents when the ticket is unassigned, plus the ticket's watchers. |
+| **SLA at risk** | First response or resolution is due within the warning window (default 30 minutes) and the SLA is not paused. Sent once per target. | The assignee, or the queue's agents when the ticket is unassigned, plus the ticket's watchers. |
 
 The agent who caused an event is never notified about it.
 

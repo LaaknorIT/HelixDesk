@@ -172,6 +172,7 @@ class AgentPanelNavigationTest extends TestCase
                     'Ticket transitions',
                     'Categories',
                     'Ticket automations',
+                    'Canned responses',
                     'SLA policies',
                 ],
                 $this->navigationItemLabelsForGroup($navigation, 'Administration'),

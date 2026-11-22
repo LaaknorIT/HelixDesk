@@ -22,6 +22,7 @@ class WorkItemMessage extends TenantModel
         'email_references',
         'from_address',
         'to_addresses',
+        'cc_addresses',
         'mail_account_id',
         'email_sent_at',
     ];
@@ -61,6 +62,7 @@ class WorkItemMessage extends TenantModel
         return [
             'is_internal' => 'boolean',
             'to_addresses' => 'array',
+            'cc_addresses' => 'array',
             'email_sent_at' => 'datetime',
         ];
     }

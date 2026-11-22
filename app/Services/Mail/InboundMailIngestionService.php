@@ -14,6 +14,7 @@ use App\Models\WorkItemMessageAttachment;
 use App\Services\SlaPolicyResolver;
 use App\Services\SlaTimerService;
 use App\Services\WorkItemAutomationService;
+use App\Services\WorkItems\WorkItemCollaborationService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -28,6 +29,7 @@ class InboundMailIngestionService
         private readonly WorkItemAutomationService $automationService,
         private readonly SlaPolicyResolver $slaPolicyResolver,
         private readonly SlaTimerService $slaTimerService,
+        private readonly WorkItemCollaborationService $collaboration,
     ) {}
 
     public function ingest(MailAccount $account, string $rawMime, ?string $transportUid = null): InboundMailIngestOutcome
@@ -57,6 +59,11 @@ class InboundMailIngestionService
         }
 
         $threadMatch = $this->resolveWorkItemForInbound($account, $parsed);
+
+        if ($threadMatch['work_item']?->merged_into_work_item_id !== null) {
+            $threadMatch['work_item'] = $this->collaboration->resolveMergeTarget($threadMatch['work_item']);
+            $threadMatch['match_method'] .= '+merged';
+        }
         $existing = $threadMatch['work_item'];
 
         if ($existing === null && $this->resolveQueueForAccount($account) === null) {
