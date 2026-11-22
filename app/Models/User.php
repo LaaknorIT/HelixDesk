@@ -5,10 +5,12 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Enums\AgentNotificationChannel;
 use App\Enums\WorkItemNotificationEvent;
+use App\Support\Locales;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,7 +24,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 use function Illuminate\Support\enum_value;
 
-class User extends Authenticatable implements FilamentUser, HasTenants
+class User extends Authenticatable implements FilamentUser, HasLocalePreference, HasTenants
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasRoles, Notifiable;
@@ -44,6 +46,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         'last_mfa_at',
         'is_admin',
         'notification_preferences',
+        'locale',
     ];
 
     /**
@@ -89,6 +92,14 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     /**
      * Users synced from an identity provider sign in through it and have no local password.
      */
+    /**
+     * Mail and notifications to this user are written in their chosen language.
+     */
+    public function preferredLocale(): string
+    {
+        return Locales::forUser($this);
+    }
+
     public function isManagedByIdentityProvider(): bool
     {
         return filled($this->entra_object_id);

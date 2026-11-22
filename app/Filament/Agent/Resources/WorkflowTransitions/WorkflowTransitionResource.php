@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\WorkflowTransitions\Pages\EditWorkflowTransitio
 use App\Filament\Agent\Resources\WorkflowTransitions\Pages\ListWorkflowTransitions;
 use App\Filament\Agent\Resources\WorkflowTransitions\Schemas\WorkflowTransitionForm;
 use App\Filament\Agent\Resources\WorkflowTransitions\Tables\WorkflowTransitionsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\WorkflowTransition;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -20,19 +21,21 @@ use UnitEnum;
 
 class WorkflowTransitionResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = WorkflowTransition::class;
 
     protected static ?string $navigationLabel = 'Ticket transitions';
 
-    protected static ?string $modelLabel = 'Ticket transition';
+    protected static ?string $modelLabel = 'ticket transition';
 
-    protected static ?string $pluralModelLabel = 'Ticket transitions';
+    protected static ?string $pluralModelLabel = 'ticket transitions';
 
     protected static ?int $navigationSort = 54;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowsRightLeft;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Administration';
+    protected static string|UnitEnum|null $navigationGroup = 'Ticket setup';
 
     public static function getEloquentQuery(): Builder
     {

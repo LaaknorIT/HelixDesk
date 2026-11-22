@@ -2,6 +2,15 @@
 
 return [
 
+    /*
+     * Languages users can pick for the interface. English is the default and the fallback for any text
+     * a language file does not translate. Add a language by adding lang/<code>.json and an entry here.
+     */
+    'locales' => [
+        'en' => 'English',
+        'nb' => 'Norsk bokmål',
+    ],
+
     'notifications' => [
         // Minutes before an SLA target is due when agents are warned that it is at risk.
         'sla_warning_minutes' => (int) env('HELIXDESK_SLA_WARNING_MINUTES', 30),
@@ -48,8 +57,8 @@ return [
     'organizations' => [
         'navigation_group' => env('HELIXDESK_ORG_NAV_GROUP', 'Customers'),
         'navigation_label' => env('HELIXDESK_ORG_NAV_LABEL', 'Customers'),
-        'model_label' => env('HELIXDESK_ORG_MODEL_LABEL', 'Customer'),
-        'plural_model_label' => env('HELIXDESK_ORG_PLURAL_MODEL_LABEL', 'Customers'),
+        'model_label' => env('HELIXDESK_ORG_MODEL_LABEL', 'customer'),
+        'plural_model_label' => env('HELIXDESK_ORG_PLURAL_MODEL_LABEL', 'customers'),
     ],
 
     'entra' => [

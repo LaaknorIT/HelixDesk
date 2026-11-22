@@ -6,6 +6,7 @@ use App\Filament\Agent\Resources\TenantRoles\Pages\CreateTenantRole;
 use App\Filament\Agent\Resources\TenantRoles\Pages\EditTenantRole;
 use App\Filament\Agent\Resources\TenantRoles\Pages\ListTenantRoles;
 use App\Filament\Agent\Resources\TenantRoles\Tables\TenantRolesTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\TenantRole;
 use BackedEnum;
 use Filament\Forms\Components\TextInput;
@@ -19,13 +20,15 @@ use UnitEnum;
 
 class TenantRoleResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = TenantRole::class;
 
     protected static ?string $navigationLabel = 'Roles';
 
-    protected static ?string $modelLabel = 'Role';
+    protected static ?string $modelLabel = 'role';
 
-    protected static ?string $pluralModelLabel = 'Roles';
+    protected static ?string $pluralModelLabel = 'roles';
 
     protected static ?int $navigationSort = 52;
 
@@ -83,7 +86,7 @@ class TenantRoleResource extends Resource
         return $schema
             ->components([
                 TextInput::make('name')
-                    ->label('Role name')
+                    ->label(__('Role name'))
                     ->required()
                     ->maxLength(255),
             ]);

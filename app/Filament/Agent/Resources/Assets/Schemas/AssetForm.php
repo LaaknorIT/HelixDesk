@@ -17,12 +17,12 @@ class AssetForm
         return $schema
             ->components([
                 Select::make('organization_id')
-                    ->label('Organization scope')
+                    ->label(__('Organization scope'))
                     ->options(fn (): array => Organization::selectArray())
                     ->searchable()
                     ->default(null),
                 Select::make('asset_type_id')
-                    ->label('Type')
+                    ->label(__('Type'))
                     ->relationship('assetType', 'name')
                     ->searchable()
                     ->preload()
@@ -31,7 +31,7 @@ class AssetForm
                     ->required()
                     ->maxLength(255),
                 TextInput::make('asset_identifier')
-                    ->label('Asset tag / ID')
+                    ->label(__('Asset tag / ID'))
                     ->maxLength(255)
                     ->default(null),
                 TextInput::make('serial_number')
@@ -42,13 +42,13 @@ class AssetForm
                 Select::make('lifecycle_status')
                     ->required()
                     ->options([
-                        'in_use' => 'In use',
-                        'in_stock' => 'In stock',
-                        'retired' => 'Retired',
+                        'in_use' => __('In use'),
+                        'in_stock' => __('In stock'),
+                        'retired' => __('Retired'),
                     ])
                     ->default('in_use'),
                 Select::make('owner_user_id')
-                    ->label('Owner (user)')
+                    ->label(__('Owner (user)'))
                     ->relationship(
                         name: 'owner',
                         titleAttribute: 'name',

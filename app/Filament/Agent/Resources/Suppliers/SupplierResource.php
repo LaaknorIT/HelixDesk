@@ -8,6 +8,7 @@ use App\Filament\Agent\Resources\Suppliers\Pages\ListSuppliers;
 use App\Filament\Agent\Resources\Suppliers\RelationManagers\DocumentsRelationManager;
 use App\Filament\Agent\Resources\Suppliers\Schemas\SupplierForm;
 use App\Filament\Agent\Resources\Suppliers\Tables\SuppliersTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\Supplier;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -20,6 +21,8 @@ use UnitEnum;
 
 class SupplierResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = Supplier::class;
 
     protected static ?int $navigationSort = 32;

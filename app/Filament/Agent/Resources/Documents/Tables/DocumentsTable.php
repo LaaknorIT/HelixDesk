@@ -19,7 +19,7 @@ class DocumentsTable
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('doc_type')
-                    ->label('Type')
+                    ->label(__('Type'))
                     ->badge()
                     ->sortable(),
                 TextColumn::make('status')
@@ -29,8 +29,8 @@ class DocumentsTable
                     ->badge()
                     ->toggleable(),
                 TextColumn::make('owner.name')
-                    ->label('Owner')
-                    ->placeholder('—'),
+                    ->label(__('Owner'))
+                    ->placeholder(__('—')),
                 TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
@@ -39,14 +39,14 @@ class DocumentsTable
             ->filters([
                 SelectFilter::make('doc_type')
                     ->options([
-                        'kb' => 'Knowledge base',
-                        'helpdesk' => 'Helpdesk guide',
-                        'it_doc' => 'IT operations doc',
+                        'kb' => __('Knowledge base'),
+                        'helpdesk' => __('Helpdesk guide'),
+                        'it_doc' => __('IT operations doc'),
                     ]),
                 SelectFilter::make('status')
                     ->options([
-                        'draft' => 'Draft',
-                        'published' => 'Published',
+                        'draft' => __('Draft'),
+                        'published' => __('Published'),
                     ]),
             ])
             ->recordActions([

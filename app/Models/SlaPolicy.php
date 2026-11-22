@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\WorkItemPriority;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -21,6 +23,16 @@ class SlaPolicy extends TenantModel
         'applies_to_work_item_type',
         'match_priority',
     ];
+
+    /**
+     * Stored with the same names as ticket priorities, so the policy matches; empty means any priority.
+     */
+    protected function appliesToPriority(): Attribute
+    {
+        return Attribute::make(
+            set: fn (mixed $value): ?string => blank($value) ? null : WorkItemPriority::normalize($value),
+        );
+    }
 
     protected function casts(): array
     {

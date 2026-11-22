@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\SlaPolicies\Pages\EditSlaPolicy;
 use App\Filament\Agent\Resources\SlaPolicies\Pages\ListSlaPolicies;
 use App\Filament\Agent\Resources\SlaPolicies\Schemas\SlaPolicyForm;
 use App\Filament\Agent\Resources\SlaPolicies\Tables\SlaPoliciesTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\SlaPolicy;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -19,6 +20,8 @@ use UnitEnum;
 
 class SlaPolicyResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = SlaPolicy::class;
 
     protected static ?string $navigationLabel = 'SLA policies';
@@ -31,7 +34,7 @@ class SlaPolicyResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Administration';
+    protected static string|UnitEnum|null $navigationGroup = 'Ticket setup';
 
     public static function canAccess(): bool
     {

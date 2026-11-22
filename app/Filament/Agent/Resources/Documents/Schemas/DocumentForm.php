@@ -16,40 +16,40 @@ class DocumentForm
         return $schema
             ->components([
                 Select::make('doc_type')
-                    ->label('Type')
+                    ->label(__('Type'))
                     ->required()
                     ->options([
-                        'kb' => 'Knowledge base',
-                        'helpdesk' => 'Helpdesk guide',
-                        'it_doc' => 'IT operations doc',
+                        'kb' => __('Knowledge base'),
+                        'helpdesk' => __('Helpdesk guide'),
+                        'it_doc' => __('IT operations doc'),
                     ]),
                 TextInput::make('title')
                     ->required()
                     ->maxLength(255),
                 TextInput::make('slug')
-                    ->label('URL slug')
+                    ->label(__('URL slug'))
                     ->maxLength(255)
-                    ->helperText('Leave blank on create to generate from the title.'),
+                    ->helperText(__('Leave blank on create to generate from the title.')),
                 Textarea::make('content')
                     ->rows(12)
                     ->columnSpanFull(),
                 Select::make('status')
                     ->options([
-                        'draft' => 'Draft',
-                        'published' => 'Published',
+                        'draft' => __('Draft'),
+                        'published' => __('Published'),
                     ])
                     ->required()
                     ->default('draft'),
                 Select::make('visibility')
                     ->options([
-                        'public' => 'Public',
-                        'authenticated' => 'Authenticated users',
-                        'restricted' => 'Restricted',
+                        'public' => __('Public'),
+                        'authenticated' => __('Authenticated users'),
+                        'restricted' => __('Restricted'),
                     ])
                     ->required()
                     ->default('authenticated'),
                 Select::make('owner_user_id')
-                    ->label('Owner')
+                    ->label(__('Owner'))
                     ->relationship(
                         name: 'owner',
                         titleAttribute: 'name',

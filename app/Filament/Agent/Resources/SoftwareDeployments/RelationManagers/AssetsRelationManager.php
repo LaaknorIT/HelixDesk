@@ -25,11 +25,11 @@ class AssetsRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->searchable(),
                 TextColumn::make('pivot.role')
-                    ->label('Role')
+                    ->label(__('Role'))
                     ->badge(),
                 TextColumn::make('organization.name')
-                    ->label('Organization')
-                    ->placeholder('—'),
+                    ->label(__('Organization'))
+                    ->placeholder(__('—')),
             ])
             ->headerActions([
                 AttachAction::make()
@@ -37,9 +37,9 @@ class AssetsRelationManager extends RelationManager
                         $action->getRecordSelect(),
                         Select::make('role')
                             ->options([
-                                'hosted_on' => 'Hosted on',
-                                'related' => 'Related',
-                                'identity_provider' => 'Identity provider',
+                                'hosted_on' => __('Hosted on'),
+                                'related' => __('Related'),
+                                'identity_provider' => __('Identity provider'),
                             ])
                             ->required()
                             ->default('related'),

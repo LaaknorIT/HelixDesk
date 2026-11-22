@@ -19,7 +19,7 @@ class SuppliersTable
                     ->sortable(),
                 TextColumn::make('notes')
                     ->limit(50)
-                    ->placeholder('—')
+                    ->placeholder(__('—'))
                     ->toggleable(),
                 TextColumn::make('updated_at')
                     ->dateTime()

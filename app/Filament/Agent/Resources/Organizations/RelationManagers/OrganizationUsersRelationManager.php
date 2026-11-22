@@ -46,8 +46,8 @@ class OrganizationUsersRelationManager extends RelationManager
                 ->maxLength(255),
             Select::make('type')
                 ->options([
-                    'agent' => 'Agent',
-                    'end_user' => 'End user',
+                    'agent' => __('Agent'),
+                    'end_user' => __('End user'),
                 ])
                 ->required()
                 ->native(false),

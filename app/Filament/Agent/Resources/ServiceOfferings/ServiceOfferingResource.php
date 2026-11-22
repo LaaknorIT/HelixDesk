@@ -11,6 +11,7 @@ use App\Filament\Agent\Resources\ServiceOfferings\RelationManagers\SoftwareDeplo
 use App\Filament\Agent\Resources\ServiceOfferings\RelationManagers\SuppliersRelationManager;
 use App\Filament\Agent\Resources\ServiceOfferings\Schemas\ServiceOfferingForm;
 use App\Filament\Agent\Resources\ServiceOfferings\Tables\ServiceOfferingsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\ServiceOffering;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -23,13 +24,15 @@ use UnitEnum;
 
 class ServiceOfferingResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = ServiceOffering::class;
 
     protected static ?string $navigationLabel = 'Service offerings';
 
-    protected static ?string $modelLabel = 'Service offering';
+    protected static ?string $modelLabel = 'service offering';
 
-    protected static ?string $pluralModelLabel = 'Service offerings';
+    protected static ?string $pluralModelLabel = 'service offerings';
 
     protected static ?int $navigationSort = 31;
 

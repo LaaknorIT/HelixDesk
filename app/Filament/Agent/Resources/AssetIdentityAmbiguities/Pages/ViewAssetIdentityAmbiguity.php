@@ -29,12 +29,12 @@ class ViewAssetIdentityAmbiguity extends ViewRecord
     {
         return [
             Action::make('linkToAsset')
-                ->label('Link to asset')
+                ->label(__('Link to asset'))
                 ->icon('heroicon-o-link')
                 ->visible(fn (): bool => $this->canResolve() && $this->record->status === AssetIdentityAmbiguityStatus::Open)
                 ->schema([
                     Select::make('asset_id')
-                        ->label('Candidate asset')
+                        ->label(__('Candidate asset'))
                         ->options(fn (): array => Asset::query()
                             ->whereIn('id', $this->record->candidate_asset_ids ?? [])
                             ->orderBy('name')
@@ -51,15 +51,15 @@ class ViewAssetIdentityAmbiguity extends ViewRecord
                     app(AssetIdentityAmbiguityResolutionService::class)->linkToAsset($ambiguity, $asset);
 
                     Notification::make()
-                        ->title('Ambiguity resolved')
-                        ->body('Provider identifiers were linked to the selected asset.')
+                        ->title(__('Ambiguity resolved'))
+                        ->body(__('Provider identifiers were linked to the selected asset.'))
                         ->success()
                         ->send();
 
                     $this->redirect(AssetResource::getUrl('view', ['record' => $asset]));
                 }),
             Action::make('createNewAsset')
-                ->label('Create new asset')
+                ->label(__('Create new asset'))
                 ->icon('heroicon-o-plus-circle')
                 ->visible(fn (): bool => $this->canResolve() && $this->record->status === AssetIdentityAmbiguityStatus::Open)
                 ->requiresConfirmation()
@@ -70,15 +70,15 @@ class ViewAssetIdentityAmbiguity extends ViewRecord
                     $asset = app(AssetIdentityAmbiguityResolutionService::class)->createNewAsset($ambiguity);
 
                     Notification::make()
-                        ->title('New asset created')
-                        ->body('A new asset was created from the provider snapshot.')
+                        ->title(__('New asset created'))
+                        ->body(__('A new asset was created from the provider snapshot.'))
                         ->success()
                         ->send();
 
                     $this->redirect(AssetResource::getUrl('view', ['record' => $asset]));
                 }),
             Action::make('dismiss')
-                ->label('Dismiss')
+                ->label(__('Dismiss'))
                 ->icon('heroicon-o-x-circle')
                 ->color('gray')
                 ->visible(fn (): bool => $this->canResolve() && $this->record->status === AssetIdentityAmbiguityStatus::Open)
@@ -90,7 +90,7 @@ class ViewAssetIdentityAmbiguity extends ViewRecord
                     app(AssetIdentityAmbiguityResolutionService::class)->dismiss($ambiguity);
 
                     Notification::make()
-                        ->title('Ambiguity dismissed')
+                        ->title(__('Ambiguity dismissed'))
                         ->success()
                         ->send();
 

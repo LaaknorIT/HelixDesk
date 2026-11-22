@@ -35,11 +35,11 @@ class AutomationRuleForm
                     ->enum(AutomationTrigger::class)
                     ->required()
                     ->native(false),
-                Section::make('Conditions')
+                Section::make(__('Conditions'))
                     ->schema([
                         Group::make([
                             CheckboxList::make('statuses')
-                                ->label('When status is')
+                                ->label(__('When status is'))
                                 ->options(fn (): array => static::statusOptions())
                                 ->columns(2)
                                 ->columnSpanFull(),
@@ -47,14 +47,14 @@ class AutomationRuleForm
                             ->statePath('conditions_json')
                             ->columnSpanFull(),
                     ]),
-                Section::make('Actions')
+                Section::make(__('Actions'))
                     ->schema([
                         Repeater::make('actions')
                             ->relationship()
                             ->orderColumn('sort_order')
                             ->schema([
                                 Select::make('action_type')
-                                    ->label('Action')
+                                    ->label(__('Action'))
                                     ->options(AutomationActionType::class)
                                     ->enum(AutomationActionType::class)
                                     ->required()
@@ -62,7 +62,7 @@ class AutomationRuleForm
                                     ->live(),
                                 Group::make([
                                     Select::make('status')
-                                        ->label('Set status to')
+                                        ->label(__('Set status to'))
                                         ->options(fn (): array => static::statusOptions())
                                         ->searchable()
                                         ->required(fn (Get $get): bool => static::isActionType(
@@ -74,14 +74,14 @@ class AutomationRuleForm
                                             AutomationActionType::SetStatus
                                         )),
                                     TextInput::make('subject')
-                                        ->label('Email subject')
+                                        ->label(__('Email subject'))
                                         ->maxLength(255)
                                         ->visible(fn (Get $get): bool => static::isActionType(
                                             $get('../action_type'),
                                             AutomationActionType::SendCustomerEmail
                                         )),
                                     Textarea::make('body')
-                                        ->label('Email body')
+                                        ->label(__('Email body'))
                                         ->rows(4)
                                         ->required(fn (Get $get): bool => static::isActionType(
                                             $get('../action_type'),
@@ -93,14 +93,14 @@ class AutomationRuleForm
                                         ))
                                         ->columnSpanFull(),
                                     Toggle::make('move_reply_message')
-                                        ->label('Move triggering reply to new ticket')
+                                        ->label(__('Move triggering reply to new ticket'))
                                         ->default(true)
                                         ->visible(fn (Get $get): bool => static::isActionType(
                                             $get('../action_type'),
                                             AutomationActionType::CreateWorkItem
                                         )),
                                     Toggle::make('link_to_original')
-                                        ->label('Link new ticket to original')
+                                        ->label(__('Link new ticket to original'))
                                         ->default(true)
                                         ->visible(fn (Get $get): bool => static::isActionType(
                                             $get('../action_type'),
@@ -124,7 +124,7 @@ class AutomationRuleForm
                                 return $data;
                             })
                             ->defaultItems(0)
-                            ->addActionLabel('Add action')
+                            ->addActionLabel(__('Add action'))
                             ->columnSpanFull(),
                     ]),
             ]);

@@ -22,7 +22,7 @@ class WorkItemsRelationManager extends RelationManager
             ->recordTitleAttribute('title')
             ->columns([
                 TextColumn::make('title')
-                    ->label('Title')
+                    ->label(__('Title'))
                     ->searchable(),
                 TextColumn::make('status')
                     ->badge(),

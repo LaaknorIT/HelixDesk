@@ -442,8 +442,11 @@ class AgentProductivityTest extends TestCase
     {
         $workItem = $this->makeWorkItem(['priority' => 'Medium']);
 
+        // Older priority names are stored as the current ones, so the priority picker can show them.
+        $this->assertSame('normal', $workItem->fresh()->priority);
+
         $this->viewPage($workItem)
-            ->assertSet('workZoneData.priority', 'Medium')
+            ->assertSet('workZoneData.priority', 'normal')
             ->fillForm(['body' => 'On it'], 'workZoneForm')
             ->call('sendReply')
             ->assertHasNoErrors()

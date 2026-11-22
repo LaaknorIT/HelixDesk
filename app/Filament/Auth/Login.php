@@ -76,7 +76,7 @@ class Login extends \Filament\Auth\Pages\Login
         $component = parent::getPasswordFormComponent();
 
         return $component->hint(new HtmlString(Blade::render(
-            '<x-filament::link :href="$url" tabindex="-1">{{ __(\'filament-panels::auth/pages/login.actions.request_password_reset.label\') }}</x-filament::link>',
+            '<x-filament::link :href="$url">{{ __(\'filament-panels::auth/pages/login.actions.request_password_reset.label\') }}</x-filament::link>',
             ['url' => route('password.request')],
         )));
     }
@@ -99,6 +99,7 @@ class Login extends \Filament\Auth\Pages\Login
                 $this->getFormContentComponent(),
                 $this->getMultiFactorChallengeFormContentComponent(),
                 RenderHook::make(PanelsRenderHook::AUTH_LOGIN_FORM_AFTER),
+                $this->getMicrosoftSignInDividerComponent(),
                 $this->getMicrosoftSignInComponent(),
                 $this->getLocalDemoLoginsComponent(),
             ]);
@@ -141,6 +142,24 @@ class Login extends \Filament\Auth\Pages\Login
         $this->redirect(route('auth.microsoft.redirect'));
     }
 
+    /**
+     * "or use Microsoft" between the password form and the Microsoft button, with the hint that the button
+     * uses the e-mail address typed above.
+     */
+    protected function getMicrosoftSignInDividerComponent(): Component
+    {
+        return View::make('filament.auth.microsoft-sign-in-divider')
+            ->visible(fn (): bool => $this->isMicrosoftSignInAvailable());
+    }
+
+    protected function isMicrosoftSignInAvailable(): bool
+    {
+        return once(fn (): bool => OrganizationIntegration::query()
+            ->withoutGlobalScope('tenant')
+            ->where('type', OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA)
+            ->exists());
+    }
+
     protected function getMicrosoftSignInComponent(): Component
     {
         return Actions::make([
@@ -153,10 +172,7 @@ class Login extends \Filament\Auth\Pages\Login
         ])
             ->fullWidth()
             ->alignment(Alignment::Center)
-            ->visible(fn (): bool => OrganizationIntegration::query()
-                ->withoutGlobalScope('tenant')
-                ->where('type', OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA)
-                ->exists());
+            ->visible(fn (): bool => $this->isMicrosoftSignInAvailable());
     }
 
     protected function getLocalDemoLoginsComponent(): Component

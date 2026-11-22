@@ -8,6 +8,7 @@ use App\Filament\Agent\Resources\WorkItems\RelationManagers\AssetsRelationManage
 use App\Filament\Agent\Resources\WorkItems\RelationManagers\DocumentsRelationManager;
 use App\Filament\Agent\Resources\WorkItems\Schemas\WorkItemForm;
 use App\Filament\Agent\Resources\WorkItems\Tables\WorkItemsTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\WorkItem;
 use App\Models\WorkItemMessage;
 use App\Support\HelixdeskWorkItemAuthorization;
@@ -23,13 +24,15 @@ use Illuminate\Support\Facades\Auth;
 
 class WorkItemResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = WorkItem::class;
 
     protected static ?string $navigationLabel = 'Tickets';
 
-    protected static ?string $modelLabel = 'Ticket';
+    protected static ?string $modelLabel = 'ticket';
 
-    protected static ?string $pluralModelLabel = 'Tickets';
+    protected static ?string $pluralModelLabel = 'tickets';
 
     protected static ?int $navigationSort = 1;
 
@@ -94,6 +97,38 @@ class WorkItemResource extends Resource
     }
 
     /**
+     * The conversation in the order it happened, starting with the request itself (the ticket description).
+     *
+     * @param  Collection<int, WorkItemMessage>  $messages
+     * @return array<int, array<string, mixed>>
+     */
+    public static function conversationEntries(
+        WorkItem $record,
+        Collection $messages,
+        bool $includeInternal,
+    ): array {
+        $rows = [];
+
+        if (filled($record->description)) {
+            $rows[] = [
+                'author_name' => $record->reportedBy?->name ?? __('Unknown user'),
+                'author_role' => __('Requester'),
+                'created_at' => $record->opened_at ?? $record->created_at,
+                'message_type' => __('Request'),
+                'message_kind' => 'request',
+                'body' => (string) $record->description,
+                'is_internal' => false,
+            ];
+        }
+
+        foreach (static::flattenThreadedMessages($messages, $includeInternal, $record->reported_by_user_id) as $row) {
+            $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    /**
      * @param  Collection<int, WorkItemMessage>  $messages
      * @return array<int, array<string, mixed>>
      */
@@ -116,18 +151,23 @@ class WorkItemResource extends Resource
                     && (int) $message->author_user_id === $reportedByUserId;
                 $authorType = $message->author?->type;
 
-                $messageType = match (true) {
-                    $message->is_internal => 'Internal note',
-                    $isRequester && $depth === 0 => 'Inbound',
-                    default => 'Reply',
+                $messageKind = match (true) {
+                    $message->is_internal => 'internal',
+                    $isRequester && $depth === 0 => 'inbound',
+                    default => 'reply',
                 };
 
                 $rows[] = [
-                    'author_name' => $message->author?->name ?? 'Unknown user',
-                    'author_role' => $authorType === 'end_user' ? 'Requester' : 'Agent',
-                    'created_at' => $message->created_at?->toDateTimeString() ?? '-',
-                    'message_type' => $messageType,
-                    'body' => str_repeat('  ', $depth).$message->body,
+                    'author_name' => $message->author?->name ?? __('Unknown user'),
+                    'author_role' => $authorType === 'end_user' ? __('Requester') : __('Agent'),
+                    'created_at' => $message->created_at,
+                    'message_type' => match ($messageKind) {
+                        'internal' => __('Internal note'),
+                        'inbound' => __('Inbound'),
+                        default => __('Reply'),
+                    },
+                    'message_kind' => $messageKind,
+                    'body' => $message->body,
                     'depth' => $depth,
                     'is_internal' => $message->is_internal,
                 ];
@@ -137,6 +177,8 @@ class WorkItemResource extends Resource
         };
 
         $walk(null, 0);
+
+        usort($rows, fn (array $a, array $b): int => ($a['created_at']?->getTimestamp() ?? 0) <=> ($b['created_at']?->getTimestamp() ?? 0));
 
         return $rows;
     }
@@ -151,20 +193,20 @@ class WorkItemResource extends Resource
         if ($record->opened_at !== null) {
             $rows[] = [
                 'when' => $record->opened_at->toDateTimeString(),
-                'who' => 'System',
-                'event' => 'Ticket created',
+                'who' => __('System'),
+                'event' => __('Ticket created'),
             ];
         }
 
         foreach ($record->messages()->with('author')->orderBy('created_at')->get() as $message) {
-            $authorName = $message->author?->name ?? 'Unknown user';
+            $authorName = $message->author?->name ?? __('Unknown user');
 
             if ($message->is_internal) {
-                $event = 'Added internal note';
+                $event = __('Added internal note');
             } elseif ((int) $message->author_user_id === (int) $record->reported_by_user_id) {
-                $event = 'Requester replied';
+                $event = __('Requester replied');
             } else {
-                $event = 'Replied to requester';
+                $event = __('Replied to requester');
             }
 
             $rows[] = [
@@ -177,16 +219,16 @@ class WorkItemResource extends Resource
         if ($record->resolved_at !== null) {
             $rows[] = [
                 'when' => $record->resolved_at->toDateTimeString(),
-                'who' => 'System',
-                'event' => 'Ticket resolved',
+                'who' => __('System'),
+                'event' => __('Ticket resolved'),
             ];
         }
 
         if ($record->closed_at !== null) {
             $rows[] = [
                 'when' => $record->closed_at->toDateTimeString(),
-                'who' => 'System',
-                'event' => 'Ticket closed',
+                'who' => __('System'),
+                'event' => __('Ticket closed'),
             ];
         }
 

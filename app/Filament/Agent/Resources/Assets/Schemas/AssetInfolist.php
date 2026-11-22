@@ -12,47 +12,47 @@ class AssetInfolist
     {
         return $schema
             ->components([
-                Section::make('Asset details')
+                Section::make(__('Asset details'))
                     ->columns(2)
                     ->schema([
                         TextEntry::make('name'),
                         TextEntry::make('assetType.name')
-                            ->label('Type'),
+                            ->label(__('Type')),
                         TextEntry::make('asset_identifier')
-                            ->label('Asset tag')
-                            ->placeholder('—'),
+                            ->label(__('Asset tag'))
+                            ->placeholder(__('—')),
                         TextEntry::make('organization.name')
-                            ->label('Organization')
-                            ->placeholder('—'),
+                            ->label(__('Organization'))
+                            ->placeholder(__('—')),
                         TextEntry::make('lifecycle_status')
-                            ->label('Lifecycle')
+                            ->label(__('Lifecycle'))
                             ->badge(),
                         TextEntry::make('owner.name')
-                            ->label('Owner')
-                            ->placeholder('—'),
+                            ->label(__('Owner'))
+                            ->placeholder(__('—')),
                         TextEntry::make('serial_number')
-                            ->placeholder('—'),
+                            ->placeholder(__('—')),
                         TextEntry::make('purchase_date')
                             ->date()
-                            ->placeholder('—'),
+                            ->placeholder(__('—')),
                         TextEntry::make('warranty_date')
                             ->date()
-                            ->placeholder('—'),
+                            ->placeholder(__('—')),
                     ]),
-                Section::make('Integration inventory')
+                Section::make(__('Integration inventory'))
                     ->columns(2)
                     ->schema([
                         TextEntry::make('primary_hostname')
-                            ->placeholder('—'),
+                            ->placeholder(__('—')),
                         TextEntry::make('operating_system')
-                            ->placeholder('—'),
+                            ->placeholder(__('—')),
                         TextEntry::make('identity_resolution_status')
-                            ->label('Identity status')
+                            ->label(__('Identity status'))
                             ->badge(),
                         TextEntry::make('last_inventory_sync_at')
-                            ->label('Last inventory sync')
+                            ->label(__('Last inventory sync'))
                             ->dateTime()
-                            ->placeholder('—'),
+                            ->placeholder(__('—')),
                     ]),
             ]);
     }

@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\WorkItemCategories\Pages\EditWorkItemCategory;
 use App\Filament\Agent\Resources\WorkItemCategories\Pages\ListWorkItemCategories;
 use App\Filament\Agent\Resources\WorkItemCategories\Schemas\WorkItemCategoryForm;
 use App\Filament\Agent\Resources\WorkItemCategories\Tables\WorkItemCategoriesTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\WorkItemCategory;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -19,19 +20,21 @@ use UnitEnum;
 
 class WorkItemCategoryResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = WorkItemCategory::class;
 
     protected static ?string $navigationLabel = 'Categories';
 
-    protected static ?string $modelLabel = 'Category';
+    protected static ?string $modelLabel = 'category';
 
-    protected static ?string $pluralModelLabel = 'Categories';
+    protected static ?string $pluralModelLabel = 'categories';
 
     protected static ?int $navigationSort = 55;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Administration';
+    protected static string|UnitEnum|null $navigationGroup = 'Ticket setup';
 
     public static function canAccess(): bool
     {

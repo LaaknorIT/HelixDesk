@@ -37,16 +37,16 @@ class TenantAdminsRelationManager extends RelationManager
                 TextColumn::make('email')
                     ->searchable(),
                 TextColumn::make('source')
-                    ->label('Source')
+                    ->label(__('Source'))
                     ->badge()
                     ->state(fn (User $record): string => $this->sourceLabel($record)),
             ])
             ->headerActions([
                 Action::make('addTenantAdministrator')
-                    ->label('Add tenant administrator')
+                    ->label(__('Add tenant administrator'))
                     ->schema([
                         Select::make('user_id')
-                            ->label('User')
+                            ->label(__('User'))
                             ->options(fn (): array => $this->candidateOptions())
                             ->searchable()
                             ->required()
@@ -89,10 +89,10 @@ class TenantAdminsRelationManager extends RelationManager
     private function sourceLabel(User $user): string
     {
         if ($user->is_admin) {
-            return 'Global admin';
+            return __('Global admin');
         }
 
-        return 'Tenant agent';
+        return __('Tenant agent');
     }
 
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool

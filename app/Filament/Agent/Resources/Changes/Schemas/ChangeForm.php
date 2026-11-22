@@ -20,10 +20,10 @@ class ChangeForm
                     ->default(null)
                     ->columnSpanFull(),
                 TextInput::make('risk_id')
-                    ->label('Risk ID')
+                    ->label(__('Risk ID'))
                     ->numeric()
                     ->default(null)
-                    ->helperText('Optional link to a risk record (when the risk module is enabled).'),
+                    ->helperText(__('Optional link to a risk record (when the risk module is enabled).')),
                 Textarea::make('implementation_plan')
                     ->default(null)
                     ->columnSpanFull(),

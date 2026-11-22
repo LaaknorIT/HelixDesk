@@ -20,17 +20,17 @@ class PatchStatusesRelationManager extends RelationManager
                 TextColumn::make('provider')
                     ->badge(),
                 TextColumn::make('compliance_status')
-                    ->label('Compliance')
+                    ->label(__('Compliance'))
                     ->badge(),
                 TextColumn::make('missing_critical_count')
-                    ->label('Critical missing')
+                    ->label(__('Critical missing'))
                     ->numeric(),
                 TextColumn::make('missing_other_count')
-                    ->label('Other missing')
+                    ->label(__('Other missing'))
                     ->numeric(),
                 TextColumn::make('last_assessed_at')
                     ->dateTime()
-                    ->placeholder('—'),
+                    ->placeholder(__('—')),
             ])
             ->paginated([10, 25, 50]);
     }

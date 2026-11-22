@@ -35,7 +35,7 @@ class MailAccountForm
     {
         return $schema
             ->components([
-                Section::make('General')
+                Section::make(__('General'))
                     ->schema([
                         TextInput::make('name')
                             ->required()
@@ -47,26 +47,26 @@ class MailAccountForm
                         Toggle::make('is_enabled')
                             ->default(true),
                         Toggle::make('supports_plus_addressing')
-                            ->label('Supports plus-addressing')
-                            ->helperText('Enable only if this mailbox receives mail addressed to local+tag@domain (e.g. support+a7Kx2@…). When on, outbound replies set Reply-To with the work item public id. Subject tokens still work either way.')
+                            ->label(__('Supports plus-addressing'))
+                            ->helperText(__('Enable only if this mailbox receives mail addressed to local+tag@domain (e.g. support+a7Kx2@…). When on, outbound replies set Reply-To with the work item public id. Subject tokens still work either way.'))
                             ->default(false),
                         Placeholder::make('last_polled_at_display')
-                            ->label('Last polled')
+                            ->label(__('Last polled'))
                             ->content(fn (?MailAccount $record): string => $record?->last_polled_at?->toDateTimeString() ?? '—')
                             ->visible(fn (?MailAccount $record): bool => $record !== null),
                         Placeholder::make('last_poll_error_display')
-                            ->label('Last poll error')
+                            ->label(__('Last poll error'))
                             ->content(fn (?MailAccount $record): string => filled($record?->last_poll_error) ? (string) $record->last_poll_error : '—')
                             ->visible(fn (?MailAccount $record): bool => $record !== null && filled($record->last_poll_error)),
                     ]),
-                Section::make('Protocols')
+                Section::make(__('Protocols'))
                     ->schema([
                         Select::make('protocol')
                             ->options([
-                                MailInboundProtocol::Imap->value => 'IMAP',
+                                MailInboundProtocol::Imap->value => __('IMAP'),
                                 MailInboundProtocol::Pop3->value => 'POP3',
-                                MailInboundProtocol::MicrosoftGraph->value => 'Microsoft 365 (Graph)',
-                                MailInboundProtocol::GoogleGmailApi->value => 'Google Workspace (API)',
+                                MailInboundProtocol::MicrosoftGraph->value => __('Microsoft 365 (Graph)'),
+                                MailInboundProtocol::GoogleGmailApi->value => __('Google Workspace (API)'),
                             ])
                             ->required()
                             ->live()
@@ -80,9 +80,9 @@ class MailAccountForm
                             }),
                         Select::make('outbound_protocol')
                             ->options([
-                                MailOutboundProtocol::Smtp->value => 'SMTP',
-                                MailOutboundProtocol::MicrosoftGraph->value => 'Microsoft 365 (Graph)',
-                                MailOutboundProtocol::GoogleGmailApi->value => 'Google Workspace (API)',
+                                MailOutboundProtocol::Smtp->value => __('SMTP'),
+                                MailOutboundProtocol::MicrosoftGraph->value => __('Microsoft 365 (Graph)'),
+                                MailOutboundProtocol::GoogleGmailApi->value => __('Google Workspace (API)'),
                             ])
                             ->required()
                             ->live()
@@ -104,8 +104,8 @@ class MailAccountForm
                                 }
                             }),
                     ]),
-                Section::make('Organization integration')
-                    ->description('Select which organization integration authenticates API-based mail for this account.')
+                Section::make(__('Organization integration'))
+                    ->description(__('Select which organization integration authenticates API-based mail for this account.'))
                     ->visible(fn (Get $get): bool => self::usesApiIntegration($get))
                     ->schema([
                         Callout::make(__('Microsoft Graph mail permissions'))
@@ -113,7 +113,7 @@ class MailAccountForm
                             ->description(MicrosoftEntraIntegrationCatalog::mailPermissionsSummaryHtml())
                             ->visible(fn (Get $get): bool => self::usesMicrosoftGraph($get)),
                         Select::make('organization_id')
-                            ->label('Organization')
+                            ->label(__('Organization'))
                             ->options(fn (): array => OrganizationIntegrationOptions::organizationsForCurrentTenant())
                             ->searchable()
                             ->live()
@@ -123,7 +123,7 @@ class MailAccountForm
                                 $set('integration_type', null);
                             }),
                         Select::make('integration_id')
-                            ->label('Integration')
+                            ->label(__('Integration'))
                             ->options(fn (Get $get): array => OrganizationIntegrationOptions::forOrganization(
                                 $get('organization_id') !== null ? (int) $get('organization_id') : null,
                                 self::allowedIntegrationTypes($get),
@@ -175,21 +175,21 @@ class MailAccountForm
                             }),
                         Hidden::make('integration_type'),
                         TextInput::make('connection_settings.mailbox_upn')
-                            ->label('Mailbox address / UPN')
-                            ->helperText('Email address or user principal name of the mailbox HelixDesk reads and sends as (often same as the account email address above).')
+                            ->label(__('Mailbox address / UPN'))
+                            ->helperText(__('Email address or user principal name of the mailbox HelixDesk reads and sends as (often same as the account email address above).'))
                             ->maxLength(255)
                             ->visible(fn (Get $get): bool => self::usesMicrosoftGraph($get)),
                         TextInput::make('connection_settings.mailbox_address')
-                            ->label('Mailbox address')
-                            ->helperText('Email address of the Google Workspace mailbox HelixDesk should impersonate via domain-wide delegation.')
+                            ->label(__('Mailbox address'))
+                            ->helperText(__('Email address of the Google Workspace mailbox HelixDesk should impersonate via domain-wide delegation.'))
                             ->maxLength(255)
                             ->visible(fn (Get $get): bool => self::usesGoogleGmailApi($get)),
                     ]),
-                Section::make('IMAP / POP3 / SMTP connection')
+                Section::make(__('IMAP / POP3 / SMTP connection'))
                     ->visible(fn (Get $get): bool => self::showsImapSmtpConnection($get))
                     ->schema([
                         Select::make('connection_settings.preset')
-                            ->label('Provider preset')
+                            ->label(__('Provider preset'))
                             ->options(MailProviderPresets::labels())
                             ->default(MailProviderPresets::Generic)
                             ->live()
@@ -205,36 +205,36 @@ class MailAccountForm
                             ->visible(fn (Get $get): bool => self::showsImapSmtpConnection($get)),
                         Grid::make(2)->schema([
                             TextInput::make('connection_settings.host')
-                                ->label('Inbound host')
-                                ->placeholder('imap.gmail.com')
+                                ->label(__('Inbound host'))
+                                ->placeholder(__('imap.gmail.com'))
                                 ->maxLength(255)
                                 ->visible(fn (Get $get): bool => $get('protocol') !== MailInboundProtocol::MicrosoftGraph->value
                                     && $get('protocol') !== MailInboundProtocol::GoogleGmailApi->value),
                             TextInput::make('connection_settings.port')
-                                ->label('Inbound port')
+                                ->label(__('Inbound port'))
                                 ->numeric()
                                 ->default(993)
                                 ->visible(fn (Get $get): bool => $get('protocol') !== MailInboundProtocol::MicrosoftGraph->value
                                     && $get('protocol') !== MailInboundProtocol::GoogleGmailApi->value),
                             Select::make('connection_settings.encryption')
-                                ->label('Inbound encryption')
+                                ->label(__('Inbound encryption'))
                                 ->options([
-                                    'ssl' => 'SSL (port 993)',
-                                    'tls' => 'TLS',
-                                    '' => 'None',
+                                    'ssl' => __('SSL (port 993)'),
+                                    'tls' => __('TLS'),
+                                    '' => __('None'),
                                 ])
                                 ->default('ssl')
                                 ->visible(fn (Get $get): bool => $get('protocol') !== MailInboundProtocol::MicrosoftGraph->value
                                     && $get('protocol') !== MailInboundProtocol::GoogleGmailApi->value),
                             TextInput::make('connection_settings.username')
-                                ->label('Username')
-                                ->helperText('Use the full email address (e.g. you@gmail.com). Leave empty to use the account email address above.')
+                                ->label(__('Username'))
+                                ->helperText(__('Use the full email address (e.g. you@gmail.com). Leave empty to use the account email address above.'))
                                 ->maxLength(255)
                                 ->visible(fn (Get $get): bool => $get('protocol') !== MailInboundProtocol::MicrosoftGraph->value
                                     && $get('protocol') !== MailInboundProtocol::GoogleGmailApi->value
                                     || $get('outbound_protocol') === MailOutboundProtocol::Smtp->value),
                             TextInput::make('connection_settings.password')
-                                ->label('Password / app password')
+                                ->label(__('Password / app password'))
                                 ->password()
                                 ->revealable()
                                 ->helperText(fn (Get $get): ?string => $get('connection_settings.preset') === MailProviderPresets::Gmail
@@ -245,21 +245,21 @@ class MailAccountForm
                                     && $get('protocol') !== MailInboundProtocol::GoogleGmailApi->value
                                     || $get('outbound_protocol') === MailOutboundProtocol::Smtp->value),
                             TextInput::make('connection_settings.smtp_host')
-                                ->label('SMTP host')
-                                ->placeholder('smtp.gmail.com')
+                                ->label(__('SMTP host'))
+                                ->placeholder(__('smtp.gmail.com'))
                                 ->maxLength(255)
                                 ->visible(fn (Get $get): bool => $get('outbound_protocol') === MailOutboundProtocol::Smtp->value),
                             TextInput::make('connection_settings.smtp_port')
-                                ->label('SMTP port')
+                                ->label(__('SMTP port'))
                                 ->numeric()
                                 ->default(587)
                                 ->visible(fn (Get $get): bool => $get('outbound_protocol') === MailOutboundProtocol::Smtp->value),
                             Select::make('connection_settings.smtp_encryption')
-                                ->label('SMTP encryption')
+                                ->label(__('SMTP encryption'))
                                 ->options([
-                                    'tls' => 'TLS (port 587)',
-                                    'ssl' => 'SSL (port 465)',
-                                    '' => 'None',
+                                    'tls' => __('TLS (port 587)'),
+                                    'ssl' => __('SSL (port 465)'),
+                                    '' => __('None'),
                                 ])
                                 ->default('tls')
                                 ->visible(fn (Get $get): bool => $get('outbound_protocol') === MailOutboundProtocol::Smtp->value),

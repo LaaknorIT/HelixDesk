@@ -7,6 +7,7 @@ use App\Filament\Agent\Resources\WorkItemStatuses\Pages\EditWorkItemStatus;
 use App\Filament\Agent\Resources\WorkItemStatuses\Pages\ListWorkItemStatuses;
 use App\Filament\Agent\Resources\WorkItemStatuses\Schemas\WorkItemStatusForm;
 use App\Filament\Agent\Resources\WorkItemStatuses\Tables\WorkItemStatusesTable;
+use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\WorkItemStatus;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -19,19 +20,21 @@ use UnitEnum;
 
 class WorkItemStatusResource extends Resource
 {
+    use TranslatesResourceLabels;
+
     protected static ?string $model = WorkItemStatus::class;
 
     protected static ?string $navigationLabel = 'Ticket statuses';
 
-    protected static ?string $modelLabel = 'Ticket status';
+    protected static ?string $modelLabel = 'ticket status';
 
-    protected static ?string $pluralModelLabel = 'Ticket statuses';
+    protected static ?string $pluralModelLabel = 'ticket statuses';
 
     protected static ?int $navigationSort = 53;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTag;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Administration';
+    protected static string|UnitEnum|null $navigationGroup = 'Ticket setup';
 
     public static function canAccess(): bool
     {

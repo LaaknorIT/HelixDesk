@@ -146,7 +146,7 @@ This plan sets the order of work for making HelixDesk the preferred open source 
 - [ ] **Password vault** per customer, with access control and audit log (Phase G; `project-description.md` §12)
 - [ ] **Contract and license alerts**: expiry of software licenses, warranties and supplier agreements
 - [ ] More **SSO providers**: Google, generic OIDC/SAML (Authentik, Keycloak)
-- [ ] **Norwegian and multi-language UI** (i18n)
+- [~] **Norwegian and multi-language UI** (i18n; `project-description.md` §18 Localization): English default and fallback, per-user language in the profile, Norwegian bokmål (`nb`) translation of the panels. Still to do: a default language per tenant, translated e-mail templates and validation messages, and a check in CI that new texts get translated
 
 ### Priority 3 — Later
 

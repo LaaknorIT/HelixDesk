@@ -3,68 +3,72 @@
 namespace App\Filament\EndUser\Resources\WorkItems\Pages;
 
 use App\Filament\EndUser\Resources\WorkItems\EndUserWorkItemResource;
-use App\Models\WorkItem;
+use App\Models\User;
 use App\Services\WorkItemWorkflowService;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Support\Icons\Heroicon;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Auth;
 
 class ViewEndUserWorkItem extends ViewRecord
 {
     protected static string $resource = EndUserWorkItemResource::class;
 
+    public function getTitle(): string|Htmlable
+    {
+        return '#'.$this->getRecord()->getKey().' · '.$this->getRecord()->title;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             Action::make('reply')
-                ->label('Reply')
-                ->icon('heroicon-o-chat-bubble-left-right')
-                ->form([
+                ->label(__('Reply'))
+                ->icon(Heroicon::OutlinedChatBubbleLeftRight)
+                ->modalHeading(__('Reply to the service desk'))
+                ->modalSubmitActionLabel(__('Send reply'))
+                ->schema([
                     Textarea::make('body')
-                        ->label('Message')
+                        ->label(__('Message'))
                         ->required()
-                        ->rows(4),
-                    Select::make('parent_message_id')
-                        ->label('Reply to')
-                        ->placeholder('Top-level reply')
-                        ->options(function (): array {
-                            /** @var WorkItem $record */
-                            $record = $this->getRecord();
-
-                            return $record->messages()
-                                ->where('is_internal', false)
-                                ->orderByDesc('created_at')
-                                ->limit(50)
-                                ->get()
-                                ->mapWithKeys(fn ($message): array => [
-                                    $message->getKey() => '#'.$message->getKey().' '.$message->body,
-                                ])
-                                ->all();
-                        }),
+                        ->rows(5),
                 ])
                 ->action(function (array $data): void {
-                    $user = auth()->user();
+                    $user = Auth::user();
 
-                    if ($user === null) {
+                    if (! $user instanceof User) {
                         return;
                     }
 
-                    app(WorkItemWorkflowService::class)->addMessage(
-                        $this->getRecord(),
-                        $data['body'],
-                        $user,
-                        $data['parent_message_id'] ?? null,
-                    );
+                    app(WorkItemWorkflowService::class)->addMessage($this->getRecord(), $data['body'], $user);
+
+                    Notification::make()
+                        ->title(__('Reply sent'))
+                        ->success()
+                        ->send();
+
+                    $this->getRecord()->refresh();
                 }),
             Action::make('close')
-                ->label('Close')
-                ->icon('heroicon-o-x-circle')
-                ->requiresConfirmation()
+                ->label(__('Mark as solved'))
+                ->icon(Heroicon::OutlinedCheckCircle)
+                ->color('gray')
+                ->modalHeading(__('Is your issue solved?'))
+                ->modalDescription(__('We will close the ticket. If the problem comes back, report a new issue and mention this ticket number.'))
+                ->modalSubmitActionLabel(__('Yes, close the ticket'))
+                ->schema([
+                    Textarea::make('comment')
+                        ->label(__('Comment (optional)'))
+                        ->placeholder(__('For example: what fixed it'))
+                        ->rows(3),
+                ])
                 ->visible(function (): bool {
-                    $user = auth()->user();
+                    $user = Auth::user();
 
-                    if ($user === null) {
+                    if (! $user instanceof User) {
                         return false;
                     }
 
@@ -73,14 +77,28 @@ class ViewEndUserWorkItem extends ViewRecord
                         app(WorkItemWorkflowService::class)->allowedTransitions($this->getRecord(), $user),
                     );
                 })
-                ->action(function (): void {
-                    $user = auth()->user();
+                ->action(function (array $data): void {
+                    $user = Auth::user();
 
-                    if ($user === null) {
+                    if (! $user instanceof User) {
                         return;
                     }
 
-                    app(WorkItemWorkflowService::class)->transition($this->getRecord(), 'Closed', $user);
+                    $workflow = app(WorkItemWorkflowService::class);
+
+                    if (filled($data['comment'] ?? null)) {
+                        $workflow->addMessage($this->getRecord(), (string) $data['comment'], $user);
+                    }
+
+                    $workflow->transition($this->getRecord(), 'Closed', $user);
+
+                    Notification::make()
+                        ->title(__('Ticket closed'))
+                        ->body(__('Thank you for letting us know.'))
+                        ->success()
+                        ->send();
+
+                    $this->getRecord()->refresh();
                 }),
         ];
     }

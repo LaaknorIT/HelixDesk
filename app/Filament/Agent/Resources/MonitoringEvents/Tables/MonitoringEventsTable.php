@@ -12,7 +12,7 @@ class MonitoringEventsTable
         return $table
             ->columns([
                 TextColumn::make('last_seen_at')
-                    ->label('Last seen')
+                    ->label(__('Last seen'))
                     ->dateTime()
                     ->sortable(),
                 TextColumn::make('severity')
@@ -22,17 +22,17 @@ class MonitoringEventsTable
                     ->badge()
                     ->sortable(),
                 TextColumn::make('occurrence_count')
-                    ->label('Count')
+                    ->label(__('Count'))
                     ->sortable(),
                 TextColumn::make('source.slug')
-                    ->label('Source'),
+                    ->label(__('Source')),
                 TextColumn::make('message')
-                    ->label('Message')
+                    ->label(__('Message'))
                     ->limit(60)
                     ->tooltip(fn ($record): ?string => $record->message ?? null),
                 TextColumn::make('external_reference')
-                    ->label('External ref')
-                    ->placeholder('—')
+                    ->label(__('External ref'))
+                    ->placeholder(__('—'))
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('last_seen_at', 'desc')

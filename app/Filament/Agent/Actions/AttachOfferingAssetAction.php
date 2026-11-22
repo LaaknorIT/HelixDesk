@@ -28,11 +28,11 @@ final class AttachOfferingAssetAction extends AttachAction
 
             $roleField = $roles !== []
                 ? Select::make('role')
-                    ->label('Realization role')
+                    ->label(__('Realization role'))
                     ->options(array_combine($roles, $roles))
                     ->required()
                 : TextInput::make('role')
-                    ->label('Realization role')
+                    ->label(__('Realization role'))
                     ->required()
                     ->maxLength(255);
 

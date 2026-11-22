@@ -21,9 +21,9 @@ class SoftwareInstallationsRelationManager extends RelationManager
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('version')
-                    ->placeholder('—'),
+                    ->placeholder(__('—')),
                 TextColumn::make('publisher')
-                    ->placeholder('—')
+                    ->placeholder(__('—'))
                     ->toggleable(),
                 TextColumn::make('provider')
                     ->badge(),
@@ -31,11 +31,11 @@ class SoftwareInstallationsRelationManager extends RelationManager
                     ->badge(),
                 TextColumn::make('install_date')
                     ->date()
-                    ->placeholder('—')
+                    ->placeholder(__('—'))
                     ->toggleable(),
                 TextColumn::make('last_seen_at')
                     ->dateTime()
-                    ->placeholder('—'),
+                    ->placeholder(__('—')),
             ])
             ->paginated([10, 25, 50]);
     }

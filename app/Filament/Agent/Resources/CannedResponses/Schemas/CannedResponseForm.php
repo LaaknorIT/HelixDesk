@@ -19,20 +19,20 @@ class CannedResponseForm
                     ->required()
                     ->maxLength(255),
                 Select::make('queue_id')
-                    ->label('Queue')
-                    ->placeholder('All queues')
-                    ->helperText('Leave empty to offer this response on every ticket.')
+                    ->label(__('Queue'))
+                    ->placeholder(__('All queues'))
+                    ->helperText(__('Leave empty to offer this response on every ticket.'))
                     ->options(fn (): array => Queue::query()
                         ->where('tenant_id', Filament::getTenant()?->getKey())
                         ->orderBy('name')
                         ->pluck('name', 'id')
                         ->all()),
                 Textarea::make('body')
-                    ->label('Text')
+                    ->label(__('Text'))
                     ->required()
                     ->rows(8)
                     ->maxLength(20000)
-                    ->helperText('Placeholders: {{requester.name}}, {{requester.first_name}}, {{ticket.id}}, {{ticket.title}}, {{agent.name}}, {{queue.name}}')
+                    ->helperText(__('Placeholders: {{requester.name}}, {{requester.first_name}}, {{ticket.id}}, {{ticket.title}}, {{agent.name}}, {{queue.name}}'))
                     ->columnSpanFull(),
             ]);
     }

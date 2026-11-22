@@ -22,6 +22,11 @@ class IntegrationSyncHealthWidget extends StatsOverviewWidget
 {
     protected static ?int $sort = 2;
 
+    protected function getHeading(): ?string
+    {
+        return __('Integrations and assets');
+    }
+
     protected function getStats(): array
     {
         $tenant = Filament::getTenant();
@@ -66,11 +71,11 @@ class IntegrationSyncHealthWidget extends StatsOverviewWidget
             Stat::make(__('Last integration sync'), $lastSync?->diffForHumans() ?? __('Never'))
                 ->description(__('Most recent successful sync across integrations'))
                 ->url($this->integrationsUrl(null)),
-            Stat::make('Open identity ambiguities', (string) $openAmbiguities)
-                ->description('Assets awaiting manual identity resolution')
+            Stat::make(__('Open identity ambiguities'), (string) $openAmbiguities)
+                ->description(__('Assets awaiting manual identity resolution'))
                 ->color($openAmbiguities === 0 ? 'success' : 'warning'),
-            Stat::make('Non-compliant patch assets', (string) $nonCompliantPatches)
-                ->description('Assets missing critical or other updates'),
+            Stat::make(__('Non-compliant patch assets'), (string) $nonCompliantPatches)
+                ->description(__('Assets missing critical or other updates')),
         ];
     }
 
