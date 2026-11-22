@@ -487,6 +487,7 @@ final class OrganizationIntegrationSettings
             'entra_azure_tenant_id' => (string) ($config['azure_tenant_id'] ?? ''),
             'entra_application_client_id' => (string) ($config['application_client_id'] ?? ''),
             'entra_client_secret' => '',
+            'entra_client_secret_expires_at' => self::dateOnly($config['client_secret_expires_at'] ?? null),
             'entra_scope_users' => (bool) ($scopes['users'] ?? false),
             'entra_scope_departments' => (bool) ($scopes['departments'] ?? false),
             'entra_scope_computers' => (bool) ($scopes['computers'] ?? false),
@@ -551,6 +552,7 @@ final class OrganizationIntegrationSettings
             'azure_tenant_id' => (string) ($data['entra_azure_tenant_id'] ?? ''),
             'application_client_id' => (string) ($data['entra_application_client_id'] ?? ''),
             'client_secret' => $clientSecret,
+            'client_secret_expires_at' => self::dateOnly($data['entra_client_secret_expires_at'] ?? null),
             'scopes' => [
                 'users' => (bool) ($data['entra_scope_users'] ?? false),
                 'departments' => (bool) ($data['entra_scope_departments'] ?? false),
@@ -703,6 +705,23 @@ final class OrganizationIntegrationSettings
                 'alerts' => (bool) ($data['action1_scope_alerts'] ?? false),
             ],
         ];
+    }
+
+    private static function dateOnly(mixed $value): ?string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::instance($value)->toDateString();
+        }
+
+        if (! is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->toDateString();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private static function entraSyncTargetFromIntegration(OrganizationIntegration $integration): ?EntraSyncTarget

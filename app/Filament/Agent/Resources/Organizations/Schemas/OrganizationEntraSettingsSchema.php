@@ -2,8 +2,11 @@
 
 namespace App\Filament\Agent\Resources\Organizations\Schemas;
 
+use App\Filament\Agent\Resources\Organizations\Pages\EditOrganizationIntegration;
+use App\Support\IntegrationHealth\IntegrationHealthInspector;
 use App\Support\MicrosoftEntraIntegrationCatalog;
 use App\Support\OrganizationEntraWizardDocumentation;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Callout;
@@ -13,6 +16,7 @@ use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\HtmlString;
+use Livewire\Component;
 
 class OrganizationEntraSettingsSchema
 {
@@ -90,12 +94,19 @@ class OrganizationEntraSettingsSchema
                                 ->maxLength(512)
                                 ->default('')
                                 ->helperText(__('Paste the secret from Certificates & secrets. When editing, leave blank to keep the stored secret.')),
+                            DatePicker::make('entra_client_secret_expires_at')
+                                ->label(__('Client secret expires on'))
+                                ->native(false)
+                                ->helperText(__('Copy the "Expires" date shown next to the secret in Entra. HelixDesk warns you :days days before it expires. If the app has Application.Read.All, HelixDesk detects this automatically.', [
+                                    'days' => IntegrationHealthInspector::SECRET_EXPIRY_WARNING_DAYS,
+                                ])),
                             Toggle::make('entra_enabled')
                                 ->label(__('Enable Microsoft Entra integration for this organization'))
                                 ->helperText(__('When on, HelixDesk may run sync jobs for the selected capabilities (once workers are deployed).'))
                                 ->default(false),
                         ]),
                 ])
+                    ->skippable(fn (Component $livewire): bool => $livewire instanceof EditOrganizationIntegration)
                     ->columnSpanFull(),
             ]);
     }

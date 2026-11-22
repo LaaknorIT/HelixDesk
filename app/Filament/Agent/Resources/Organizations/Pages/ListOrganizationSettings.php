@@ -2,11 +2,15 @@
 
 namespace App\Filament\Agent\Resources\Organizations\Pages;
 
+use App\Enums\IntegrationHealthStatus;
+use App\Filament\Agent\Pages\IntegrationGallery;
 use App\Filament\Agent\Resources\Organizations\OrganizationResource;
+use App\Repositories\OrganizationIntegrationRepository;
+use App\Support\IntegrationHealth\IntegrationHealthInspector;
+use App\Support\IntegrationHealth\IntegrationHealthPresenter;
 use App\Support\OrganizationIntegrationSettings;
 use App\Support\OrganizationIntegrationSyncQueue;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
@@ -15,7 +19,6 @@ use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\RenderHook;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -68,13 +71,21 @@ class ListOrganizationSettings extends Page implements HasTable
                 TextColumn::make('type_label')
                     ->label(__('Integration'))
                     ->searchable(false),
-                IconColumn::make('enabled')
-                    ->label(__('Enabled'))
-                    ->boolean(),
+                TextColumn::make('status')
+                    ->label(__('Status'))
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => IntegrationHealthStatus::from($state)->label())
+                    ->color(fn (string $state): string => IntegrationHealthStatus::from($state)->color())
+                    ->icon(fn (string $state): Heroicon => IntegrationHealthStatus::from($state)->icon())
+                    ->description(fn (array $record): ?string => $record['issue']),
                 TextColumn::make('summary')
                     ->label(__('Details'))
                     ->wrap(),
             ])
+            ->recordUrl(fn (array $record): string => static::getResource()::getUrl('settings.integrations.edit', [
+                'record' => $this->getRecord(),
+                'integration' => $record['id'],
+            ]))
             ->headerActions([
                 $this->makeNewIntegrationActionGroup(),
             ])
@@ -148,22 +159,12 @@ class ListOrganizationSettings extends Page implements HasTable
             ->paginated(false);
     }
 
-    private function makeNewIntegrationActionGroup(): ActionGroup
+    private function makeNewIntegrationActionGroup(): Action
     {
-        $actions = [];
-
-        foreach (OrganizationIntegrationSettings::creatableTypeLabels() as $type => $label) {
-            $actions[] = Action::make('new_'.$type)
-                ->label($label)
-                ->url(static::getResource()::getUrl('settings.integrations.create', [
-                    'record' => $this->getRecord(),
-                    'type' => $type,
-                ]));
-        }
-
-        return ActionGroup::make($actions)
-            ->label(__('New'))
-            ->icon(Heroicon::OutlinedPlus);
+        return Action::make('add_integration')
+            ->label(__('Add integration'))
+            ->icon(Heroicon::OutlinedPlus)
+            ->url(IntegrationGallery::getUrl(['organization' => $this->getRecord()->getKey()]));
     }
 
     /**
@@ -171,10 +172,16 @@ class ListOrganizationSettings extends Page implements HasTable
      */
     private function integrationTableRecords(): array
     {
+        $reports = [];
+        foreach (app(OrganizationIntegrationRepository::class)->listModelsForOrganization($this->getRecord()) as $integration) {
+            $reports[(string) $integration->getKey()] = IntegrationHealthInspector::inspect($integration);
+        }
+
         $rows = [];
         foreach (OrganizationIntegrationSettings::listEntriesForOrganization($this->getRecord()) as $entry) {
             $id = $entry['id'];
             $config = $entry['config'];
+            $report = $reports[$id] ?? null;
             $rows[] = [
                 '__key' => $id,
                 'id' => $id,
@@ -182,6 +189,8 @@ class ListOrganizationSettings extends Page implements HasTable
                 'type_label' => OrganizationIntegrationSettings::typeLabel($entry['type']),
                 'enabled' => (bool) ($config['enabled'] ?? false),
                 'summary' => $this->integrationSummary($entry['type'], $config),
+                'status' => ($report?->status ?? IntegrationHealthStatus::Disabled)->value,
+                'issue' => $report !== null ? IntegrationHealthPresenter::shortDescription($report) : null,
             ];
         }
 

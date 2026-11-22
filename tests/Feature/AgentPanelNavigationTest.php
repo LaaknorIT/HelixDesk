@@ -179,6 +179,7 @@ class AgentPanelNavigationTest extends TestCase
             $this->assertSame(
                 [
                     'Mail accounts',
+                    'Integrations',
                     'Roles',
                     'Integration settings',
                     'Dashboard layouts',

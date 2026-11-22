@@ -135,6 +135,14 @@ final class OrganizationIntegrationRepository
             $integration->last_sync_error = $configPatch['last_action1_sync_error'];
         }
 
+        foreach (['last_entra_sync_error', 'last_sync_error', 'last_action1_sync_error'] as $errorKey) {
+            if (filled($configPatch[$errorKey] ?? null)) {
+                $integration->last_sync_failed_at = now();
+
+                break;
+            }
+        }
+
         if (array_key_exists('api_base_url', $configPatch)) {
             $integration->api_base_url = is_string($configPatch['api_base_url']) && trim($configPatch['api_base_url']) !== ''
                 ? trim($configPatch['api_base_url'])
