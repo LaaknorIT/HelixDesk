@@ -10,11 +10,13 @@ class LocalDemoLogins
     }
 
     /**
+     * Demo accounts for one panel, or for every panel when no panel is given (the shared login page).
+     *
      * @return list<array{email: string, label: string}>
      */
-    public static function accountsForPanel(?string $panelId): array
+    public static function accountsForPanel(?string $panelId = null): array
     {
-        if (! static::isEnabled() || blank($panelId)) {
+        if (! static::isEnabled()) {
             return [];
         }
 
@@ -28,12 +30,12 @@ class LocalDemoLogins
             ],
             array_filter(
                 $accounts,
-                fn (array $account): bool => in_array($panelId, $account['panels'], true),
+                fn (array $account): bool => $panelId === null || in_array($panelId, $account['panels'], true),
             ),
         ));
     }
 
-    public static function shouldShow(?string $panelId): bool
+    public static function shouldShow(?string $panelId = null): bool
     {
         return static::accountsForPanel($panelId) !== [];
     }
@@ -48,7 +50,7 @@ class LocalDemoLogins
         return (string) config('helixdesk.demo_logins.tenant_slug', 'demo-tenant');
     }
 
-    public static function isAllowedEmail(string $email, ?string $panelId): bool
+    public static function isAllowedEmail(string $email, ?string $panelId = null): bool
     {
         return collect(static::accountsForPanel($panelId))
             ->contains(fn (array $account): bool => $account['email'] === $email);
@@ -62,7 +64,7 @@ class LocalDemoLogins
      *     panelHasTenant: bool,
      * }
      */
-    public static function viewData(?string $panelId, bool $panelHasTenant = false): array
+    public static function viewData(?string $panelId = null, bool $panelHasTenant = true): array
     {
         return [
             'accounts' => static::accountsForPanel($panelId),

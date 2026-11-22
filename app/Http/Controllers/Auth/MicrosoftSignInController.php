@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\OrganizationIntegration;
 use App\Models\User;
 use App\Services\Auth\EntraSignInService;
+use App\Services\Auth\HomePanelResolver;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Panel;
@@ -16,7 +17,7 @@ use Symfony\Component\HttpFoundation\RedirectResponse as SymfonyRedirectResponse
 use Throwable;
 
 /**
- * "Sign in with Microsoft" for users synced from Microsoft Entra, started from a panel login page.
+ * "Sign in with Microsoft" for users synced from Microsoft Entra, started from the shared login page.
  */
 class MicrosoftSignInController extends Controller
 {
@@ -34,7 +35,7 @@ class MicrosoftSignInController extends Controller
         if ($pending['config'] === null) {
             $request->session()->forget(EntraSignInService::SESSION_KEY);
 
-            return $this->failed($pending['panel']);
+            return $this->failed();
         }
 
         return $signIn->provider($pending['config'])
@@ -56,7 +57,7 @@ class MicrosoftSignInController extends Controller
         ['user' => $user, 'panel' => $panel, 'config' => $config] = $pending;
 
         if ($config === null) {
-            return $this->failed($panel);
+            return $this->failed();
         }
 
         try {
@@ -67,7 +68,7 @@ class MicrosoftSignInController extends Controller
                 'error' => $exception->getMessage(),
             ]);
 
-            return $this->failed($panel);
+            return $this->failed();
         }
 
         if (strcasecmp((string) $remoteUser->getId(), (string) $user->entra_object_id) !== 0) {
@@ -75,13 +76,14 @@ class MicrosoftSignInController extends Controller
                 'user_id' => $user->getKey(),
             ]);
 
-            return $this->failed($panel);
+            return $this->failed();
         }
 
         $panel->auth()->login($user);
+        $intendedUrl = $request->session()->pull('url.intended');
         $request->session()->regenerate();
 
-        return redirect()->intended($panel->getUrl());
+        return redirect(app(HomePanelResolver::class)->destinationFor($user, $intendedUrl) ?? $panel->getUrl());
     }
 
     /**
@@ -117,7 +119,7 @@ class MicrosoftSignInController extends Controller
         ];
     }
 
-    private function failed(Panel $panel): RedirectResponse
+    private function failed(): RedirectResponse
     {
         Notification::make()
             ->title(__('Microsoft sign-in failed'))
@@ -125,6 +127,6 @@ class MicrosoftSignInController extends Controller
             ->danger()
             ->send();
 
-        return redirect($panel->getLoginUrl() ?? '/');
+        return redirect()->route('login');
     }
 }

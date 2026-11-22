@@ -24,18 +24,20 @@ class EntraSignInService
     public const SESSION_KEY = 'entra_sign_in';
 
     /**
-     * Find the synced user and the Entra integration to send them to.
+     * Find the synced user, the panel they land in, and the Entra integration to send them to.
      *
-     * @return array{user: User, integration: OrganizationIntegration, config: array{azure_tenant_id: string, application_client_id: string, client_secret: string}}|null
+     * @return array{user: User, panel: Panel, integration: OrganizationIntegration, config: array{azure_tenant_id: string, application_client_id: string, client_secret: string}}|null
      */
-    public function resolveForEmail(string $email, Panel $panel): ?array
+    public function resolveForEmail(string $email): ?array
     {
         $user = User::query()
             ->where('email', $email)
             ->whereNotNull('entra_object_id')
             ->first();
 
-        if ($user === null || ! $user->canAccessPanel($panel)) {
+        $panel = $user !== null ? app(HomePanelResolver::class)->panelFor($user) : null;
+
+        if ($user === null || $panel === null) {
             return null;
         }
 
@@ -49,7 +51,7 @@ class EntraSignInService
             return null;
         }
 
-        return ['user' => $user, 'integration' => $integration, 'config' => $config];
+        return ['user' => $user, 'panel' => $panel, 'integration' => $integration, 'config' => $config];
     }
 
     /**
