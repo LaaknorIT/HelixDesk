@@ -10,5 +10,5 @@
 
 - [ ] Tests added or updated, and `php artisan test --compact` passes
 - [ ] `vendor/bin/pint` has been run
-- [ ] `docs/roadmap.md` updated if this delivers a roadmap item
+- [ ] Roadmap issue linked with `Fixes #…` if this delivers a roadmap item
 - [ ] I agree my contribution is licensed under the MIT License

@@ -39,7 +39,7 @@ Use `php artisan db:seed --class=DemoContentSeeder` for demo data when developin
 
 ## Documentation
 
-Product and architecture notes live in `[docs/](docs/)`. The working delivery plan is `[docs/roadmap.md](docs/roadmap.md)`.
+Product and architecture notes live in `[docs/](docs/)`. The roadmap is tracked as [GitHub issues labelled `roadmap`](https://github.com/LaaknorIT/HelixDesk/issues?q=is%3Aissue+label%3Aroadmap) and [milestones](https://github.com/LaaknorIT/HelixDesk/milestones); see [`docs/roadmap.md`](docs/roadmap.md).
 
 ## Contributing
 
