@@ -194,6 +194,68 @@ class AssetReconciliationServiceTest extends TestCase
     /**
      * @return array{0: Tenant, 1: Organization, 2: OrganizationIntegration}
      */
+    public function test_two_devices_sharing_a_serial_number_do_not_break_the_sync(): void
+    {
+        [$tenant, $organization, $integration] = $this->createIntegrationFixtures();
+
+        $first = $this->service->reconcile($this->entraDeviceSnapshot($tenant->id, $organization->id, (string) $integration->id, 'intune-1', 'PF39T6C3', 'laptop-old'));
+        $second = $this->service->reconcile($this->entraDeviceSnapshot($tenant->id, $organization->id, (string) $integration->id, 'intune-2', 'PF39T6C3', 'laptop-new'));
+
+        $this->assertTrue($second->created);
+        $this->assertNotSame($first->asset->id, $second->asset->id);
+
+        $serial = AssetExternalIdentifier::query()
+            ->where('identifier_type', AssetExternalIdentifierType::SerialNumber)
+            ->where('external_id', 'PF39T6C3')
+            ->sole();
+        $this->assertSame($first->asset->id, $serial->asset_id);
+
+        $this->assertSame($second->asset->id, AssetExternalIdentifier::query()
+            ->where('identifier_type', AssetExternalIdentifierType::EntraIntuneManagedDeviceId)
+            ->where('external_id', 'intune-2')
+            ->sole()->asset_id);
+
+        $again = $this->service->reconcile($this->entraDeviceSnapshot($tenant->id, $organization->id, (string) $integration->id, 'intune-2', 'PF39T6C3', 'laptop-new'));
+        $this->assertSame($second->asset->id, $again->asset->id);
+    }
+
+    public function test_device_moved_to_another_organization_takes_its_device_id_along(): void
+    {
+        [$tenant, $organization, $integration] = $this->createIntegrationFixtures();
+        $otherOrganization = Organization::factory()->create(['tenant_id' => $tenant->id]);
+
+        $original = $this->service->reconcile($this->entraDeviceSnapshot($tenant->id, $organization->id, (string) $integration->id, 'intune-9', 'SER-9', 'host-9'));
+        $moved = $this->service->reconcile($this->entraDeviceSnapshot($tenant->id, $otherOrganization->id, (string) $integration->id, 'intune-9', 'SER-9', 'host-9'));
+
+        $this->assertNotSame($original->asset->id, $moved->asset->id);
+        $deviceId = AssetExternalIdentifier::query()
+            ->where('identifier_type', AssetExternalIdentifierType::EntraIntuneManagedDeviceId)
+            ->where('external_id', 'intune-9')
+            ->sole();
+        $this->assertSame($moved->asset->id, $deviceId->asset_id);
+        $this->assertSame($otherOrganization->id, $deviceId->organization_id);
+    }
+
+    private function entraDeviceSnapshot(int $tenantId, int $organizationId, string $integrationId, string $intuneId, string $serial, string $hostname): AssetProviderSnapshot
+    {
+        return new AssetProviderSnapshot(
+            tenantId: $tenantId,
+            organizationId: $organizationId,
+            organizationIntegrationId: $integrationId,
+            provider: IntegrationType::MICROSOFT_ENTRA,
+            identifiers: [
+                ['type' => AssetExternalIdentifierType::EntraIntuneManagedDeviceId, 'value' => $intuneId],
+                ['type' => AssetExternalIdentifierType::SerialNumber, 'value' => $serial],
+                ['type' => AssetExternalIdentifierType::Hostname, 'value' => $hostname],
+            ],
+            attributes: [
+                'name' => $hostname,
+                'serial_number' => $serial,
+                'primary_hostname' => $hostname,
+            ],
+        );
+    }
+
     private function createIntegrationFixtures(): array
     {
         $tenant = Tenant::factory()->create();
