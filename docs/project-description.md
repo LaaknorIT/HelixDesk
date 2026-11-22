@@ -57,6 +57,7 @@ The system must:
 - support **horizontal scaling**  
 - have extensive capabilities for integrations to and from AI  
 - be deployable in EU regions only, with a path to future multi-region failover  
+- be **translatable into multiple languages**, with **English as the default** (see §18, Localization)  
 
 ---
 
@@ -786,6 +787,15 @@ Visibility:
 - audit logs for critical actions  
 - encryption of sensitive data (including tenant-unique salt for passwords)  
 - EU-only data residency for all primary and backup data  
+
+**Localization:**
+
+- every user-facing text (agent, end-user and global admin panels, public page, notifications and e-mail) goes through the translator, so a new language needs only a translation file and no code changes  
+- **English is the default** and the fallback: a text without a translation is shown in English  
+- each user picks their language in their profile; users who have not chosen one get the application default  
+- the first additional language is Norwegian bokmål (`nb`); more languages are added through `config/helixdesk.php` (`locales`) and a file in `lang/`  
+- dates and numbers follow one consistent display format across panels  
+- tenant data such as status names, queue names and categories is shown as entered, but status names may be translated through the same files  
 
 **Backup:**
 
