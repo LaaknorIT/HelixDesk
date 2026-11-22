@@ -39,6 +39,8 @@ class WorkItem extends TenantModel
         'resolution_breached_at',
         'resolved_at',
         'closed_at',
+        'response_warning_notified_at',
+        'resolution_warning_notified_at',
     ];
 
     protected function casts(): array
@@ -56,6 +58,8 @@ class WorkItem extends TenantModel
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
             'sla_paused_seconds' => 'integer',
+            'response_warning_notified_at' => 'datetime',
+            'resolution_warning_notified_at' => 'datetime',
         ];
     }
 

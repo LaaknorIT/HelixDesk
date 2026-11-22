@@ -113,7 +113,7 @@ This plan sets the order of work for making HelixDesk the preferred open source 
 **Release 1 — "Get started"**
 
 - [x] **Docker image + docker-compose** with Redis and Horizon, and an installation guide (also closes the Horizon/Redis item in Phase F): `Dockerfile`, `compose.yaml`, image published to `ghcr.io/laaknorit/helixdesk`, [`docs/installation.md`](installation.md)
-- [ ] **Notifications**: new ticket, assigned, customer reply, SLA close to breach. Channels: email, in-app, Microsoft Teams, Slack
+- [x] **Notifications**: new ticket, assigned, customer reply, SLA close to breach. Channels: email, in-app, Microsoft Teams, Slack ([`docs/notifications.md`](notifications.md))
 - [ ] **Agent productivity**: canned responses, merge and link tickets, watchers/CC, collision warning when another agent is working on a ticket
 - [ ] **MFA (TOTP)** for agents (Phase G)
 
@@ -160,4 +160,4 @@ Ongoing alongside all releases: expand automated tests across problems, changes,
 
 ---
 
-*Last updated: 2026-10-18 — Docker image, Compose stack and installation guide delivered (Release 1).*
+*Last updated: 2026-10-26 — agent notifications delivered (Release 1).*

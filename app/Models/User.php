@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Enums\AgentNotificationChannel;
+use App\Enums\WorkItemNotificationEvent;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasTenants;
@@ -41,6 +43,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         'type',
         'last_mfa_at',
         'is_admin',
+        'notification_preferences',
     ];
 
     /**
@@ -65,7 +68,22 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             'last_mfa_at' => 'datetime',
             'is_admin' => 'boolean',
             'password' => 'hashed',
+            'notification_preferences' => 'array',
         ];
+    }
+
+    /**
+     * Whether the user wants a work item notification on a channel. Unset preferences mean everything is on.
+     */
+    public function wantsWorkItemNotification(WorkItemNotificationEvent $event, AgentNotificationChannel $channel): bool
+    {
+        $enabledEvents = $this->notification_preferences[$channel->value] ?? null;
+
+        if (! is_array($enabledEvents)) {
+            return true;
+        }
+
+        return in_array($event->value, $enabledEvents, true);
     }
 
     /**

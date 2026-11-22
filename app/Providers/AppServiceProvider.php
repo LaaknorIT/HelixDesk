@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\Tenant;
+use App\Models\WorkItem;
 use App\Observers\TenantObserver;
+use App\Observers\WorkItemObserver;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use SocialiteProviders\Azure\Provider as AzureProvider;
@@ -25,6 +27,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Tenant::observe(TenantObserver::class);
+        WorkItem::observe(WorkItemObserver::class);
 
         Event::listen(function (SocialiteWasCalled $event): void {
             $event->extendSocialite('azure', AzureProvider::class);

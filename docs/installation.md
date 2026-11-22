@@ -95,7 +95,7 @@ location / {
 
 ## Mail
 
-The `MAIL_*` settings in `.env` are for system mail such as password resets. Ticket mail is sent and received through the mailboxes you add in the agent panel; see [`email-handling.md`](email-handling.md). The scheduler polls those mailboxes every five minutes.
+The `MAIL_*` settings in `.env` are for system mail such as password resets and agent notifications. Ticket mail is sent and received through the mailboxes you add in the agent panel; see [`email-handling.md`](email-handling.md). The scheduler polls those mailboxes every five minutes.
 
 ## Upgrading
 
@@ -146,3 +146,4 @@ All settings from [`.env.example`](../.env.example) can be added to `.env`. Comp
 | `HELIXDESK_MIGRATE` | `true` | Run migrations when the `app` container starts. |
 | `HELIXDESK_DB_WAIT_SECONDS` | `60` | How long containers wait for the database on start. |
 | `TRUSTED_PROXIES` | empty | Reverse proxies whose `X-Forwarded-*` headers are trusted. |
+| `HELIXDESK_SLA_WARNING_MINUTES` | `30` | How long before an SLA target is due agents are warned. See [`notifications.md`](notifications.md). |

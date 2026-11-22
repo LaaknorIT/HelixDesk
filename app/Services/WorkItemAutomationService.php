@@ -14,6 +14,7 @@ use App\Models\WorkItem;
 use App\Models\WorkItemMessage;
 use App\Models\WorkItemStatus;
 use App\Services\Mail\OutboundWorkItemMailService;
+use App\Services\Notifications\WorkItemNotifier;
 use Illuminate\Support\Facades\DB;
 
 class WorkItemAutomationService
@@ -21,15 +22,20 @@ class WorkItemAutomationService
     public function __construct(
         private readonly SlaTimerService $slaTimerService,
         private readonly OutboundWorkItemMailService $outboundMail,
+        private readonly WorkItemNotifier $notifier,
     ) {}
 
     /**
      * Run customer-reply automations after a non-internal customer message is saved.
      *
+     * Agents are notified of the reply, unless an automation moved it to a new ticket (which notifies as a new ticket).
+     *
      * @return WorkItem The work item that should own the reply going forward (may be a newly created ticket).
      */
     public function handleCustomerReplied(WorkItem $workItem, WorkItemMessage $message): WorkItem
     {
+        $originalWorkItemId = (int) $workItem->getKey();
+
         $context = [
             'message' => $message,
             'work_item' => $workItem,
@@ -57,7 +63,13 @@ class WorkItemAutomationService
             }
         }
 
-        return $workItem->fresh() ?? $workItem;
+        $workItem = $workItem->fresh() ?? $workItem;
+
+        if ((int) $workItem->getKey() === $originalWorkItemId) {
+            $this->notifier->customerReplied($workItem, $message);
+        }
+
+        return $workItem;
     }
 
     public function handleAgentReplied(WorkItem $workItem, WorkItemMessage $message): void

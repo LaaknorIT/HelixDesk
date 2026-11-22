@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\WorkItemNotificationEvent;
 use Database\Factories\QueueFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,7 +22,29 @@ class Queue extends TenantModel
         'name',
         'description',
         'default_mail_account_id',
+        'teams_webhook_url',
+        'slack_webhook_url',
+        'chat_notification_events',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'teams_webhook_url' => 'encrypted',
+            'slack_webhook_url' => 'encrypted',
+            'chat_notification_events' => 'array',
+        ];
+    }
+
+    /**
+     * Whether this queue posts the event to its Teams and Slack channels.
+     */
+    public function postsToChat(WorkItemNotificationEvent $event): bool
+    {
+        $events = $this->chat_notification_events ?? WorkItemNotificationEvent::defaultChatEvents();
+
+        return in_array($event->value, $events, true);
+    }
 
     public function defaultMailAccount(): BelongsTo
     {

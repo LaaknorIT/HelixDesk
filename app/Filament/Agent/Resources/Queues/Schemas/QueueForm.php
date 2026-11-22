@@ -2,7 +2,11 @@
 
 namespace App\Filament\Agent\Resources\Queues\Schemas;
 
+use App\Enums\ChatPlatform;
+use App\Enums\WorkItemNotificationEvent;
 use App\Models\MailAccount;
+use App\Services\Notifications\ChatWebhookPlatform;
+use Closure;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Select;
@@ -54,6 +58,36 @@ class QueueForm
                             ->searchable()
                             ->nullable(),
                     ]),
+                Section::make('Chat notifications')
+                    ->description('Post ticket activity in this queue to a Microsoft Teams or Slack channel.')
+                    ->schema([
+                        self::webhookInput(ChatPlatform::Teams)
+                            ->helperText('In Teams, add the "Post to a channel when a webhook request is received" workflow to the channel and paste its URL.'),
+                        self::webhookInput(ChatPlatform::Slack)
+                            ->helperText('Create an incoming webhook for the channel in your Slack app and paste its URL.'),
+                        CheckboxList::make('chat_notification_events')
+                            ->label('Post these events')
+                            ->options(WorkItemNotificationEvent::options())
+                            ->default(WorkItemNotificationEvent::defaultChatEvents())
+                            ->columns(2),
+                    ])
+                    ->collapsible(),
             ]);
+    }
+
+    private static function webhookInput(ChatPlatform $platform): TextInput
+    {
+        return TextInput::make($platform->webhookAttribute())
+            ->label($platform->label().' webhook URL')
+            ->password()
+            ->revealable()
+            ->url()
+            ->maxLength(2048)
+            ->nullable()
+            ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail) use ($platform): void {
+                if (filled($value) && ! ChatWebhookPlatform::allowsUrl($platform, (string) $value)) {
+                    $fail('This is not a '.$platform->label().' webhook URL.');
+                }
+            });
     }
 }
