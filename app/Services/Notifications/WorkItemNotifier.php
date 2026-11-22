@@ -135,7 +135,36 @@ class WorkItemNotifier
                 ->reject(fn (User $user): bool => (int) $user->getKey() === (int) $workItem->assigned_agent_id),
             WorkItemNotificationEvent::Assigned => collect($assignee !== null ? [$assignee] : []),
             WorkItemNotificationEvent::CustomerReplied,
-            WorkItemNotificationEvent::SlaAtRisk => $assignee !== null ? collect([$assignee]) : $this->queueAgents($workItem),
+            WorkItemNotificationEvent::SlaAtRisk => ($assignee !== null ? collect([$assignee]) : $this->queueAgents($workItem))
+                ->merge($this->watchers($workItem)),
         };
+    }
+
+    /**
+     * Agents watching the ticket who can still read its queue.
+     *
+     * @return Collection<int, User>
+     */
+    public function watchers(WorkItem $workItem): Collection
+    {
+        if ($workItem->queue_id === null || $workItem->tenant_id === null) {
+            return new Collection;
+        }
+
+        $queueId = (int) $workItem->queue_id;
+        $previousTeamId = getPermissionsTeamId();
+
+        setPermissionsTeamId((int) $workItem->tenant_id);
+
+        try {
+            return $workItem->watchers()
+                ->orderBy('users.id')
+                ->get()
+                ->filter(fn (User $user): bool => HelixdeskWorkItemAuthorization::hasWorkItemPermission($user, 'read', $queueId))
+                ->values()
+                ->toBase();
+        } finally {
+            setPermissionsTeamId($previousTeamId);
+        }
     }
 }

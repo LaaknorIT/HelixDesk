@@ -7,9 +7,12 @@ use App\Filament\Agent\Resources\WorkItems\Pages\ViewWorkItem;
 use App\Filament\Agent\Resources\WorkItems\RelationManagers\AssetsRelationManager;
 use App\Filament\Agent\Resources\WorkItems\RelationManagers\DocumentsRelationManager;
 use App\Filament\Agent\Resources\WorkItems\WorkItemResource;
+use App\Livewire\WorkItemViewers;
 use App\Models\WorkItem;
+use Filament\Actions\Action;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
@@ -29,7 +32,7 @@ class WorkItemInfolist
             ->components([
                 Grid::make(['default' => 1, 'xl' => 10])
                     ->schema([
-                        Group::make(static::workZoneComponents())
+                        Group::make(static::workZoneComponents($page))
                             ->columnSpan(['xl' => 7]),
                         Group::make(static::metadataSidebarComponents($page))
                             ->columnSpan(['xl' => 3]),
@@ -40,9 +43,24 @@ class WorkItemInfolist
     /**
      * @return array<int, mixed>
      */
-    private static function workZoneComponents(): array
+    private static function workZoneComponents(ViewWorkItem $page): array
     {
         return [
+            Livewire::make(WorkItemViewers::class, ['workItemId' => (int) $page->getRecord()->getKey()])
+                ->key('work-item-viewers')
+                ->columnSpanFull(),
+            Callout::make(fn (WorkItem $record): string => 'Merged into #'.$record->merged_into_work_item_id)
+                ->description('This ticket was merged. New messages and email replies go to the other ticket.')
+                ->info()
+                ->icon('heroicon-o-arrows-pointing-in')
+                ->visible(fn (WorkItem $record): bool => $record->merged_into_work_item_id !== null)
+                ->actions([
+                    Action::make('openMergedInto')
+                        ->label('Open ticket')
+                        ->link()
+                        ->url(fn (WorkItem $record): string => WorkItemResource::getUrl('view', ['record' => $record->merged_into_work_item_id])),
+                ])
+                ->columnSpanFull(),
             Section::make()
                 ->schema([
                     TextEntry::make('id')
@@ -180,6 +198,12 @@ class WorkItemInfolist
             TextEntry::make('resolved_at')->label('Resolved')->dateTime()->placeholder('—'),
             TextEntry::make('closed_at')->label('Closed')->dateTime()->placeholder('—'),
             TextEntry::make('assignedAgent.name')->label('Assigned to')->placeholder('—'),
+            TextEntry::make('watcher_names')
+                ->label('Watchers')
+                ->state(fn (WorkItem $record): string => $record->watchers()->orderBy('name')->pluck('name')->implode(', ') ?: '—'),
+            TextEntry::make('cc_list')
+                ->label('CC')
+                ->state(fn (WorkItem $record): string => implode(', ', $record->ccAddressList()) ?: '—'),
             TextEntry::make('description')->label('Description')->placeholder('—')->columnSpanFull(),
         ];
     }
@@ -235,6 +259,16 @@ class WorkItemInfolist
                 ->key(AssetsRelationManager::class),
             Livewire::make(DocumentsRelationManager::class, $managerData)
                 ->key(DocumentsRelationManager::class),
+            TextEntry::make('linked_tickets')
+                ->label('Linked tickets')
+                ->state(fn (WorkItem $record): array => $record->linkedWorkItems()
+                    ->map(fn (WorkItem $linked): string => '<a class="fi-link" href="'.e(WorkItemResource::getUrl('view', ['record' => $linked->getKey()])).'">'
+                        .e(ViewWorkItem::ticketLabel($linked)).'</a> <span class="fi-color-gray">('.e((string) $linked->status).')</span>')
+                    ->all())
+                ->html()
+                ->listWithLineBreaks()
+                ->placeholder('—')
+                ->columnSpanFull(),
             TextEntry::make('linked_problems')
                 ->label('Linked problems')
                 ->state(function (WorkItem $record): string {

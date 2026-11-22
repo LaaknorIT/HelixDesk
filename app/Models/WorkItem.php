@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\WorkItemSource;
 use App\Enums\WorkItemType;
 use App\Services\Mail\WorkItemPublicIdGenerator;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -41,6 +42,8 @@ class WorkItem extends TenantModel
         'closed_at',
         'response_warning_notified_at',
         'resolution_warning_notified_at',
+        'cc_addresses',
+        'merged_into_work_item_id',
     ];
 
     protected function casts(): array
@@ -60,6 +63,7 @@ class WorkItem extends TenantModel
             'sla_paused_seconds' => 'integer',
             'response_warning_notified_at' => 'datetime',
             'resolution_warning_notified_at' => 'datetime',
+            'cc_addresses' => 'array',
         ];
     }
 
@@ -146,5 +150,57 @@ class WorkItem extends TenantModel
         return $this->morphToMany(Document::class, 'linkable', 'document_links')
             ->using(DocumentLink::class)
             ->withTimestamps();
+    }
+
+    public function mergedInto(): BelongsTo
+    {
+        return $this->belongsTo(WorkItem::class, 'merged_into_work_item_id');
+    }
+
+    public function watchers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'work_item_watchers')->withTimestamps();
+    }
+
+    /**
+     * Links this ticket created. Use {@see linkedWorkItems()} for both directions.
+     */
+    public function outgoingLinks(): BelongsToMany
+    {
+        return $this->belongsToMany(WorkItem::class, 'work_item_links', 'work_item_id', 'linked_work_item_id')
+            ->withTimestamps();
+    }
+
+    public function incomingLinks(): BelongsToMany
+    {
+        return $this->belongsToMany(WorkItem::class, 'work_item_links', 'linked_work_item_id', 'work_item_id')
+            ->withTimestamps();
+    }
+
+    /**
+     * Tickets linked to this one in either direction.
+     *
+     * @return Collection<int, WorkItem>
+     */
+    public function linkedWorkItems(): Collection
+    {
+        return $this->outgoingLinks()->get()
+            ->merge($this->incomingLinks()->get())
+            ->unique(fn (WorkItem $workItem): int => (int) $workItem->getKey())
+            ->sortBy('id')
+            ->values();
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function ccAddressList(): array
+    {
+        $addresses = is_array($this->cc_addresses) ? $this->cc_addresses : [];
+
+        return array_values(array_filter(array_map(
+            fn ($address): string => is_string($address) ? trim($address) : '',
+            $addresses,
+        ), fn (string $address): bool => $address !== ''));
     }
 }
