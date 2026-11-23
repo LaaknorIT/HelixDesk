@@ -14,6 +14,8 @@ final class DeviceSourceRecordData
     /**
      * @param  list<string>  $macAddresses
      * @param  array<string, mixed>  $metadata
+     * @param  bool  $discoveredOnly  the source has seen the device (for example on the network) but does not manage
+     *                                or protect it, such as a Defender device that can be onboarded but is not
      */
     public function __construct(
         public string $source,
@@ -28,6 +30,7 @@ final class DeviceSourceRecordData
         public ?bool $enabled = null,
         public ?Carbon $lastActivityAt = null,
         public array $metadata = [],
+        public bool $discoveredOnly = false,
     ) {}
 
     /**

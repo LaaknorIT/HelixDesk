@@ -892,5 +892,16 @@
     "The collector reads this on every run. HelixDesk warns when it has not reported for three intervals.": "Collectoren leser dette ved hver kjøring. HelixDesk varsler når den ikke har rapportert på tre intervaller.",
     "Enable Active Directory integration for this organization": "Slå på Active Directory-integrasjonen for denne organisasjonen",
     "While disabled, HelixDesk rejects data from the collector.": "Så lenge den er av, avviser HelixDesk data fra collectoren.",
-    "The last collector run was incomplete: HelixDesk received :received of :expected computers. Nothing was marked as removed.": "Siste collector-kjøring var ufullstendig: HelixDesk mottok :received av :expected maskiner. Ingenting ble markert som fjernet."
+    "The last collector run was incomplete: HelixDesk received :received of :expected computers. Nothing was marked as removed.": "Siste collector-kjøring var ufullstendig: HelixDesk mottok :received av :expected maskiner. Ingenting ble markert som fjernet.",
+    "Discovered, not onboarded": "Oppdaget, ikke innrullert",
+    "HelixDesk could not get a token for the Microsoft Defender for Endpoint API. Check that Defender for Endpoint is licensed in the tenant and that the app registration has WindowsDefenderATP permissions. :error": "HelixDesk fikk ikke token for Microsoft Defender for Endpoint-API-et. Sjekk at Defender for Endpoint er lisensiert i tenanten og at appregistreringen har WindowsDefenderATP-tillatelser. :error",
+    "Machine.Read.All belongs to the WindowsDefenderATP API, not Microsoft Graph: find it under APIs my organization uses.": "Machine.Read.All hører til WindowsDefenderATP-API-et, ikke Microsoft Graph: du finner det under «APIs my organization uses».",
+    "Microsoft Defender": "Microsoft Defender",
+    "Not onboarded": "Ikke innrullert",
+    "Sync users, departments and Intune devices, read Microsoft Defender devices and security incidents, and use Microsoft 365 mailboxes.": "Synkroniser brukere, avdelinger og Intune-enheter, les enheter og sikkerhetshendelser fra Microsoft Defender, og bruk Microsoft 365-postbokser.",
+    "Uses the same app registration and client secret as the rest of this integration.": "Bruker samme appregistrering og klienthemmelighet som resten av denne integrasjonen.",
+    "Devices (Microsoft Defender for Endpoint)": "Enheter (Microsoft Defender for Endpoint)",
+    "Read onboarded and discovered devices from Microsoft Defender for Endpoint, so the device coverage report can show PCs and servers without endpoint protection.": "Les innrullerte og oppdagede enheter fra Microsoft Defender for Endpoint, slik at rapporten over enhetsdekning kan vise PC-er og servere uten endepunktbeskyttelse.",
+    "Security incidents": "Sikkerhetshendelser",
+    "Ingest Microsoft 365 Defender / unified security incidents for correlation with service desk work.": "Hent sikkerhetshendelser fra Microsoft 365 Defender for å koble dem til arbeid i servicedesken."
 }

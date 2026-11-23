@@ -178,6 +178,14 @@ Future sources plug into the same registry: Tactical RMM, NinjaOne, Datto RMM ([
 - Defender also reports **discovered but not onboarded** devices (`onboardingStatus = CanBeOnboarded`). These are stored as source records but never create assets on their own.
 - Permission checks in `MicrosoftEntraIntegrationCatalog::runtimePermissionRequirements()` get the Defender permission, so a missing consent shows up as a health warning like the other scopes.
 
+*Implemented (phase 4):*
+
+- `MicrosoftDefenderHttpClient` gets a second token from the same app registration with scope `https://api.securitycenter.microsoft.com/.default` and pages through `GET https://api.security.microsoft.com/api/machines`. The Defender token carries its own `roles` claim, so its permissions are stored as `granted_defender_permissions` in the health metadata, apart from the Graph permissions, and the health inspector checks `defender_devices` against them.
+- A missing `Machine.Read.All` skips only this scope and shows *Missing API permission*. A Defender token or API error (for example Defender for Endpoint not licensed) is a scope warning; the rest of the Entra sync carries on, and nothing is marked gone after an interrupted listing.
+- **Linking without creating:** Defender reports no serial number, so it never creates assets and never changes asset fields. An onboarded device links to an asset through `aadDeviceId` (the Intune/Entra device ID) or, like AD, the one asset in the organization with the same computer name. The Defender machine ID is stored as the hard identifier `defender_machine_id`.
+- **Discovered devices** (`onboardingStatus` other than `Onboarded`) are stored with `discovered_only` in the record metadata and get the status *Discovered, not onboarded*. They are never linked by name. In the coverage report the Defender cell shows *Not onboarded*, which counts as missing for *Any source → endpoint security*. This flag is generic: any source can mark a device it has seen but does not manage.
+- Defender's compact platform names (`Windows11`, `WindowsServer2022`) are spaced out (`Windows 11`, `Windows Server 2022`) so device class and the rules' OS filters treat them like the other sources.
+
 ---
 
 ## 4. Data model
@@ -337,7 +345,7 @@ Phase 2 ships the rules *Directory → device management*, *Remote management �
 | **1. Source records** | `asset_source_records`, `DeviceSourceRole`, `device_sources` in the integration catalog, source records and activity time from Intune and Action1, marking records gone after a complete sync, sources on the asset page | — |
 | **2. Coverage report v1** | Generic matrix (columns from registered sources), role-based built-in rules, CSV, health warning | Phase 1 |
 | **3. Active Directory** | `active_directory` type, collector key, push API, PowerShell collector. LDAPS mode, the Entra `devices` scope and the SID bridge follow separately | Phase 1 |
-| **4. Defender for Endpoint** | `defender_devices` scope on the Entra integration (same credentials), Defender grouping in the UI, discovered devices | Phase 1 |
+| **4. Defender for Endpoint** | `defender_devices` scope on the Entra integration (same credentials), Defender grouping in the UI, discovered devices. Implemented as in §3.1 | Phase 1 |
 | **5. Follow-up** | Rule editor, exceptions, trends, tickets per rule, MSP overview, dashboard widget, license hint | Phase 2 |
 
 Each phase is its own pull request. Phases 3 and 4 are independent of each other. Phase 2 is useful on its own (Intune vs Action1 works with today's integrations), so it ships before AD.

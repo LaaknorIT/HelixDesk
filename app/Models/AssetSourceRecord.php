@@ -23,6 +23,11 @@ class AssetSourceRecord extends TenantModel
 
     public const STATUS_GONE = 'gone';
 
+    /** Seen by the source, but not managed or protected by it (see DeviceSourceRecordData::$discoveredOnly). */
+    public const STATUS_DISCOVERED = 'discovered';
+
+    public const METADATA_DISCOVERED_ONLY = 'discovered_only';
+
     /**
      * @var list<string>
      */
@@ -82,12 +87,17 @@ class AssetSourceRecord extends TenantModel
         return $this->belongsTo(OrganizationIntegration::class);
     }
 
+    public function isDiscoveredOnly(): bool
+    {
+        return ($this->metadata_json[self::METADATA_DISCOVERED_ONLY] ?? false) === true;
+    }
+
     /**
-     * Still reported, not disabled, and active within the threshold.
+     * Still reported, managed by the source, not disabled, and active within the threshold.
      */
     public function isActive(?int $thresholdDays = null, ?Carbon $now = null): bool
     {
-        if ($this->gone_at !== null || $this->enabled === false || $this->last_activity_at === null) {
+        if ($this->gone_at !== null || $this->enabled === false || $this->last_activity_at === null || $this->isDiscoveredOnly()) {
             return false;
         }
 
@@ -102,6 +112,7 @@ class AssetSourceRecord extends TenantModel
     {
         return match (true) {
             $this->gone_at !== null => self::STATUS_GONE,
+            $this->isDiscoveredOnly() => self::STATUS_DISCOVERED,
             $this->enabled === false => self::STATUS_DISABLED,
             $this->isActive($thresholdDays) => self::STATUS_ACTIVE,
             default => self::STATUS_STALE,
@@ -115,6 +126,7 @@ class AssetSourceRecord extends TenantModel
             self::STATUS_STALE => __('Stale'),
             self::STATUS_DISABLED => __('Disabled'),
             self::STATUS_GONE => __('No longer reported'),
+            self::STATUS_DISCOVERED => __('Discovered, not onboarded'),
             default => $status,
         };
     }
@@ -128,6 +140,8 @@ class AssetSourceRecord extends TenantModel
         return $query
             ->whereNull('gone_at')
             ->where(fn (Builder $q) => $q->whereNull('enabled')->orWhere('enabled', true))
+            ->where(fn (Builder $q) => $q->whereNull('metadata_json->'.self::METADATA_DISCOVERED_ONLY)
+                ->orWhere('metadata_json->'.self::METADATA_DISCOVERED_ONLY, false))
             ->where('last_activity_at', '>=', now()->subDays($thresholdDays ?? self::DEFAULT_ACTIVE_THRESHOLD_DAYS));
     }
 }

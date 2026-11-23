@@ -178,6 +178,7 @@ class DeviceCoverage extends Page implements HasTable
             DeviceCoverageReport::CELL_ACTIVE => __('Active'),
             DeviceCoverageReport::CELL_STALE => __('Stale'),
             DeviceCoverageReport::CELL_DISABLED => __('Disabled'),
+            DeviceCoverageReport::CELL_DISCOVERED => __('Not onboarded'),
             DeviceCoverageReport::CELL_MISSING => __('Missing'),
             DeviceCoverageReport::CELL_ABSENT => '–',
             default => __('Not connected'),
@@ -189,7 +190,7 @@ class DeviceCoverage extends Page implements HasTable
         return match ($state) {
             DeviceCoverageReport::CELL_ACTIVE => 'success',
             DeviceCoverageReport::CELL_STALE => 'warning',
-            DeviceCoverageReport::CELL_MISSING => 'danger',
+            DeviceCoverageReport::CELL_MISSING, DeviceCoverageReport::CELL_DISCOVERED => 'danger',
             default => 'gray',
         };
     }
