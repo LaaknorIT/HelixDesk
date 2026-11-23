@@ -90,6 +90,10 @@ final class MicrosoftEntraOrganizationSyncService
                 $this->syncSecurityIncidents($client, $target, $organization);
             }
 
+            if (($scopes['defender_devices'] ?? false)) {
+                $this->syncDefenderDevices($target, $organization);
+            }
+
             OrganizationIntegrationSettings::patchMicrosoftEntraIntegrationConfig(
                 $organization,
                 $target->integrationId,
@@ -129,7 +133,8 @@ final class MicrosoftEntraOrganizationSyncService
                 continue;
             }
 
-            $missingForScope = $grantedPermissions === null
+            // Defender API permissions are not in the Graph token; syncDefenderDevices() checks them with its own token.
+            $missingForScope = $grantedPermissions === null || MicrosoftEntraIntegrationCatalog::usesDefenderApi($scopeKey)
                 ? []
                 : MicrosoftEntraIntegrationCatalog::missingPermissionsForScope($scopeKey, $grantedPermissions);
 
@@ -427,6 +432,154 @@ final class MicrosoftEntraOrganizationSyncService
             DeviceSourceKey::MICROSOFT_INTUNE,
             $syncStartedAt,
         );
+    }
+
+    /**
+     * Reads devices from Microsoft Defender for Endpoint with the integration's own app registration. They are stored
+     * as the separate device source "microsoft_defender", so the coverage report shows them apart from Intune.
+     * Defender reports no serial number, so it links to an existing asset through the Entra device ID or a unique
+     * computer name and never creates assets. Problems with this scope are warnings; the rest of the sync goes on.
+     */
+    private function syncDefenderDevices(EntraSyncTarget $target, Organization $organization): void
+    {
+        $client = MicrosoftDefenderHttpClient::fromTarget($target);
+
+        try {
+            $client->authenticate();
+            $granted = $client->grantedApplicationPermissions();
+        } catch (Throwable $exception) {
+            IntegrationHealthRecorder::recordScopeWarning($target->integrationId, 'defender_devices', __('HelixDesk could not get a token for the Microsoft Defender for Endpoint API. Check that Defender for Endpoint is licensed in the tenant and that the app registration has WindowsDefenderATP permissions. :error', [
+                'error' => Str::limit($exception->getMessage(), 500),
+            ]));
+
+            return;
+        }
+
+        IntegrationHealthRecorder::recordGrantedDefenderPermissions($target->integrationId, $granted);
+
+        if ($granted !== null && MicrosoftEntraIntegrationCatalog::missingPermissionsForScope('defender_devices', $granted) !== []) {
+            // Shown as a missing permission by the health inspector.
+            IntegrationHealthRecorder::recordScopeWarning($target->integrationId, 'defender_devices', null);
+
+            return;
+        }
+
+        $syncStartedAt = now();
+
+        try {
+            foreach ($client->paginateCollection('machines') as $machine) {
+                $this->reconcileDefenderMachine($target, $organization, $machine);
+            }
+        } catch (Throwable $exception) {
+            // Nothing is marked gone after an interrupted listing.
+            IntegrationHealthRecorder::recordScopeWarning($target->integrationId, 'defender_devices', Str::limit($exception->getMessage(), 1000));
+
+            return;
+        }
+
+        IntegrationHealthRecorder::recordScopeWarning($target->integrationId, 'defender_devices', null);
+
+        $this->deviceSourceRecordService->markMissingAsGone(
+            $target->tenantId,
+            $target->integrationId,
+            DeviceSourceKey::MICROSOFT_DEFENDER,
+            $syncStartedAt,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $machine
+     */
+    private function reconcileDefenderMachine(EntraSyncTarget $target, Organization $organization, array $machine): void
+    {
+        $machineId = trim((string) ($machine['id'] ?? ''));
+        if ($machineId === '') {
+            return;
+        }
+
+        $dnsName = trim((string) ($machine['computerDnsName'] ?? ''));
+        $aadDeviceId = trim((string) ($machine['aadDeviceId'] ?? ''));
+        $onboarded = strcasecmp((string) ($machine['onboardingStatus'] ?? 'Onboarded'), 'Onboarded') === 0;
+        $operatingSystem = $this->defenderOperatingSystem($machine);
+
+        $identifiers = [[
+            'type' => AssetExternalIdentifierType::DefenderMachineId,
+            'value' => $machineId,
+        ]];
+
+        // A device Defender has only discovered on the network is not linked by name: the name is all it has.
+        if ($onboarded) {
+            if ($aadDeviceId !== '') {
+                $identifiers[] = [
+                    'type' => AssetExternalIdentifierType::EntraAzureAdDeviceId,
+                    'value' => $aadDeviceId,
+                ];
+            }
+
+            if (AssetIdentityNormalizer::normalizeHostname($dnsName) !== null) {
+                $identifiers[] = [
+                    'type' => AssetExternalIdentifierType::Hostname,
+                    'value' => $dnsName,
+                ];
+            }
+        }
+
+        $this->assetReconciliationService->reconcile(new AssetProviderSnapshot(
+            tenantId: $target->tenantId,
+            organizationId: (int) $organization->getKey(),
+            organizationIntegrationId: $target->integrationId,
+            provider: IntegrationType::MICROSOFT_ENTRA,
+            identifiers: $identifiers,
+            // Defender does not change asset fields; Intune and the RMM own them.
+            attributes: [],
+            sourceRecord: new DeviceSourceRecordData(
+                source: DeviceSourceKey::MICROSOFT_DEFENDER,
+                providerRecordId: $machineId,
+                displayName: $dnsName !== '' ? $dnsName : null,
+                hostname: $dnsName !== '' ? $dnsName : null,
+                fqdn: str_contains($dnsName, '.') ? $dnsName : null,
+                operatingSystem: $operatingSystem,
+                lastActivityAt: DeviceSourceRecordData::parseActivityTime($machine['lastSeen'] ?? null),
+                metadata: array_filter([
+                    'onboarding_status' => $machine['onboardingStatus'] ?? null,
+                    'health_status' => $machine['healthStatus'] ?? null,
+                    'os_platform' => $machine['osPlatform'] ?? null,
+                    'os_version' => $machine['version'] ?? ($machine['osVersion'] ?? null),
+                    'risk_score' => $machine['riskScore'] ?? null,
+                    'exposure_level' => $machine['exposureLevel'] ?? null,
+                    'av_status' => $machine['defenderAvStatus'] ?? null,
+                    'device_group' => $machine['rbacGroupName'] ?? null,
+                    'tags' => is_array($machine['machineTags'] ?? null) && $machine['machineTags'] !== [] ? $machine['machineTags'] : null,
+                    'last_ip_address' => $machine['lastIpAddress'] ?? null,
+                    'managed_by' => $machine['managedBy'] ?? null,
+                    'azure_ad_device_id' => $aadDeviceId !== '' ? $aadDeviceId : null,
+                    'first_seen_at' => $machine['firstSeen'] ?? null,
+                ], fn (mixed $value): bool => $value !== null && $value !== ''),
+                discoveredOnly: ! $onboarded,
+            ),
+            createAssetIfUnmatched: false,
+            matchByUniqueHostname: $onboarded,
+        ));
+    }
+
+    /**
+     * Defender reports compact platform names ("Windows11", "WindowsServer2022", "macOS", "Linux"). Spacing them out
+     * lets DeviceClass and the coverage rules recognise them like other sources' operating systems.
+     *
+     * @param  array<string, mixed>  $machine
+     */
+    private function defenderOperatingSystem(array $machine): ?string
+    {
+        $platform = trim((string) ($machine['osPlatform'] ?? ''));
+        if ($platform === '') {
+            return null;
+        }
+
+        if (preg_match('/^Windows(Server)?(\d.*)?$/i', $platform, $m) === 1) {
+            return trim('Windows'.(($m[1] ?? '') !== '' ? ' Server' : '').(($m[2] ?? '') !== '' ? ' '.$m[2] : ''));
+        }
+
+        return $platform;
     }
 
     private function syncSecurityIncidents(

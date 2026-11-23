@@ -378,7 +378,8 @@ final class OrganizationIntegrationSettings
         return ($data['entra_scope_users'] ?? false)
             || ($data['entra_scope_departments'] ?? false)
             || ($data['entra_scope_computers'] ?? false)
-            || ($data['entra_scope_security_work_items'] ?? false);
+            || ($data['entra_scope_security_work_items'] ?? false)
+            || ($data['entra_scope_defender_devices'] ?? false);
     }
 
     /**
@@ -452,6 +453,7 @@ final class OrganizationIntegrationSettings
                 'departments' => false,
                 'computers' => false,
                 'security_work_items' => false,
+                'defender_devices' => false,
                 'mail' => false,
             ],
         ]);
@@ -498,6 +500,7 @@ final class OrganizationIntegrationSettings
             'entra_scope_departments' => (bool) ($scopes['departments'] ?? false),
             'entra_scope_computers' => (bool) ($scopes['computers'] ?? false),
             'entra_scope_security_work_items' => (bool) ($scopes['security_work_items'] ?? false),
+            'entra_scope_defender_devices' => (bool) ($scopes['defender_devices'] ?? false),
             'entra_scope_mail' => (bool) ($scopes['mail'] ?? false),
         ];
     }
@@ -564,6 +567,7 @@ final class OrganizationIntegrationSettings
                 'departments' => (bool) ($data['entra_scope_departments'] ?? false),
                 'computers' => (bool) ($data['entra_scope_computers'] ?? false),
                 'security_work_items' => (bool) ($data['entra_scope_security_work_items'] ?? false),
+                'defender_devices' => (bool) ($data['entra_scope_defender_devices'] ?? false),
                 'mail' => (bool) ($data['entra_scope_mail'] ?? false),
             ],
         ];

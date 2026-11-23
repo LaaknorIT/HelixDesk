@@ -33,6 +33,20 @@ final class IntegrationHealthRecorder
     }
 
     /**
+     * Permissions granted on the Microsoft Defender for Endpoint API, read from a Defender token. They are stored apart
+     * from the Microsoft Graph permissions because the two APIs issue separate tokens.
+     *
+     * @param  list<string>|null  $grantedPermissions
+     */
+    public static function recordGrantedDefenderPermissions(string $integrationId, ?array $grantedPermissions): void
+    {
+        self::find($integrationId)?->mergeHealthMetadata([
+            'granted_defender_permissions' => $grantedPermissions,
+            'defender_permissions_checked_at' => now()->toIso8601String(),
+        ]);
+    }
+
+    /**
      * Record (or clear, with a null message) a warning for one capability that could not be synced
      * while the rest of the integration kept working.
      */

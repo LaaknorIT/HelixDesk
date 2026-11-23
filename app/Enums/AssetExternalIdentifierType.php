@@ -10,6 +10,7 @@ enum AssetExternalIdentifierType: string
     case Action1EndpointId = 'action1_endpoint_id';
     case AdObjectGuid = 'ad_object_guid';
     case AdObjectSid = 'ad_object_sid';
+    case DefenderMachineId = 'defender_machine_id';
     case SerialNumber = 'serial_number';
     case Hostname = 'hostname';
     case MacAddress = 'mac_address';
@@ -22,7 +23,8 @@ enum AssetExternalIdentifierType: string
             self::EntraDeviceId,
             self::Action1EndpointId,
             self::AdObjectGuid,
-            self::AdObjectSid => true,
+            self::AdObjectSid,
+            self::DefenderMachineId => true,
             default => false,
         };
     }

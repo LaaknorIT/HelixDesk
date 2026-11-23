@@ -42,6 +42,11 @@ final class DeviceSourceRecordService
             $data->macAddresses,
         ))));
 
+        $metadata = $data->metadata;
+        if ($data->discoveredOnly) {
+            $metadata[AssetSourceRecord::METADATA_DISCOVERED_ONLY] = true;
+        }
+
         $record->fill([
             'organization_id' => $snapshot->organizationId,
             'asset_id' => $asset?->getKey(),
@@ -56,7 +61,7 @@ final class DeviceSourceRecordService
             'last_activity_at' => $data->lastActivityAt,
             'last_reported_at' => $now,
             'gone_at' => null,
-            'metadata_json' => $data->metadata !== [] ? $data->metadata : null,
+            'metadata_json' => $metadata !== [] ? $metadata : null,
         ]);
 
         if (! $record->exists) {

@@ -197,16 +197,29 @@ final class IntegrationHealthInspector
      */
     private static function permissionIssues(OrganizationIntegration $integration, array $config, array $metadata): array
     {
-        if (! $integration->isMicrosoftEntra() || ! is_array($metadata['granted_permissions'] ?? null)) {
+        if (! $integration->isMicrosoftEntra()) {
             return [];
         }
 
-        $granted = array_values(array_filter($metadata['granted_permissions'], 'is_string'));
+        $grantedByApi = [
+            'graph' => is_array($metadata['granted_permissions'] ?? null)
+                ? array_values(array_filter($metadata['granted_permissions'], 'is_string'))
+                : null,
+            'defender' => is_array($metadata['granted_defender_permissions'] ?? null)
+                ? array_values(array_filter($metadata['granted_defender_permissions'], 'is_string'))
+                : null,
+        ];
         $scopes = is_array($config['scopes'] ?? null) ? $config['scopes'] : [];
         $issues = [];
 
         foreach (array_keys(MicrosoftEntraIntegrationCatalog::runtimePermissionRequirements()) as $scopeKey) {
             if (! ($scopes[$scopeKey] ?? false)) {
+                continue;
+            }
+
+            $defenderApi = MicrosoftEntraIntegrationCatalog::usesDefenderApi($scopeKey);
+            $granted = $grantedByApi[$defenderApi ? 'defender' : 'graph'];
+            if ($granted === null) {
                 continue;
             }
 
@@ -225,7 +238,7 @@ final class IntegrationHealthInspector
                     'capability' => mb_strtolower(IntegrationCatalog::capabilityLabel((string) $integration->type, $scopeKey)),
                     'permissions' => implode(', ', $missing),
                 ]),
-                occurredAt: self::parseDate($metadata['permissions_checked_at'] ?? null),
+                occurredAt: self::parseDate($metadata[$defenderApi ? 'defender_permissions_checked_at' : 'permissions_checked_at'] ?? null),
             );
         }
 

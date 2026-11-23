@@ -10,6 +10,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Callout;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
@@ -56,10 +57,20 @@ class OrganizationEntraSettingsSchema
                                 ->label(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['computers']['label'])
                                 ->helperText(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['computers']['description'])
                                 ->default(false),
-                            Toggle::make('entra_scope_security_work_items')
-                                ->label(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['security_work_items']['label'])
-                                ->helperText(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['security_work_items']['description'])
-                                ->default(false),
+                            Section::make(__('Microsoft Defender'))
+                                ->description(__('Uses the same app registration and client secret as the rest of this integration.'))
+                                ->icon(Heroicon::OutlinedShieldCheck)
+                                ->compact()
+                                ->schema([
+                                    Toggle::make('entra_scope_security_work_items')
+                                        ->label(fn (): string => __(MicrosoftEntraIntegrationCatalog::scopeDefinitions()['security_work_items']['label']))
+                                        ->helperText(fn (): string => __(MicrosoftEntraIntegrationCatalog::scopeDefinitions()['security_work_items']['description']))
+                                        ->default(false),
+                                    Toggle::make('entra_scope_defender_devices')
+                                        ->label(fn (): string => __(MicrosoftEntraIntegrationCatalog::scopeDefinitions()['defender_devices']['label']))
+                                        ->helperText(fn (): string => __(MicrosoftEntraIntegrationCatalog::scopeDefinitions()['defender_devices']['description']))
+                                        ->default(false),
+                                ]),
                             Toggle::make('entra_scope_mail')
                                 ->label(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['mail']['label'])
                                 ->helperText(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['mail']['description'])

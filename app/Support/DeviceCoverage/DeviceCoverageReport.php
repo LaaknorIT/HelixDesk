@@ -13,6 +13,9 @@ final readonly class DeviceCoverageReport
 
     public const CELL_DISABLED = 'disabled';
 
+    /** Seen by the source but not managed or protected by it, e.g. a Defender device that is not onboarded. */
+    public const CELL_DISCOVERED = 'discovered';
+
     /** Expected by a rule but not reported by the source. */
     public const CELL_MISSING = 'missing';
 

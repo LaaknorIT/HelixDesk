@@ -133,7 +133,10 @@ final class DeviceCoverageService
                 $summaries[$rule->key]['missing']++;
                 $row['findings'][] = $rule->key;
                 foreach ($expectedSources as $key) {
-                    $row['cells'][$key] = DeviceCoverageReport::CELL_MISSING;
+                    // A source that has only discovered the device keeps that state: it is missing, and why is useful.
+                    if (($row['cells'][$key] ?? null) !== DeviceCoverageReport::CELL_DISCOVERED) {
+                        $row['cells'][$key] = DeviceCoverageReport::CELL_MISSING;
+                    }
                 }
             }
 
@@ -236,9 +239,10 @@ final class DeviceCoverageService
     private function buildRow(string $groupKey, array $group, array $columns, array $organizationSources, array $thresholdByIntegration, array $catalog): array
     {
         $rank = [
-            DeviceCoverageReport::CELL_ACTIVE => 3,
-            DeviceCoverageReport::CELL_STALE => 2,
-            DeviceCoverageReport::CELL_DISABLED => 1,
+            DeviceCoverageReport::CELL_ACTIVE => 4,
+            DeviceCoverageReport::CELL_STALE => 3,
+            DeviceCoverageReport::CELL_DISABLED => 2,
+            DeviceCoverageReport::CELL_DISCOVERED => 1,
         ];
 
         $cells = [];
@@ -297,6 +301,7 @@ final class DeviceCoverageService
         return match ($record->status($threshold)) {
             AssetSourceRecord::STATUS_ACTIVE => DeviceCoverageReport::CELL_ACTIVE,
             AssetSourceRecord::STATUS_DISABLED => DeviceCoverageReport::CELL_DISABLED,
+            AssetSourceRecord::STATUS_DISCOVERED => DeviceCoverageReport::CELL_DISCOVERED,
             default => DeviceCoverageReport::CELL_STALE,
         };
     }

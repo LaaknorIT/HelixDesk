@@ -52,6 +52,14 @@ final class MicrosoftEntraIntegrationCatalog
                 ],
                 'setup_notes' => 'Exact API surface evolves with Microsoft Graph security APIs—verify the permission exists for your tenant SKU and that incident export matches your compliance policy.',
             ],
+            'defender_devices' => [
+                'label' => 'Devices (Microsoft Defender for Endpoint)',
+                'description' => 'Read onboarded and discovered devices from Microsoft Defender for Endpoint, so the device coverage report can show PCs and servers without endpoint protection.',
+                'application_permissions' => [
+                    'Machine.Read.All',
+                ],
+                'setup_notes' => 'Uses the same app registration. Add it under API permissions → APIs my organization uses → WindowsDefenderATP → Application permissions → Machine.Read.All, then grant admin consent. Requires Microsoft Defender for Endpoint (Plan 1, Plan 2 or Defender for Business).',
+            ],
             'mail' => [
                 'label' => 'Mail (shared mailboxes)',
                 'description' => 'Poll shared mailboxes, mark processed messages as read, and send incident replies via Microsoft Graph.',
@@ -87,6 +95,12 @@ final class MicrosoftEntraIntegrationCatalog
                 'SecurityIncident.Read.All' => [
                     'SecurityIncident.Read.All',
                     'SecurityIncident.ReadWrite.All',
+                ],
+            ],
+            'defender_devices' => [
+                'Machine.Read.All' => [
+                    'Machine.Read.All',
+                    'Machine.ReadWrite.All',
                 ],
             ],
             'mail' => [
@@ -133,11 +147,37 @@ final class MicrosoftEntraIntegrationCatalog
      */
     public static function directorySyncScopeKeys(): array
     {
-        return ['users', 'departments', 'computers', 'security_work_items'];
+        return ['users', 'departments', 'computers', 'security_work_items', 'defender_devices'];
     }
 
     /**
-     * @param  array<string, bool>  $scopesEnabled  keys: users, departments, computers, security_work_items, mail
+     * Scopes whose permissions belong to the Microsoft Defender for Endpoint API (WindowsDefenderATP) instead of
+     * Microsoft Graph. They are checked against the roles in a Defender API token, not the Graph token.
+     *
+     * @return list<string>
+     */
+    public static function defenderApiScopeKeys(): array
+    {
+        return ['defender_devices'];
+    }
+
+    public static function usesDefenderApi(string $scopeKey): bool
+    {
+        return in_array($scopeKey, self::defenderApiScopeKeys(), true);
+    }
+
+    /**
+     * Scopes shown together under "Microsoft Defender" in the gallery and the setup wizard.
+     *
+     * @return list<string>
+     */
+    public static function defenderGroupScopeKeys(): array
+    {
+        return ['security_work_items', 'defender_devices'];
+    }
+
+    /**
+     * @param  array<string, bool>  $scopesEnabled  keys: users, departments, computers, security_work_items, defender_devices, mail
      */
     public static function collectApplicationPermissions(array $scopesEnabled): array
     {
@@ -195,6 +235,9 @@ final class MicrosoftEntraIntegrationCatalog
         $lines[] = '<div class="p-4">';
         $lines[] = '<p class="text-xs font-semibold">'.e(__('Combined unique application permissions')).'</p>';
         $lines[] = '<p class="text-xs mt-1">'.e(__('Add in App registration → API permissions → Microsoft Graph → Application permissions, then grant admin consent.')).'</p>';
+        if (array_intersect(array_keys($any), self::defenderApiScopeKeys()) !== []) {
+            $lines[] = '<p class="text-xs mt-1">'.e(__('Machine.Read.All belongs to the WindowsDefenderATP API, not Microsoft Graph: find it under APIs my organization uses.')).'</p>';
+        }
         $lines[] = '<p class="mt-3 font-mono text-xs break-all px-3 py-2">'.e(implode(', ', $all)).'</p>';
         $lines[] = '</div>';
 
@@ -218,6 +261,7 @@ final class MicrosoftEntraIntegrationCatalog
             'departments' => (bool) $get('entra_scope_departments'),
             'computers' => (bool) $get('entra_scope_computers'),
             'security_work_items' => (bool) $get('entra_scope_security_work_items'),
+            'defender_devices' => (bool) $get('entra_scope_defender_devices'),
             'mail' => (bool) $get('entra_scope_mail'),
         ];
     }
