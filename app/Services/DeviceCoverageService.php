@@ -29,14 +29,14 @@ final class DeviceCoverageService
      *
      * @return array<string, int> rule key => missing devices
      */
-    public static function cachedMissingCounts(int $tenantId, int $organizationId): array
+    public static function cachedMissingCounts(int $tenantId, ?int $organizationId): array
     {
         return Cache::remember(
             'device-coverage:missing:'.$tenantId.':'.$organizationId,
             self::SUMMARY_CACHE_SECONDS,
             function () use ($tenantId, $organizationId): array {
                 $counts = [];
-                foreach (app(self::class)->build($tenantId, $organizationId)->ruleSummaries as $summary) {
+                foreach (app(self::class)->build($tenantId, $organizationId, includeDescendants: true)->ruleSummaries as $summary) {
                     $counts[$summary['rule']->key] = $summary['missing'];
                 }
 
@@ -45,11 +45,20 @@ final class DeviceCoverageService
         );
     }
 
-    public function build(int $tenantId, ?int $organizationId = null): DeviceCoverageReport
+    /**
+     * @param  ?int  $organizationId  null for the whole tenant
+     * @param  bool  $includeDescendants  also report devices in organizations below $organizationId (an integration's
+     *                                    reach), not only devices in that organization itself
+     */
+    public function build(int $tenantId, ?int $organizationId = null, bool $includeDescendants = false): DeviceCoverageReport
     {
         $catalog = DeviceSourceCatalog::all();
 
         $lineage = new OrganizationLineage;
+        $reportOrganizationIds = $organizationId === null ? null : [
+            $organizationId,
+            ...($includeDescendants ? $lineage->descendantIds($tenantId, $organizationId) : []),
+        ];
 
         // An integration covers its own organization and everything below it, so a report for one organization
         // includes the integrations above it (for example an MSP-wide RMM at the root level).
@@ -58,7 +67,7 @@ final class DeviceCoverageService
             ->where('tenant_id', $tenantId)
             ->when($organizationId !== null, fn ($query) => $query->where(fn ($inner) => $inner
                 ->whereNull('organization_id')
-                ->orWhereIn('organization_id', [$organizationId, ...$lineage->ancestorIds($tenantId, $organizationId)])))
+                ->orWhereIn('organization_id', [...$reportOrganizationIds, ...$lineage->ancestorIds($tenantId, $organizationId)])))
             ->where('enabled', true)
             ->get();
 
@@ -109,7 +118,7 @@ final class DeviceCoverageService
         $records = AssetSourceRecord::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
+            ->when($reportOrganizationIds !== null, fn ($query) => $query->whereIn('organization_id', $reportOrganizationIds))
             ->whereNull('gone_at')
             ->with(['asset' => fn ($query) => $query->withoutGlobalScopes(), 'organization' => fn ($query) => $query->withoutGlobalScopes()])
             ->get()
@@ -242,7 +251,9 @@ final class DeviceCoverageService
 
             $groups[$groupKey] ??= [
                 'organization_id' => $record->organization_id !== null ? (int) $record->organization_id : null,
-                'organization' => (string) ($record->organization?->name ?? ''),
+                'organization' => $record->organization_id === null
+                    ? __('Root level (no organization yet)')
+                    : (string) ($record->organization?->name ?? ''),
                 'asset' => $asset,
                 'probable_match' => false,
                 'records' => [],

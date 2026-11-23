@@ -8,6 +8,7 @@ use App\Models\AssetIdentityAmbiguity;
 use App\Models\AssetSourceRecord;
 use App\Models\Organization;
 use App\Models\OrganizationIntegration;
+use App\Support\OrganizationIntegrationSettings;
 use App\Support\OrganizationLineage;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,12 @@ final class OrganizationIntegrationMover
         if ($target !== null && (int) $target->tenant_id !== $tenantId) {
             throw ValidationException::withMessages([
                 'organization_id' => __('The integration can only move to an organization in the same tenant.'),
+            ]);
+        }
+
+        if ($target === null && ! in_array((string) $integration->type, OrganizationIntegrationSettings::tenantRootTypes(), true)) {
+            throw ValidationException::withMessages([
+                'organization_id' => __('Only device integrations such as an RMM can sit at the root level. This integration brings users or mail into one organization.'),
             ]);
         }
 

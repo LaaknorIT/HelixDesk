@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Organization;
+use App\Models\OrganizationIntegration;
 use App\Repositories\OrganizationIntegrationRepository;
 use App\Services\Action1\Action1OrganizationSyncService;
 use App\Support\Action1SyncTarget;
@@ -21,7 +22,8 @@ class SyncNextAction1IntegrationJob implements ShouldQueue
     public int $timeout;
 
     public function __construct(
-        public int $organizationId,
+        /** Null for an integration at the tenant root. */
+        public ?int $organizationId,
         public string $integrationId,
     ) {
         $this->timeout = max(
@@ -32,7 +34,9 @@ class SyncNextAction1IntegrationJob implements ShouldQueue
 
     public function handle(Action1OrganizationSyncService $syncService): void
     {
-        $organization = Organization::query()->withoutGlobalScopes()->find($this->organizationId);
+        $organization = $this->organizationId !== null
+            ? Organization::query()->withoutGlobalScopes()->find($this->organizationId)
+            : $this->tenantRootFor($this->integrationId);
         if ($organization === null) {
             Log::warning('Action1 sync skipped: organization not found.', [
                 'organization_id' => $this->organizationId,
@@ -83,7 +87,7 @@ class SyncNextAction1IntegrationJob implements ShouldQueue
 
         $target = new Action1SyncTarget(
             tenantId: (int) $organization->tenant_id,
-            organizationId: (int) $organization->getKey(),
+            organizationId: $organization->isTenantRoot() ? null : (int) $organization->getKey(),
             integrationId: (string) $entry['id'],
             config: $config,
             credentials: $integration?->mergedCredentials() ?? [],
@@ -117,5 +121,16 @@ class SyncNextAction1IntegrationJob implements ShouldQueue
             ]);
             $syncService->recordFailure($target, $e);
         }
+    }
+
+    private function tenantRootFor(string $integrationId): ?Organization
+    {
+        $integration = OrganizationIntegration::query()->withoutGlobalScopes()->find($integrationId);
+
+        if ($integration === null || $integration->organization_id !== null || $integration->tenant_id === null) {
+            return null;
+        }
+
+        return Organization::tenantRoot((int) $integration->tenant_id);
     }
 }

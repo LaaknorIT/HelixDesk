@@ -56,7 +56,7 @@ final class Action1OrganizationSyncService
         setPermissionsTeamId($target->tenantId);
 
         try {
-            $organization = Organization::query()->find($target->organizationId);
+            $organization = Organization::forIntegrationScope($target->organizationId, $target->tenantId);
             if ($organization === null) {
                 throw new RuntimeException('Organization not found: '.$target->organizationId);
             }
@@ -116,7 +116,7 @@ final class Action1OrganizationSyncService
         setPermissionsTeamId($target->tenantId);
 
         try {
-            $organization = Organization::query()->find($target->organizationId);
+            $organization = Organization::forIntegrationScope($target->organizationId, $target->tenantId);
             if ($organization === null) {
                 return;
             }
@@ -265,7 +265,7 @@ final class Action1OrganizationSyncService
 
         return new AssetProviderSnapshot(
             tenantId: $target->tenantId,
-            organizationId: (int) $organization->getKey(),
+            organizationId: $target->organizationId,
             organizationIntegrationId: $target->integrationId,
             provider: IntegrationType::ACTION1,
             identifiers: $identifiers,
@@ -602,7 +602,7 @@ final class Action1OrganizationSyncService
         return MonitoringEventSource::query()->firstOrCreate(
             [
                 'tenant_id' => $target->tenantId,
-                'slug' => 'action1-alerts-org-'.$organization->getKey(),
+                'slug' => 'action1-alerts-org-'.$organization->routeKeyForIntegrations(),
             ],
             [
                 'name' => 'Action1 alerts — '.$organization->name,

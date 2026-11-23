@@ -107,6 +107,12 @@ class Integrations extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('root')
+                ->label(__('Root-level integrations'))
+                ->tooltip(__('Integrations above every organization, such as an RMM that covers all your customers'))
+                ->icon(Heroicon::OutlinedGlobeAlt)
+                ->color('gray')
+                ->url(OrganizationResource::getUrl('settings', ['record' => Organization::TENANT_ROOT_ROUTE_KEY])),
             Action::make('add')
                 ->label(__('Add integration'))
                 ->icon(Heroicon::OutlinedPlus)
@@ -188,7 +194,9 @@ class Integrations extends Page implements HasTable
                         ->visible(fn (array $record): bool => in_array($record['type'], OrganizationIntegrationSettings::assetSyncTypes(), true))
                         ->action(function (array $record): void {
                             $integration = $this->findIntegration($record['id']);
-                            $organization = $integration?->organization;
+                            $organization = $integration !== null
+                                ? Organization::forIntegrationScope($integration->organization_id !== null ? (int) $integration->organization_id : null, (int) $integration->tenant_id)
+                                : null;
                             if ($integration === null || ! $organization instanceof Organization) {
                                 return;
                             }
@@ -221,8 +229,13 @@ class Integrations extends Page implements HasTable
                         ->schema(fn (array $record): array => [
                             Select::make('organization_id')
                                 ->label(__('New organization'))
-                                ->options(fn (): array => collect(OrganizationIntegrationOptions::organizationPathsForCurrentTenant())
-                                    ->except([$record['organization_id']])
+                                ->options(fn (): array => collect(
+                                    in_array($record['type'], OrganizationIntegrationSettings::tenantRootTypes(), true)
+                                        ? [Organization::TENANT_ROOT_ROUTE_KEY => __('All organizations (root level)')]
+                                        : [],
+                                )
+                                    ->union(OrganizationIntegrationOptions::organizationPathsForCurrentTenant())
+                                    ->except([$record['organization_id'] ?? Organization::TENANT_ROOT_ROUTE_KEY])
                                     ->all())
                                 ->searchable()
                                 ->required(),
@@ -231,11 +244,16 @@ class Integrations extends Page implements HasTable
                         ->action(function (array $record, array $data): void {
                             $integration = $this->findIntegration($record['id']);
                             $tenant = Filament::getTenant();
-                            $target = Organization::query()
-                                ->where('tenant_id', $tenant?->getKey())
-                                ->find((int) ($data['organization_id'] ?? 0));
+                            $toRoot = (string) ($data['organization_id'] ?? '') === Organization::TENANT_ROOT_ROUTE_KEY;
+                            $target = $toRoot
+                                ? null
+                                : Organization::query()->where('tenant_id', $tenant?->getKey())->find((int) ($data['organization_id'] ?? 0));
 
-                            if ($integration === null || $target === null) {
+                            if ($integration === null || $tenant === null || (! $toRoot && $target === null)) {
+                                return;
+                            }
+
+                            if ($toRoot && ! in_array((string) $integration->type, OrganizationIntegrationSettings::tenantRootTypes(), true)) {
                                 return;
                             }
 
@@ -254,7 +272,7 @@ class Integrations extends Page implements HasTable
                             $this->reports = null;
 
                             Notification::make()
-                                ->title(__('Integration moved to :organization', ['organization' => $target->name]))
+                                ->title(__('Integration moved to :organization', ['organization' => $target->name ?? __('All organizations (root level)')]))
                                 ->body(trans_choice('{0} No devices needed to move.|{1} 1 device moved with it.|[2,*] :count devices moved with it.', $result['moved_devices']))
                                 ->success()
                                 ->send();
@@ -300,8 +318,10 @@ class Integrations extends Page implements HasTable
                 return [
                     '__key' => (string) $integration->getKey(),
                     'id' => (string) $integration->getKey(),
-                    'organization_id' => (int) $integration->organization_id,
-                    'organization' => (string) ($integration->organization?->name ?? '—'),
+                    'organization_id' => $integration->organization_id !== null ? (int) $integration->organization_id : null,
+                    'organization' => $integration->organization_id === null
+                        ? __('All organizations (root level)')
+                        : (string) ($integration->organization?->name ?? '—'),
                     'type' => (string) $integration->type,
                     'type_label' => IntegrationType::label((string) $integration->type),
                     'status' => $report->status->value,
@@ -370,7 +390,7 @@ class Integrations extends Page implements HasTable
     private function editUrl(array $record): string
     {
         return OrganizationResource::getUrl('settings.integrations.edit', [
-            'record' => $record['organization_id'],
+            'record' => $record['organization_id'] ?? Organization::TENANT_ROOT_ROUTE_KEY,
             'integration' => $record['id'],
         ]);
     }

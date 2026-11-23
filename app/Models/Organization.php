@@ -53,6 +53,57 @@ class Organization extends TenantModel
         });
     }
 
+    private bool $isTenantRoot = false;
+
+    /** Route key that stands for the tenant root in organization URLs (/organizations/root/settings). */
+    public const TENANT_ROOT_ROUTE_KEY = 'root';
+
+    /**
+     * The tenant itself, above every organization, as an unsaved organization with no ID. Integrations attached
+     * here have no organization_id and see devices in the whole tenant; devices they create have no organization
+     * until a more specific integration finds them. It is never saved.
+     */
+    public static function tenantRoot(int $tenantId): self
+    {
+        $root = new self;
+        $root->isTenantRoot = true;
+        $root->forceFill([
+            'tenant_id' => $tenantId,
+            'type' => OrganizationType::Group,
+            'name' => __('All organizations (root level)'),
+            'is_billable' => false,
+        ]);
+
+        return $root;
+    }
+
+    public function isTenantRoot(): bool
+    {
+        return $this->isTenantRoot;
+    }
+
+    /**
+     * The organization an integration is attached to, or the tenant root when it has none.
+     */
+    public static function forIntegrationScope(?int $organizationId, int $tenantId): ?self
+    {
+        if ($organizationId === null) {
+            return self::tenantRoot($tenantId);
+        }
+
+        return self::query()->withoutGlobalScopes()->where('tenant_id', $tenantId)->find($organizationId);
+    }
+
+    public function getRouteKey(): mixed
+    {
+        return $this->isTenantRoot ? self::TENANT_ROOT_ROUTE_KEY : parent::getRouteKey();
+    }
+
+    public function routeKeyForIntegrations(): int|string
+    {
+        return $this->isTenantRoot() ? self::TENANT_ROOT_ROUTE_KEY : (int) $this->getKey();
+    }
+
     public function determineTitleColumnName(): string
     {
         return 'name';
