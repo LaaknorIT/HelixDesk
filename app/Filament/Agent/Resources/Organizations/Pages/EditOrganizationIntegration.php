@@ -4,11 +4,13 @@ namespace App\Filament\Agent\Resources\Organizations\Pages;
 
 use App\Filament\Agent\Resources\Organizations\Concerns\HandlesAction1IntegrationSave;
 use App\Filament\Agent\Resources\Organizations\Concerns\HandlesMicrosoftEntraIntegrationSave;
+use App\Filament\Agent\Resources\Organizations\Concerns\ResolvesTenantRootRecord;
 use App\Filament\Agent\Resources\Organizations\OrganizationResource;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationAction1SettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationActiveDirectorySettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationEntraSettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationGoogleWorkspaceSettingsSchema;
+use App\Models\Organization;
 use App\Models\OrganizationIntegration;
 use App\Repositories\OrganizationIntegrationRepository;
 use App\Services\ActiveDirectory\CollectorKeyService;
@@ -30,6 +32,7 @@ class EditOrganizationIntegration extends EditRecord
 {
     use HandlesAction1IntegrationSave;
     use HandlesMicrosoftEntraIntegrationSave;
+    use ResolvesTenantRootRecord;
 
     protected static string $resource = OrganizationResource::class;
 
@@ -54,6 +57,13 @@ class EditOrganizationIntegration extends EditRecord
         $this->integrationType = (string) ($entry['type'] ?? OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA);
 
         parent::mount($record);
+    }
+
+    public function getSubNavigation(): array
+    {
+        $record = $this->getRecord();
+
+        return $record instanceof Organization && $record->isTenantRoot() ? [] : parent::getSubNavigation();
     }
 
     public function form(Schema $schema): Schema

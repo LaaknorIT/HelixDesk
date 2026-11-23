@@ -36,7 +36,7 @@ final class OrganizationIntegrationSyncQueue
                 $integrationId,
             ),
             OrganizationIntegrationSettings::TYPE_ACTION1 => SyncNextAction1IntegrationJob::dispatch(
-                (int) $organization->getKey(),
+                $organization->isTenantRoot() ? null : (int) $organization->getKey(),
                 $integrationId,
             ),
             default => null,

@@ -4,7 +4,9 @@ namespace App\Filament\Agent\Resources\Organizations\Pages;
 
 use App\Enums\IntegrationHealthStatus;
 use App\Filament\Agent\Pages\IntegrationGallery;
+use App\Filament\Agent\Resources\Organizations\Concerns\ResolvesTenantRootRecord;
 use App\Filament\Agent\Resources\Organizations\OrganizationResource;
+use App\Models\Organization;
 use App\Repositories\OrganizationIntegrationRepository;
 use App\Support\IntegrationHealth\IntegrationHealthInspector;
 use App\Support\IntegrationHealth\IntegrationHealthPresenter;
@@ -31,6 +33,7 @@ class ListOrganizationSettings extends Page implements HasTable
 {
     use InteractsWithRecord;
     use InteractsWithTable;
+    use ResolvesTenantRootRecord;
 
     protected static string $resource = OrganizationResource::class;
 
@@ -45,7 +48,30 @@ class ListOrganizationSettings extends Page implements HasTable
 
     public function getTitle(): string|Htmlable
     {
+        if ($this->isForTenantRoot()) {
+            return __('Root-level integrations');
+        }
+
         return __('Organization settings: :name', ['name' => $this->getRecord()->name]);
+    }
+
+    public function getSubtitle(): string|Htmlable|null
+    {
+        return $this->isForTenantRoot()
+            ? __('Integrations here see devices in every organization. A device they find stays at the root level until an integration in a customer organization finds it too; then it moves to that organization.')
+            : null;
+    }
+
+    public function getSubNavigation(): array
+    {
+        return $this->isForTenantRoot() ? [] : parent::getSubNavigation();
+    }
+
+    private function isForTenantRoot(): bool
+    {
+        $record = $this->getRecord();
+
+        return $record instanceof Organization && $record->isTenantRoot();
     }
 
     public function getBreadcrumb(): ?string
@@ -161,6 +187,16 @@ class ListOrganizationSettings extends Page implements HasTable
 
     private function makeNewIntegrationActionGroup(): Action
     {
+        if ($this->isForTenantRoot()) {
+            return Action::make('add_integration')
+                ->label(__('Add Action1 integration'))
+                ->icon(Heroicon::OutlinedPlus)
+                ->url(static::getResource()::getUrl('settings.integrations.create', [
+                    'record' => $this->getRecord(),
+                    'type' => OrganizationIntegrationSettings::TYPE_ACTION1,
+                ]));
+        }
+
         return Action::make('add_integration')
             ->label(__('Add integration'))
             ->icon(Heroicon::OutlinedPlus)

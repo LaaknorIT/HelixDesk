@@ -404,7 +404,10 @@ final class IntegrationHealthInspector
             return [];
         }
 
-        $missing = DeviceCoverageService::cachedMissingCounts((int) $integration->tenant_id, (int) $integration->organization_id);
+        $missing = DeviceCoverageService::cachedMissingCounts(
+            (int) $integration->tenant_id,
+            $integration->organization_id !== null ? (int) $integration->organization_id : null,
+        );
         $ownRoles = [];
         foreach ($ownSources as $key) {
             foreach (DeviceSourceCatalog::find($key)['roles'] ?? [] as $role) {

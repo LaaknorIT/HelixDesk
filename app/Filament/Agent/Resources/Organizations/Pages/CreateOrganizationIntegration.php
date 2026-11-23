@@ -4,22 +4,27 @@ namespace App\Filament\Agent\Resources\Organizations\Pages;
 
 use App\Filament\Agent\Resources\Organizations\Concerns\HandlesAction1IntegrationSave;
 use App\Filament\Agent\Resources\Organizations\Concerns\HandlesMicrosoftEntraIntegrationSave;
+use App\Filament\Agent\Resources\Organizations\Concerns\ResolvesTenantRootRecord;
 use App\Filament\Agent\Resources\Organizations\OrganizationResource;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationAction1SettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationActiveDirectorySettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationEntraSettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationGoogleWorkspaceSettingsSchema;
+use App\Models\Organization;
+use App\Models\OrganizationIntegration;
 use App\Repositories\OrganizationIntegrationRepository;
 use App\Support\OrganizationIntegrationSettings;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Validation\ValidationException;
 
 class CreateOrganizationIntegration extends EditRecord
 {
     use HandlesAction1IntegrationSave;
     use HandlesMicrosoftEntraIntegrationSave;
+    use ResolvesTenantRootRecord;
 
     protected static string $resource = OrganizationResource::class;
 
@@ -35,6 +40,52 @@ class CreateOrganizationIntegration extends EditRecord
         }
 
         parent::mount($record);
+
+        abort_if(
+            $this->getRecord() instanceof Organization
+                && $this->getRecord()->isTenantRoot()
+                && ! in_array($this->integrationType, OrganizationIntegrationSettings::tenantRootTypes(), true),
+            404,
+        );
+    }
+
+    public function getSubNavigation(): array
+    {
+        return $this->isForTenantRoot() ? [] : parent::getSubNavigation();
+    }
+
+    /**
+     * The unique index cannot catch two identical integrations without an organization, so the root checks here.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function assertNoDuplicateAtTenantRoot(array $data): void
+    {
+        if (! $this->isForTenantRoot()) {
+            return;
+        }
+
+        $scopeKey = OrganizationIntegration::resolveScopeKey($this->integrationType, [
+            'action1_group_id' => (string) ($data['action1_group_id'] ?? ''),
+        ]);
+
+        $exists = app(OrganizationIntegrationRepository::class)->queryForOrganization($this->getRecord())
+            ->where('type', $this->integrationType)
+            ->where('scope_key', $scopeKey)
+            ->exists();
+
+        if ($exists) {
+            throw ValidationException::withMessages([
+                'data.action1_organization_id' => __('The root level already has an Action1 integration for the same group. Edit that one, or choose a group.'),
+            ]);
+        }
+    }
+
+    private function isForTenantRoot(): bool
+    {
+        $record = $this->getRecord();
+
+        return $record instanceof Organization && $record->isTenantRoot();
     }
 
     public function form(Schema $schema): Schema
@@ -91,6 +142,7 @@ class CreateOrganizationIntegration extends EditRecord
     {
         if ($this->integrationType === OrganizationIntegrationSettings::TYPE_ACTION1) {
             $this->validateAction1FormData($data);
+            $this->assertNoDuplicateAtTenantRoot($data);
 
             $integration = app(OrganizationIntegrationRepository::class)->createAction1FromForm(
                 $this->record,

@@ -90,7 +90,9 @@ class IntegrationSyncHealthWidget extends StatsOverviewWidget
         $integration = $first->integration;
         $summary = __(':integration · :organization: :issue', [
             'integration' => IntegrationType::label((string) $integration->type),
-            'organization' => (string) ($integration->organization?->name ?? '—'),
+            'organization' => $integration->organization_id === null
+                ? __('All organizations (root level)')
+                : (string) ($integration->organization?->name ?? '—'),
             'issue' => $first->firstIssue()?->title ?? '',
         ]);
 

@@ -6,19 +6,36 @@ use App\Models\Organization;
 use App\Models\OrganizationIntegration;
 use App\Support\IntegrationType;
 use App\Support\OrganizationIntegrationSettings;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 final class OrganizationIntegrationRepository
 {
+    /**
+     * Integrations attached to the organization. For the tenant root (Organization::tenantRoot()), the integrations
+     * with no organization in that tenant.
+     *
+     * @return Builder<OrganizationIntegration>
+     */
+    public function queryForOrganization(Organization $organization): Builder
+    {
+        $query = OrganizationIntegration::query()->withoutGlobalScopes();
+
+        if ($organization->isTenantRoot()) {
+            return $query->where('tenant_id', $organization->tenant_id)->whereNull('organization_id');
+        }
+
+        return $query->where('organization_id', $organization->getKey());
+    }
+
     /**
      * @return list<array{id: string, type: string, config: array<string, mixed>}>
      */
     public function listEntries(Organization $organization): array
     {
-        return OrganizationIntegration::query()
-            ->withoutGlobalScopes()
-            ->where('organization_id', $organization->getKey())
+        return $this->queryForOrganization($organization)
             ->orderBy('type')
             ->orderBy('id')
             ->get()
@@ -28,9 +45,7 @@ final class OrganizationIntegrationRepository
 
     public function findEntry(Organization $organization, string $integrationId): ?array
     {
-        $integration = OrganizationIntegration::query()
-            ->withoutGlobalScopes()
-            ->where('organization_id', $organization->getKey())
+        $integration = $this->queryForOrganization($organization)
             ->where('id', $integrationId)
             ->first();
 
@@ -43,9 +58,7 @@ final class OrganizationIntegrationRepository
 
     public function findModel(Organization $organization, string $integrationId): ?OrganizationIntegration
     {
-        return OrganizationIntegration::query()
-            ->withoutGlobalScopes()
-            ->where('organization_id', $organization->getKey())
+        return $this->queryForOrganization($organization)
             ->where('id', $integrationId)
             ->first();
     }
@@ -55,9 +68,7 @@ final class OrganizationIntegrationRepository
      */
     public function listModelsForOrganization(Organization $organization): array
     {
-        return OrganizationIntegration::query()
-            ->withoutGlobalScopes()
-            ->where('organization_id', $organization->getKey())
+        return $this->queryForOrganization($organization)
             ->orderBy('type')
             ->orderBy('id')
             ->get()
@@ -524,6 +535,17 @@ final class OrganizationIntegrationRepository
         $credentials = self::extractCredentials($type, $config);
         $publicConfig = self::stripSecretsFromConfig($type, $config);
         $apiBaseUrl = self::resolveApiBaseUrl($type, $config);
+        $scopeKey = OrganizationIntegration::resolveScopeKey($type, $config);
+
+        // The database unique index treats a missing organization as distinct, so the root is checked here.
+        if ($organization->isTenantRoot() && $this->queryForOrganization($organization)
+            ->where('type', $type)
+            ->where('scope_key', $scopeKey)
+            ->exists()) {
+            throw ValidationException::withMessages([
+                'organization_id' => __('The root level already has this integration for the same scope.'),
+            ]);
+        }
 
         return OrganizationIntegration::query()->create([
             'tenant_id' => $organization->tenant_id,
@@ -533,7 +555,7 @@ final class OrganizationIntegrationRepository
             'config' => $publicConfig,
             'credentials' => $credentials,
             'api_base_url' => $apiBaseUrl,
-            'scope_key' => OrganizationIntegration::resolveScopeKey($type, $config),
+            'scope_key' => $scopeKey,
             'sync_interval_hours' => isset($config['sync_interval_hours'])
                 ? (int) $config['sync_interval_hours']
                 : null,

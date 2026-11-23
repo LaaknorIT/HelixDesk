@@ -32,6 +32,19 @@ final class OrganizationIntegrationSettings
     }
 
     /**
+     * Types that can sit at the tenant root, above every organization. Only device sources qualify: identity and mail
+     * integrations bring users and mailboxes into one organization, so they need one.
+     *
+     * @return list<string>
+     */
+    public static function tenantRootTypes(): array
+    {
+        return [
+            self::TYPE_ACTION1,
+        ];
+    }
+
+    /**
      * @return list<string>
      */
     public static function assetSyncTypes(): array
@@ -858,7 +871,7 @@ final class OrganizationIntegrationSettings
 
         return new Action1SyncTarget(
             tenantId: (int) $tenantId,
-            organizationId: (int) $integration->organization_id,
+            organizationId: $integration->organization_id !== null ? (int) $integration->organization_id : null,
             integrationId: (string) $integration->getKey(),
             config: $config,
             credentials: $credentials,
@@ -872,7 +885,10 @@ final class OrganizationIntegrationSettings
     private static function mergedConfigForIntegration(OrganizationIntegration $integration): array
     {
         $repository = app(OrganizationIntegrationRepository::class);
-        $organization = Organization::query()->withoutGlobalScopes()->find($integration->organization_id);
+        $organization = Organization::forIntegrationScope(
+            $integration->organization_id !== null ? (int) $integration->organization_id : null,
+            (int) $integration->tenant_id,
+        );
         if ($organization === null) {
             return [];
         }

@@ -6,18 +6,21 @@ use App\Enums\IntegrationHealthStatus;
 use App\Filament\Agent\Resources\Organizations\OrganizationResource;
 use App\Models\Organization;
 use App\Models\OrganizationIntegration;
+use App\Services\OrganizationIntegrationMover;
 use App\Support\IntegrationCatalog;
 use App\Support\IntegrationHealth\IntegrationConnectionChecker;
 use App\Support\IntegrationHealth\IntegrationHealthInspector;
 use App\Support\IntegrationHealth\IntegrationHealthPresenter;
 use App\Support\IntegrationHealth\IntegrationHealthReport;
 use App\Support\IntegrationType;
+use App\Support\OrganizationIntegrationOptions;
 use App\Support\OrganizationIntegrationSettings;
 use App\Support\OrganizationIntegrationSyncQueue;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -31,6 +34,7 @@ use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Url;
 use UnitEnum;
 
@@ -103,6 +107,12 @@ class Integrations extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('root')
+                ->label(__('Root-level integrations'))
+                ->tooltip(__('Integrations above every organization, such as an RMM that covers all your customers'))
+                ->icon(Heroicon::OutlinedGlobeAlt)
+                ->color('gray')
+                ->url(OrganizationResource::getUrl('settings', ['record' => Organization::TENANT_ROOT_ROUTE_KEY])),
             Action::make('add')
                 ->label(__('Add integration'))
                 ->icon(Heroicon::OutlinedPlus)
@@ -184,7 +194,9 @@ class Integrations extends Page implements HasTable
                         ->visible(fn (array $record): bool => in_array($record['type'], OrganizationIntegrationSettings::assetSyncTypes(), true))
                         ->action(function (array $record): void {
                             $integration = $this->findIntegration($record['id']);
-                            $organization = $integration?->organization;
+                            $organization = $integration !== null
+                                ? Organization::forIntegrationScope($integration->organization_id !== null ? (int) $integration->organization_id : null, (int) $integration->tenant_id)
+                                : null;
                             if ($integration === null || ! $organization instanceof Organization) {
                                 return;
                             }
@@ -207,6 +219,62 @@ class Integrations extends Page implements HasTable
                                 ->title(__('Sync not started'))
                                 ->body(OrganizationIntegrationSyncQueue::skipReasonMessage((string) $result['skip_reason']))
                                 ->warning()
+                                ->send();
+                        }),
+                    Action::make('move')
+                        ->label(__('Move to another organization'))
+                        ->icon(Heroicon::OutlinedArrowsRightLeft)
+                        ->modalHeading(fn (array $record): string => __('Move :integration', ['integration' => $record['type_label'].' · '.$record['organization']]))
+                        ->modalDescription(__('Devices above the new organization move down to it. Devices that only this integration placed in the current organization follow it. Devices never move up, and devices another integration placed stay where they are.'))
+                        ->schema(fn (array $record): array => [
+                            Select::make('organization_id')
+                                ->label(__('New organization'))
+                                ->options(fn (): array => collect(
+                                    in_array($record['type'], OrganizationIntegrationSettings::tenantRootTypes(), true)
+                                        ? [Organization::TENANT_ROOT_ROUTE_KEY => __('All organizations (root level)')]
+                                        : [],
+                                )
+                                    ->union(OrganizationIntegrationOptions::organizationPathsForCurrentTenant())
+                                    ->except([$record['organization_id'] ?? Organization::TENANT_ROOT_ROUTE_KEY])
+                                    ->all())
+                                ->searchable()
+                                ->required(),
+                        ])
+                        ->modalSubmitActionLabel(__('Move integration'))
+                        ->action(function (array $record, array $data): void {
+                            $integration = $this->findIntegration($record['id']);
+                            $tenant = Filament::getTenant();
+                            $toRoot = (string) ($data['organization_id'] ?? '') === Organization::TENANT_ROOT_ROUTE_KEY;
+                            $target = $toRoot
+                                ? null
+                                : Organization::query()->where('tenant_id', $tenant?->getKey())->find((int) ($data['organization_id'] ?? 0));
+
+                            if ($integration === null || $tenant === null || (! $toRoot && $target === null)) {
+                                return;
+                            }
+
+                            if ($toRoot && ! in_array((string) $integration->type, OrganizationIntegrationSettings::tenantRootTypes(), true)) {
+                                return;
+                            }
+
+                            try {
+                                $result = app(OrganizationIntegrationMover::class)->move($integration, $target);
+                            } catch (ValidationException $exception) {
+                                Notification::make()
+                                    ->title(__('Integration not moved'))
+                                    ->body(collect($exception->errors())->flatten()->first())
+                                    ->danger()
+                                    ->send();
+
+                                return;
+                            }
+
+                            $this->reports = null;
+
+                            Notification::make()
+                                ->title(__('Integration moved to :organization', ['organization' => $target->name ?? __('All organizations (root level)')]))
+                                ->body(trans_choice('{0} No devices needed to move.|{1} 1 device moved with it.|[2,*] :count devices moved with it.', $result['moved_devices']))
+                                ->success()
                                 ->send();
                         }),
                     Action::make('edit')
@@ -250,8 +318,10 @@ class Integrations extends Page implements HasTable
                 return [
                     '__key' => (string) $integration->getKey(),
                     'id' => (string) $integration->getKey(),
-                    'organization_id' => (int) $integration->organization_id,
-                    'organization' => (string) ($integration->organization?->name ?? '—'),
+                    'organization_id' => $integration->organization_id !== null ? (int) $integration->organization_id : null,
+                    'organization' => $integration->organization_id === null
+                        ? __('All organizations (root level)')
+                        : (string) ($integration->organization?->name ?? '—'),
                     'type' => (string) $integration->type,
                     'type_label' => IntegrationType::label((string) $integration->type),
                     'status' => $report->status->value,
@@ -320,7 +390,7 @@ class Integrations extends Page implements HasTable
     private function editUrl(array $record): string
     {
         return OrganizationResource::getUrl('settings.integrations.edit', [
-            'record' => $record['organization_id'],
+            'record' => $record['organization_id'] ?? Organization::TENANT_ROOT_ROUTE_KEY,
             'integration' => $record['id'],
         ]);
     }

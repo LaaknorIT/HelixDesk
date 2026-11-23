@@ -48,7 +48,8 @@ final class DeviceSourceRecordService
         }
 
         $record->fill([
-            'organization_id' => $snapshot->organizationId,
+            // A linked record follows its device, which may live below the integration's organization.
+            'organization_id' => $asset !== null ? $asset->organization_id : $snapshot->organizationId,
             'asset_id' => $asset?->getKey(),
             'display_name' => $data->displayName,
             'hostname' => AssetIdentityNormalizer::normalizeHostname($data->hostname ?? $data->fqdn),

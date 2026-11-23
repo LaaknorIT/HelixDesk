@@ -61,7 +61,7 @@ trait HandlesAction1IntegrationSave
             return;
         }
 
-        SyncNextAction1IntegrationJob::dispatch((int) $organization->getKey(), $integrationId);
+        SyncNextAction1IntegrationJob::dispatch($organization->isTenantRoot() ? null : (int) $organization->getKey(), $integrationId);
 
         Log::info('Action1 sync queued after save.', [
             'organization_id' => $organization->getKey(),

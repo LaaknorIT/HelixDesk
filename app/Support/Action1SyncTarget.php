@@ -10,7 +10,8 @@ final class Action1SyncTarget
      */
     public function __construct(
         public int $tenantId,
-        public int $organizationId,
+        /** Null for an integration at the tenant root. */
+        public ?int $organizationId,
         public string $integrationId,
         public array $config,
         public array $credentials = [],
