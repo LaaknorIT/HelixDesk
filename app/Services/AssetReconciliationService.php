@@ -107,13 +107,20 @@ final class AssetReconciliationService
             }
         }
 
-        $entraDeviceId = $snapshot->identifierValue(AssetExternalIdentifierType::EntraAzureAdDeviceId);
-        if ($entraDeviceId !== null) {
+        // Cross-provider bridges: IDs that several providers report for the same device. The Entra device ID is
+        // reported by Intune, Defender, Entra ID and Action1; the AD objectSid is also the Entra device's
+        // onPremisesSecurityIdentifier for hybrid joined PCs.
+        foreach ([AssetExternalIdentifierType::EntraAzureAdDeviceId, AssetExternalIdentifierType::AdObjectSid] as $bridgeType) {
+            $bridgeValue = $snapshot->identifierValue($bridgeType);
+            if ($bridgeValue === null) {
+                continue;
+            }
+
             $crossProvider = AssetExternalIdentifier::query()
                 ->withoutGlobalScopes()
                 ->where('tenant_id', $snapshot->tenantId)
-                ->where('identifier_type', AssetExternalIdentifierType::EntraAzureAdDeviceId)
-                ->where('external_id', $entraDeviceId)
+                ->where('identifier_type', $bridgeType)
+                ->where('external_id', $bridgeValue)
                 ->first();
 
             if ($crossProvider !== null) {
@@ -124,7 +131,10 @@ final class AssetReconciliationService
                     ->whereKey($crossProvider->asset_id)
                     ->first();
             }
+        }
 
+        $entraDeviceId = $snapshot->identifierValue(AssetExternalIdentifierType::EntraAzureAdDeviceId);
+        if ($entraDeviceId !== null) {
             if ($snapshot->provider === IntegrationType::MICROSOFT_ENTRA) {
                 return $this->findLegacyEntraAssetIdentifierMatch($snapshot, $entraDeviceId);
             }

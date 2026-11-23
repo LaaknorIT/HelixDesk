@@ -8,6 +8,7 @@ use App\Services\DeviceCoverageService;
 use App\Support\DeviceCoverage\CoverageRules;
 use App\Support\DeviceCoverage\DeviceCoverageExport;
 use App\Support\DeviceCoverage\DeviceCoverageReport;
+use App\Support\DeviceSourceCatalog;
 use App\Support\OrganizationIntegrationOptions;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -129,7 +130,7 @@ class DeviceCoverage extends Page implements HasTable
                 ->label($label)
                 ->state(fn (array $record): string => $record['cells'][$key] ?? DeviceCoverageReport::CELL_NOT_ENABLED)
                 ->badge()
-                ->formatStateUsing(fn (string $state): string => self::cellLabel($state))
+                ->formatStateUsing(fn (string $state): string => self::cellLabel($state, $key))
                 ->color(fn (string $state): string => self::cellColor($state))
                 ->tooltip(fn (array $record): ?string => isset($record['last_activity'][$key])
                     ? __('Last active :ago', ['ago' => Carbon::parse($record['last_activity'][$key])->diffForHumans()])
@@ -172,13 +173,13 @@ class DeviceCoverage extends Page implements HasTable
             ->defaultPaginationPageOption(25);
     }
 
-    public static function cellLabel(string $state): string
+    public static function cellLabel(string $state, ?string $sourceKey = null): string
     {
         return match ($state) {
             DeviceCoverageReport::CELL_ACTIVE => __('Active'),
             DeviceCoverageReport::CELL_STALE => __('Stale'),
             DeviceCoverageReport::CELL_DISABLED => __('Disabled'),
-            DeviceCoverageReport::CELL_DISCOVERED => __('Not onboarded'),
+            DeviceCoverageReport::CELL_DISCOVERED => $sourceKey !== null ? DeviceSourceCatalog::discoveredLabel($sourceKey) : __('Seen, not managed'),
             DeviceCoverageReport::CELL_MISSING => __('Missing'),
             DeviceCoverageReport::CELL_ABSENT => '–',
             default => __('Not connected'),

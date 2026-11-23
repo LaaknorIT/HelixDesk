@@ -30,7 +30,9 @@ class SourceRecordsRelationManager extends RelationManager
                     ->label(__('Status'))
                     ->badge()
                     ->state(fn (AssetSourceRecord $record): string => $record->status())
-                    ->formatStateUsing(fn (string $state): string => AssetSourceRecord::statusLabel($state))
+                    ->formatStateUsing(fn (string $state, AssetSourceRecord $record): string => $state === AssetSourceRecord::STATUS_DISCOVERED
+                        ? DeviceSourceCatalog::discoveredLabel($record->source)
+                        : AssetSourceRecord::statusLabel($state))
                     ->color(fn (string $state): string => match ($state) {
                         AssetSourceRecord::STATUS_ACTIVE => 'success',
                         AssetSourceRecord::STATUS_STALE => 'warning',

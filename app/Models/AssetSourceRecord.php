@@ -126,7 +126,7 @@ class AssetSourceRecord extends TenantModel
             self::STATUS_STALE => __('Stale'),
             self::STATUS_DISABLED => __('Disabled'),
             self::STATUS_GONE => __('No longer reported'),
-            self::STATUS_DISCOVERED => __('Discovered, not onboarded'),
+            self::STATUS_DISCOVERED => __('Seen, not managed'),
             default => $status,
         };
     }

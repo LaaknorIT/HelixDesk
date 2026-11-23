@@ -903,5 +903,10 @@
     "Devices (Microsoft Defender for Endpoint)": "Enheter (Microsoft Defender for Endpoint)",
     "Read onboarded and discovered devices from Microsoft Defender for Endpoint, so the device coverage report can show PCs and servers without endpoint protection.": "Les innrullerte og oppdagede enheter fra Microsoft Defender for Endpoint, slik at rapporten over enhetsdekning kan vise PC-er og servere uten endepunktbeskyttelse.",
     "Security incidents": "Sikkerhetshendelser",
-    "Ingest Microsoft 365 Defender / unified security incidents for correlation with service desk work.": "Hent sikkerhetshendelser fra Microsoft 365 Defender for å koble dem til arbeid i servicedesken."
+    "Ingest Microsoft 365 Defender / unified security incidents for correlation with service desk work.": "Hent sikkerhetshendelser fra Microsoft 365 Defender for å koble dem til arbeid i servicedesken.",
+    "Devices (Entra ID)": "Enheter (Entra ID)",
+    "Read device objects in Entra ID (joined, hybrid joined and registered) for the device coverage report, and link hybrid joined PCs to Active Directory computers.": "Les enhetsobjekter i Entra ID (innmeldt, hybrid innmeldt og registrert) for rapporten over enhetsdekning, og koble hybrid innmeldte PC-er til maskiner i Active Directory.",
+    "Entra ID": "Entra ID",
+    "Registered only": "Kun registrert",
+    "Seen, not managed": "Sett, ikke administrert"
 }

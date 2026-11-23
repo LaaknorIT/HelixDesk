@@ -57,6 +57,10 @@ class OrganizationEntraSettingsSchema
                                 ->label(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['computers']['label'])
                                 ->helperText(fn (): string => MicrosoftEntraIntegrationCatalog::scopeDefinitions()['computers']['description'])
                                 ->default(false),
+                            Toggle::make('entra_scope_devices')
+                                ->label(fn (): string => __(MicrosoftEntraIntegrationCatalog::scopeDefinitions()['devices']['label']))
+                                ->helperText(fn (): string => __(MicrosoftEntraIntegrationCatalog::scopeDefinitions()['devices']['description']))
+                                ->default(false),
                             Section::make(__('Microsoft Defender'))
                                 ->description(__('Uses the same app registration and client secret as the rest of this integration.'))
                                 ->icon(Heroicon::OutlinedShieldCheck)
