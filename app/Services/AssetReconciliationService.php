@@ -10,10 +10,13 @@ use App\Enums\AssetIdentityResolutionStatus;
 use App\Models\Asset;
 use App\Models\AssetExternalIdentifier;
 use App\Models\AssetIdentityAmbiguity;
+use App\Models\AssetSourceRecord;
 use App\Models\AssetType;
 use App\Support\AssetIdentifierHelper;
 use App\Support\AssetIdentityNormalizer;
 use App\Support\IntegrationType;
+use App\Support\OrganizationLineage;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -22,6 +25,7 @@ final class AssetReconciliationService
     public function __construct(
         private readonly AssetAttributeMerger $attributeMerger,
         private readonly DeviceSourceRecordService $deviceSourceRecordService,
+        private readonly OrganizationLineage $lineage,
     ) {}
 
     /**
@@ -55,6 +59,7 @@ final class AssetReconciliationService
         }
 
         if ($matchedAsset !== null) {
+            $this->moveToMoreSpecificOrganization($snapshot, $matchedAsset);
             $this->applySnapshotToAsset($snapshot, $matchedAsset);
 
             return new AssetReconciliationResult(
@@ -98,10 +103,7 @@ final class AssetReconciliationService
                 ->first();
 
             if ($externalId !== null) {
-                return Asset::query()
-                    ->withoutGlobalScopes()
-                    ->where('tenant_id', $snapshot->tenantId)
-                    ->where('organization_id', $snapshot->organizationId)
+                return $this->scopedAssetQuery($snapshot)
                     ->whereKey($externalId->asset_id)
                     ->first();
             }
@@ -116,20 +118,20 @@ final class AssetReconciliationService
                 continue;
             }
 
-            $crossProvider = AssetExternalIdentifier::query()
+            $crossProviderAssetIds = AssetExternalIdentifier::query()
                 ->withoutGlobalScopes()
                 ->where('tenant_id', $snapshot->tenantId)
                 ->where('identifier_type', $bridgeType)
                 ->where('external_id', $bridgeValue)
-                ->first();
+                ->pluck('asset_id')
+                ->unique()
+                ->values();
 
-            if ($crossProvider !== null) {
-                return Asset::query()
-                    ->withoutGlobalScopes()
-                    ->where('tenant_id', $snapshot->tenantId)
-                    ->where('organization_id', $snapshot->organizationId)
-                    ->whereKey($crossProvider->asset_id)
-                    ->first();
+            if ($crossProviderAssetIds->isNotEmpty()) {
+                return $this->mostSpecificAsset(
+                    $snapshot,
+                    $this->scopedAssetQuery($snapshot)->whereKey($crossProviderAssetIds->all())->get(),
+                );
             }
         }
 
@@ -167,10 +169,7 @@ final class AssetReconciliationService
             return null;
         }
 
-        $candidates = Asset::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $snapshot->tenantId)
-            ->where('organization_id', $snapshot->organizationId)
+        $candidates = $this->sameOrBelowAssetQuery($snapshot)
             ->where(fn ($query) => $query
                 ->whereRaw('LOWER(primary_hostname) = ?', [$hostname])
                 ->orWhereRaw('LOWER(primary_hostname) LIKE ?', [$hostname.'.%'])
@@ -215,10 +214,7 @@ final class AssetReconciliationService
             ];
         }
 
-        $serialCandidates = Asset::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $snapshot->tenantId)
-            ->where('organization_id', $snapshot->organizationId)
+        $serialCandidates = $this->scopedAssetQuery($snapshot)
             ->whereRaw('LOWER(TRIM(serial_number)) = ?', [strtolower($serial)])
             ->get();
 
@@ -414,12 +410,86 @@ final class AssetReconciliationService
             return null;
         }
 
-        return Asset::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $snapshot->tenantId)
-            ->where('organization_id', $snapshot->organizationId)
+        return $this->scopedAssetQuery($snapshot)
             ->where('asset_identifier', $identifier)
             ->first();
+    }
+
+    /**
+     * Assets the snapshot's integration may claim: those at the root level, in the integration's organization, above
+     * it or below it. Devices under another customer (a sibling branch) are never matched.
+     *
+     * @return Builder<Asset>
+     */
+    private function scopedAssetQuery(AssetProviderSnapshot $snapshot): Builder
+    {
+        return $this->lineage->constrain(
+            Asset::query()->withoutGlobalScopes()->where('tenant_id', $snapshot->tenantId),
+            $snapshot->tenantId,
+            $snapshot->organizationId,
+        );
+    }
+
+    /**
+     * Assets in the integration's organization or below it. Used for weak matches (hostname only), which must not
+     * pull an unrelated device with a common name down from a higher level.
+     *
+     * @return Builder<Asset>
+     */
+    private function sameOrBelowAssetQuery(AssetProviderSnapshot $snapshot): Builder
+    {
+        $query = Asset::query()->withoutGlobalScopes()->where('tenant_id', $snapshot->tenantId);
+
+        if ($snapshot->organizationId === null) {
+            return $query;
+        }
+
+        return $query->whereIn('organization_id', [
+            $snapshot->organizationId,
+            ...$this->lineage->descendantIds($snapshot->tenantId, $snapshot->organizationId),
+        ]);
+    }
+
+    /**
+     * @param  Collection<int, Asset>  $assets
+     */
+    private function mostSpecificAsset(AssetProviderSnapshot $snapshot, Collection $assets): ?Asset
+    {
+        return $assets
+            ->sortByDesc(fn (Asset $asset): int => $this->lineage->depth($snapshot->tenantId, $asset->organization_id !== null ? (int) $asset->organization_id : null))
+            ->first();
+    }
+
+    /**
+     * A device lives in the most specific organization that an integration has found it in. When the snapshot comes
+     * from an integration below the asset's current organization (for example a customer's Microsoft 365 tenant
+     * finding a device the MSP-wide RMM put at the root level), the asset moves down to the integration's
+     * organization. It never moves up or sideways, so a device an agent placed in a department stays there.
+     */
+    private function moveToMoreSpecificOrganization(AssetProviderSnapshot $snapshot, Asset $asset): void
+    {
+        $current = $asset->organization_id !== null ? (int) $asset->organization_id : null;
+
+        if (! $this->lineage->isStrictAncestor($snapshot->tenantId, $current, $snapshot->organizationId)) {
+            return;
+        }
+
+        Log::info('Asset moved to the more specific organization of the integration that found it.', [
+            'tenant_id' => $snapshot->tenantId,
+            'asset_id' => $asset->getKey(),
+            'from_organization_id' => $current,
+            'to_organization_id' => $snapshot->organizationId,
+            'organization_integration_id' => $snapshot->organizationIntegrationId,
+        ]);
+
+        $asset->organization_id = $snapshot->organizationId;
+        $asset->save();
+
+        AssetSourceRecord::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $snapshot->tenantId)
+            ->where('asset_id', $asset->getKey())
+            ->update(['organization_id' => $snapshot->organizationId, 'updated_at' => now()]);
     }
 
     /**

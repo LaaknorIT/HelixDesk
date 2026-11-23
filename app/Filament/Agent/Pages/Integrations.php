@@ -6,18 +6,21 @@ use App\Enums\IntegrationHealthStatus;
 use App\Filament\Agent\Resources\Organizations\OrganizationResource;
 use App\Models\Organization;
 use App\Models\OrganizationIntegration;
+use App\Services\OrganizationIntegrationMover;
 use App\Support\IntegrationCatalog;
 use App\Support\IntegrationHealth\IntegrationConnectionChecker;
 use App\Support\IntegrationHealth\IntegrationHealthInspector;
 use App\Support\IntegrationHealth\IntegrationHealthPresenter;
 use App\Support\IntegrationHealth\IntegrationHealthReport;
 use App\Support\IntegrationType;
+use App\Support\OrganizationIntegrationOptions;
 use App\Support\OrganizationIntegrationSettings;
 use App\Support\OrganizationIntegrationSyncQueue;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
@@ -31,6 +34,7 @@ use Filament\Tables\Table;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Url;
 use UnitEnum;
 
@@ -207,6 +211,52 @@ class Integrations extends Page implements HasTable
                                 ->title(__('Sync not started'))
                                 ->body(OrganizationIntegrationSyncQueue::skipReasonMessage((string) $result['skip_reason']))
                                 ->warning()
+                                ->send();
+                        }),
+                    Action::make('move')
+                        ->label(__('Move to another organization'))
+                        ->icon(Heroicon::OutlinedArrowsRightLeft)
+                        ->modalHeading(fn (array $record): string => __('Move :integration', ['integration' => $record['type_label'].' · '.$record['organization']]))
+                        ->modalDescription(__('Devices above the new organization move down to it. Devices that only this integration placed in the current organization follow it. Devices never move up, and devices another integration placed stay where they are.'))
+                        ->schema(fn (array $record): array => [
+                            Select::make('organization_id')
+                                ->label(__('New organization'))
+                                ->options(fn (): array => collect(OrganizationIntegrationOptions::organizationPathsForCurrentTenant())
+                                    ->except([$record['organization_id']])
+                                    ->all())
+                                ->searchable()
+                                ->required(),
+                        ])
+                        ->modalSubmitActionLabel(__('Move integration'))
+                        ->action(function (array $record, array $data): void {
+                            $integration = $this->findIntegration($record['id']);
+                            $tenant = Filament::getTenant();
+                            $target = Organization::query()
+                                ->where('tenant_id', $tenant?->getKey())
+                                ->find((int) ($data['organization_id'] ?? 0));
+
+                            if ($integration === null || $target === null) {
+                                return;
+                            }
+
+                            try {
+                                $result = app(OrganizationIntegrationMover::class)->move($integration, $target);
+                            } catch (ValidationException $exception) {
+                                Notification::make()
+                                    ->title(__('Integration not moved'))
+                                    ->body(collect($exception->errors())->flatten()->first())
+                                    ->danger()
+                                    ->send();
+
+                                return;
+                            }
+
+                            $this->reports = null;
+
+                            Notification::make()
+                                ->title(__('Integration moved to :organization', ['organization' => $target->name]))
+                                ->body(trans_choice('{0} No devices needed to move.|{1} 1 device moved with it.|[2,*] :count devices moved with it.', $result['moved_devices']))
+                                ->success()
                                 ->send();
                         }),
                     Action::make('edit')

@@ -30,6 +30,7 @@ use App\Support\DeviceSourceKey;
 use App\Support\IntegrationHealth\IntegrationHealthRecorder;
 use App\Support\IntegrationType;
 use App\Support\OrganizationIntegrationSettings;
+use App\Support\OrganizationLineage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -43,6 +44,7 @@ final class Action1OrganizationSyncService
         private readonly AssetRetirementService $assetRetirementService,
         private readonly MonitoringEventAssetLinker $monitoringEventAssetLinker,
         private readonly DeviceSourceRecordService $deviceSourceRecordService,
+        private readonly OrganizationLineage $lineage,
     ) {}
 
     public function sync(Action1SyncTarget $target): void
@@ -363,10 +365,12 @@ final class Action1OrganizationSyncService
             return null;
         }
 
-        return Asset::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $target->tenantId)
-            ->where('organization_id', $target->organizationId)
+        // The device may have moved below this integration's organization when a more specific integration found it.
+        return $this->lineage->constrain(
+            Asset::query()->withoutGlobalScopes()->where('tenant_id', $target->tenantId),
+            $target->tenantId,
+            $target->organizationId,
+        )
             ->whereKey($external->asset_id)
             ->first();
     }

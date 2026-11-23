@@ -16,7 +16,8 @@ final class AssetProviderSnapshot
      */
     public function __construct(
         public int $tenantId,
-        public int $organizationId,
+        /** The integration's organization; null for an integration at the root level (the tenant itself). */
+        public ?int $organizationId,
         public string $organizationIntegrationId,
         public string $provider,
         public array $identifiers,

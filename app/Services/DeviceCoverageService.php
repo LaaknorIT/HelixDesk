@@ -12,6 +12,7 @@ use App\Support\DeviceCoverage\CoverageRule;
 use App\Support\DeviceCoverage\CoverageRules;
 use App\Support\DeviceCoverage\DeviceCoverageReport;
 use App\Support\DeviceSourceCatalog;
+use App\Support\OrganizationLineage;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -48,21 +49,27 @@ final class DeviceCoverageService
     {
         $catalog = DeviceSourceCatalog::all();
 
+        $lineage = new OrganizationLineage;
+
+        // An integration covers its own organization and everything below it, so a report for one organization
+        // includes the integrations above it (for example an MSP-wide RMM at the root level).
         $integrations = OrganizationIntegration::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
-            ->when($organizationId !== null, fn ($query) => $query->where('organization_id', $organizationId))
+            ->when($organizationId !== null, fn ($query) => $query->where(fn ($inner) => $inner
+                ->whereNull('organization_id')
+                ->orWhereIn('organization_id', [$organizationId, ...$lineage->ancestorIds($tenantId, $organizationId)])))
             ->where('enabled', true)
             ->get();
 
-        /** @var array<int, array<string, true>> $sourcesByOrganization */
+        /** @var array<int, array<string, true>> $sourcesByOrganization integration organization ID (0 = root level) => sources */
         $sourcesByOrganization = [];
         /** @var array<string, int> $thresholdByIntegration */
         $thresholdByIntegration = [];
 
         foreach ($integrations as $integration) {
             foreach (DeviceSourceCatalog::enabledFor($integration) as $sourceKey) {
-                $sourcesByOrganization[(int) $integration->organization_id][$sourceKey] = true;
+                $sourcesByOrganization[(int) ($integration->organization_id ?? 0)][$sourceKey] = true;
             }
 
             $threshold = (int) ($integration->config['active_threshold_days'] ?? 0);
@@ -80,6 +87,25 @@ final class DeviceCoverageService
             }
         }
 
+        /** @var array<int, array<string, true>> $effectiveSourcesCache */
+        $effectiveSourcesCache = [];
+        $effectiveSources = function (?int $deviceOrganizationId) use (&$effectiveSourcesCache, $sourcesByOrganization, $lineage, $tenantId): array {
+            $key = (int) ($deviceOrganizationId ?? 0);
+
+            if (! isset($effectiveSourcesCache[$key])) {
+                $sources = $sourcesByOrganization[0] ?? [];
+                if ($deviceOrganizationId !== null) {
+                    foreach ([...array_reverse($lineage->ancestorIds($tenantId, $deviceOrganizationId)), $deviceOrganizationId] as $id) {
+                        $sources = array_merge($sources, $sourcesByOrganization[$id] ?? []);
+                    }
+                }
+
+                $effectiveSourcesCache[$key] = $sources;
+            }
+
+            return $effectiveSourcesCache[$key];
+        };
+
         $records = AssetSourceRecord::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $tenantId)
@@ -87,7 +113,7 @@ final class DeviceCoverageService
             ->whereNull('gone_at')
             ->with(['asset' => fn ($query) => $query->withoutGlobalScopes(), 'organization' => fn ($query) => $query->withoutGlobalScopes()])
             ->get()
-            ->filter(fn (AssetSourceRecord $record): bool => isset($sourcesByOrganization[(int) $record->organization_id][$record->source]));
+            ->filter(fn (AssetSourceRecord $record): bool => isset($effectiveSources($record->organization_id !== null ? (int) $record->organization_id : null)[$record->source]));
 
         $groups = $this->groupByDevice($tenantId, $records);
 
@@ -99,7 +125,7 @@ final class DeviceCoverageService
 
         $rows = [];
         foreach ($groups as $groupKey => $group) {
-            $organizationSources = $sourcesByOrganization[$group['organization_id']] ?? [];
+            $organizationSources = $effectiveSources($group['organization_id']);
             $row = $this->buildRow($groupKey, $group, array_keys($columns), $organizationSources, $thresholdByIntegration, $catalog);
 
             foreach ($rules as $rule) {
@@ -162,7 +188,7 @@ final class DeviceCoverageService
      * same short hostname (shown as a probable match), otherwise by hostname, otherwise one device per record.
      *
      * @param  Collection<int, AssetSourceRecord>  $records
-     * @return array<string, array{organization_id: int, organization: string, asset: ?Asset, probable_match: bool, records: list<AssetSourceRecord>}>
+     * @return array<string, array{organization_id: ?int, organization: string, asset: ?Asset, probable_match: bool, records: list<AssetSourceRecord>}>
      */
     private function groupByDevice(int $tenantId, Collection $records): array
     {
@@ -215,7 +241,7 @@ final class DeviceCoverageService
             };
 
             $groups[$groupKey] ??= [
-                'organization_id' => (int) $record->organization_id,
+                'organization_id' => $record->organization_id !== null ? (int) $record->organization_id : null,
                 'organization' => (string) ($record->organization?->name ?? ''),
                 'asset' => $asset,
                 'probable_match' => false,
@@ -229,7 +255,7 @@ final class DeviceCoverageService
     }
 
     /**
-     * @param  array{organization_id: int, organization: string, asset: ?Asset, probable_match: bool, records: list<AssetSourceRecord>}  $group
+     * @param  array{organization_id: ?int, organization: string, asset: ?Asset, probable_match: bool, records: list<AssetSourceRecord>}  $group
      * @param  list<string>  $columns
      * @param  array<string, true>  $organizationSources
      * @param  array<string, int>  $thresholdByIntegration

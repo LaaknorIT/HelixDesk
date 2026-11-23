@@ -94,6 +94,40 @@ final class OrganizationIntegrationOptions
             ->all();
     }
 
+    /**
+     * Organizations with their place in the tree ("MSP › Customer A › Sales"), sorted by that path, so an agent can
+     * tell levels apart when choosing where an integration belongs.
+     *
+     * @return array<int, string> organization_id => path
+     */
+    public static function organizationPathsForCurrentTenant(): array
+    {
+        $tenant = Filament::getTenant();
+        if ($tenant === null) {
+            return [];
+        }
+
+        $organizations = Organization::query()
+            ->where('tenant_id', $tenant->getKey())
+            ->get(['id', 'parent_id', 'name'])
+            ->keyBy(fn (Organization $organization): int => (int) $organization->getKey());
+
+        $lineage = new OrganizationLineage;
+        $paths = [];
+        foreach ($organizations as $id => $organization) {
+            $names = array_map(
+                fn (int $ancestorId): string => (string) ($organizations->get($ancestorId)?->name ?? ''),
+                array_reverse($lineage->ancestorIds((int) $tenant->getKey(), $id)),
+            );
+            $names[] = (string) $organization->name;
+            $paths[$id] = implode(' › ', array_filter($names, fn (string $name): bool => $name !== ''));
+        }
+
+        asort($paths, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $paths;
+    }
+
     public static function resolveType(?int $organizationId, ?string $integrationId): ?string
     {
         if ($organizationId === null || $integrationId === null || $integrationId === '') {
