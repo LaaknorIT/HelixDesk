@@ -11,4 +11,6 @@ final class DeviceSourceKey
     public const MICROSOFT_INTUNE = 'microsoft_intune';
 
     public const ACTION1 = 'action1';
+
+    public const ACTIVE_DIRECTORY = 'active_directory';
 }

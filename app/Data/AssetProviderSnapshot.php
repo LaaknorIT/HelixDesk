@@ -10,6 +10,9 @@ final class AssetProviderSnapshot
      * @param  list<array{type: AssetExternalIdentifierType, value: string}>  $identifiers
      * @param  array<string, mixed>  $attributes
      * @param  array<string, mixed>  $satellite
+     * @param  bool  $createAssetIfUnmatched  false leaves an unmatched device as an unlinked source record only
+     * @param  bool  $matchByUniqueHostname  for sources without serial numbers (Active Directory): link to the one
+     *                                       asset in the organization with the same short hostname, if exactly one
      */
     public function __construct(
         public int $tenantId,
@@ -20,6 +23,8 @@ final class AssetProviderSnapshot
         public array $attributes = [],
         public array $satellite = [],
         public ?DeviceSourceRecordData $sourceRecord = null,
+        public bool $createAssetIfUnmatched = true,
+        public bool $matchByUniqueHostname = false,
     ) {}
 
     public function identifierValue(AssetExternalIdentifierType $type): ?string

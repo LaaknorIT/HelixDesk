@@ -50,6 +50,10 @@ final class AssetReconciliationService
             $matchedAsset = $softMatch['asset'];
         }
 
+        if ($matchedAsset === null && $snapshot->matchByUniqueHostname) {
+            $matchedAsset = $this->findAssetByUniqueHostname($snapshot);
+        }
+
         if ($matchedAsset !== null) {
             $this->applySnapshotToAsset($snapshot, $matchedAsset);
 
@@ -58,6 +62,10 @@ final class AssetReconciliationService
                 created: false,
                 matched: true,
             );
+        }
+
+        if (! $snapshot->createAssetIfUnmatched) {
+            return new AssetReconciliationResult(asset: null);
         }
 
         $asset = $this->createAssetFromSnapshot($snapshot);
@@ -131,6 +139,36 @@ final class AssetReconciliationService
         }
 
         return null;
+    }
+
+    /**
+     * Sources such as Active Directory report no serial number or MAC address, so the serial-based soft match can
+     * never link them. A computer name is unique within a domain, so one asset in the organization with the same
+     * short hostname is taken as the same device. Two or more candidates link nothing.
+     */
+    private function findAssetByUniqueHostname(AssetProviderSnapshot $snapshot): ?Asset
+    {
+        $hostname = AssetIdentityNormalizer::normalizeHostname(
+            $snapshot->identifierValue(AssetExternalIdentifierType::Hostname)
+                ?? ($snapshot->attributes['primary_hostname'] ?? $snapshot->attributes['name'] ?? null),
+        );
+
+        if ($hostname === null) {
+            return null;
+        }
+
+        $candidates = Asset::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $snapshot->tenantId)
+            ->where('organization_id', $snapshot->organizationId)
+            ->where(fn ($query) => $query
+                ->whereRaw('LOWER(primary_hostname) = ?', [$hostname])
+                ->orWhereRaw('LOWER(primary_hostname) LIKE ?', [$hostname.'.%'])
+                ->orWhereRaw('LOWER(name) = ?', [$hostname]))
+            ->limit(2)
+            ->get();
+
+        return $candidates->count() === 1 ? $candidates->first() : null;
     }
 
     /**

@@ -62,7 +62,7 @@ Both modes produce the same `AssetProviderSnapshot` DTOs (integrations.md §5.1)
 
 The collector lives in a separate repository (like the companion apps), is MIT licensed, and is versioned independently. HelixDesk shows the collector version it last heard from and warns when it is outdated.
 
-**Pairing:** the agent creates the AD integration on the customer organization and gets a one-time **pairing code** (same pattern as QR pairing of widgets). The collector exchanges the code for a Sanctum token with only the `integrations:ad:push` ability, bound to **one** `organization_integrations` row. The token can only push to that integration; it cannot read anything.
+**Collector key (implemented):** after creating the AD integration, the agent chooses **Create collector key** on the integration page. HelixDesk shows the key once (`hdc_…`) and stores only its SHA-256 hash in the integration's encrypted credentials. The key is bound to **one** `organization_integrations` row and only works on that integration's collector endpoints; it cannot read anything else. *Replace collector key* invalidates the old key at once. This needs no extra package; Sanctum tokens remain the plan for user-facing API tokens.
 
 **What it reads (computers, v1):**
 
@@ -93,21 +93,39 @@ Users and groups are a later scope (`scopes.users`) for organizations that do no
 | `active_threshold_days` | Default `30` (§4.4) |
 | `create_assets` | `active_only` (default), `all`, or `never` (§4.3) |
 
-**Credentials (`credentials` column):** collector mode stores only the hash of the push token (in Sanctum's table). LDAPS mode stores `bind_dn` and `bind_password`, plus an optional CA certificate for the DC.
+**Credentials (`credentials` column):** collector mode stores only `collector_key_hash` (plus the last four characters as a hint). LDAPS mode stores `bind_dn` and `bind_password`, plus an optional CA certificate for the DC.
 
 ### 2.4 Push API
 
 ```
-POST /api/v1/integrations/{integration}/ad/runs                 → { run_id }
-POST /api/v1/integrations/{integration}/ad/runs/{run}/objects   ← batches of up to 500 objects
-POST /api/v1/integrations/{integration}/ad/runs/{run}/complete  ← { object_count, collector_version }
-POST /api/v1/integrations/{integration}/heartbeat               ← { collector_version, host, last_error }
+GET  /api/v1/collectors/active-directory/{integration}/config                 → domain, search bases, excluded OUs, interval, batch size
+POST /api/v1/collectors/active-directory/{integration}/runs                   → { run_id }
+POST /api/v1/collectors/active-directory/{integration}/runs/{run}/objects     ← { sequence, objects: [...] } (max 200)
+POST /api/v1/collectors/active-directory/{integration}/runs/{run}/complete    ← { object_count }
+POST /api/v1/collectors/active-directory/{integration}/heartbeat              ← { collector_version, host, last_error }
 ```
 
-- A run is a **full snapshot**. Only when `complete` arrives with the expected `object_count` does HelixDesk mark objects that were not in the run as gone. An interrupted run never removes anything.
-- Batches are stored raw and processed by a queued job (`ProcessActiveDirectoryRunJob`), same tenant-context rules as other sync jobs (integrations.md §7.2).
-- Rate limited per token; payloads gzip-compressed; request body limit per batch.
-- Every request is idempotent on `(run_id, batch_sequence)`.
+All calls send `Authorization: Bearer <collector key>` and are rate limited (120 per minute).
+
+- A run is a **full snapshot** (`collector_runs`). Only when `complete` arrives and HelixDesk has received `object_count` objects are computers that were not in the run marked gone. An interrupted or short run never removes anything; it is marked *incomplete* and shown as a sync error.
+- Batches are processed in the request (at most 200 objects each), so `complete` always sees every stored object.
+- A batch is idempotent on `(run, sequence)`: a retried batch is ignored.
+- Starting a new run closes any run still open for the integration.
+
+### 2.4.1 The PowerShell collector
+
+`resources/collectors/active-directory/HelixDesk-ADCollector.ps1`, downloaded from the integration page with the HelixDesk URL and integration ID filled in (never the key).
+
+```powershell
+.\HelixDesk-ADCollector.ps1 -Install -CollectorKey 'hdc_...'          # once, as administrator
+.\HelixDesk-ADCollector.ps1 -WhatIf                                   # read AD, print a summary, send nothing
+.\HelixDesk-ADCollector.ps1 -Install -CollectorKey 'hdc_...' -RunAsUser 'CORP\gmsa-helixdesk$'
+.\HelixDesk-ADCollector.ps1 -Uninstall
+```
+
+- `-Install` stores the key encrypted with DPAPI (LocalMachine scope) in `%ProgramData%\HelixDesk`, readable only by administrators, SYSTEM and the task account, and registers a scheduled task at the interval set in HelixDesk.
+- By default the task runs as SYSTEM, which reads AD as the computer account. `-RunAsUser` runs it as a gMSA instead.
+- It uses `System.DirectoryServices` (no RSAT module), reads with paging, and reports errors to HelixDesk through the heartbeat.
 
 ### 2.5 Health and the integration gallery
 
@@ -214,7 +232,7 @@ AD has no serial number or MAC address, so the serial + corroborating identifier
 Rules:
 
 1. Link through the hard bridges in §4.2 when possible.
-2. Otherwise, link when the **FQDN** matches exactly one asset in the organization and no other AD record claims it. Short hostname alone is not enough (same rule as today: hostname-only never merges).
+2. Otherwise, link when exactly **one** asset in the organization has the same computer name (short hostname, or the start of its FQDN). A computer name is unique within a domain, and MDM/RMM sources usually report the short name, so requiring the FQDN would almost never match. Two or more candidates link nothing (`matchByUniqueHostname` on the snapshot). Other providers keep the strict rule: hostname alone never merges.
 3. Otherwise, depending on `create_assets`:
    - `active_only` (default, decided 2026-11-22): create an asset only for **enabled and active** computers. Stale and disabled objects stay as unlinked source records, visible in the report but not cluttering the CMDB.
    - `all` / `never`: as named.
@@ -306,7 +324,7 @@ Phase 2 ships the rules *Directory → device management*, *Remote management �
 
 - All new tables carry `tenant_id` with the global tenant scope; unique keys include `tenant_id`.
 - Collector tokens: one ability, one integration, revocable from the integration page, creation and use written to the activity log. Optional IP allow list per integration.
-- The collector never receives anything from HelixDesk except pairing and configuration (search bases, interval). It cannot be used to run commands.
+- The collector never receives anything from HelixDesk except its configuration (search bases, interval). It cannot be used to run commands.
 - LDAPS mode requires TLS with certificate validation; plain LDAP (389) is not offered.
 - Raw AD batches are deleted after processing (default 7 days, for debugging).
 
@@ -318,7 +336,7 @@ Phase 2 ships the rules *Directory → device management*, *Remote management �
 | ----- | ------- | ---------- |
 | **1. Source records** | `asset_source_records`, `DeviceSourceRole`, `device_sources` in the integration catalog, source records and activity time from Intune and Action1, marking records gone after a complete sync, sources on the asset page | — |
 | **2. Coverage report v1** | Generic matrix (columns from registered sources), role-based built-in rules, CSV, health warning | Phase 1 |
-| **3. Active Directory** | `active_directory` type, push API, PowerShell collector with API credentials, pairing, LDAPS mode, Entra `devices` scope and the SID bridge | Phase 1, Sanctum tokens |
+| **3. Active Directory** | `active_directory` type, collector key, push API, PowerShell collector. LDAPS mode, the Entra `devices` scope and the SID bridge follow separately | Phase 1 |
 | **4. Defender for Endpoint** | `defender_devices` scope on the Entra integration (same credentials), Defender grouping in the UI, discovered devices | Phase 1 |
 | **5. Follow-up** | Rule editor, exceptions, trends, tickets per rule, MSP overview, dashboard widget, license hint | Phase 2 |
 

@@ -6,10 +6,13 @@ use App\Filament\Agent\Resources\Organizations\Concerns\HandlesAction1Integratio
 use App\Filament\Agent\Resources\Organizations\Concerns\HandlesMicrosoftEntraIntegrationSave;
 use App\Filament\Agent\Resources\Organizations\OrganizationResource;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationAction1SettingsSchema;
+use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationActiveDirectorySettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationEntraSettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationGoogleWorkspaceSettingsSchema;
 use App\Models\OrganizationIntegration;
 use App\Repositories\OrganizationIntegrationRepository;
+use App\Services\ActiveDirectory\CollectorKeyService;
+use App\Support\ActiveDirectoryCollectorScript;
 use App\Support\IntegrationHealth\IntegrationConnectionChecker;
 use App\Support\IntegrationHealth\IntegrationHealthInspector;
 use App\Support\IntegrationHealth\IntegrationHealthPresenter;
@@ -58,6 +61,7 @@ class EditOrganizationIntegration extends EditRecord
         return match ($this->integrationType) {
             OrganizationIntegrationSettings::TYPE_ACTION1 => OrganizationAction1SettingsSchema::configure($schema),
             OrganizationIntegrationSettings::TYPE_GOOGLE_WORKSPACE => OrganizationGoogleWorkspaceSettingsSchema::configure($schema),
+            OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY => OrganizationActiveDirectorySettingsSchema::configure($schema),
             default => OrganizationEntraSettingsSchema::configure($schema),
         };
     }
@@ -96,6 +100,40 @@ class EditOrganizationIntegration extends EditRecord
                         ->{$result['ok'] ? 'success' : 'danger'}()
                         ->send();
                 }),
+            Action::make('collector_key')
+                ->label(fn (): string => app(CollectorKeyService::class)->hasKey($this->integrationModel())
+                    ? __('Replace collector key')
+                    : __('Create collector key'))
+                ->icon(Heroicon::OutlinedKey)
+                ->color('gray')
+                ->visible(fn (): bool => $this->integrationType === OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY)
+                ->requiresConfirmation(fn (): bool => app(CollectorKeyService::class)->hasKey($this->integrationModel()))
+                ->modalDescription(__('The current key stops working right away. Update the collector with the new key.'))
+                ->action(function (): void {
+                    $integration = $this->integrationModel();
+                    if ($integration === null) {
+                        return;
+                    }
+
+                    $key = app(CollectorKeyService::class)->issue($integration);
+
+                    Notification::make()
+                        ->title(__('Collector key created'))
+                        ->body(__('Copy it now, it is shown only once: :key', ['key' => $key]))
+                        ->success()
+                        ->persistent()
+                        ->send();
+                }),
+            Action::make('download_collector')
+                ->label(__('Download collector'))
+                ->icon(Heroicon::OutlinedArrowDownTray)
+                ->color('gray')
+                ->visible(fn (): bool => $this->integrationType === OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY)
+                ->action(fn () => response()->streamDownload(
+                    fn () => print (ActiveDirectoryCollectorScript::render($this->integrationModel())),
+                    ActiveDirectoryCollectorScript::FILE_NAME,
+                    ['Content-Type' => 'text/plain; charset=UTF-8'],
+                )),
         ];
     }
 
@@ -145,6 +183,7 @@ class EditOrganizationIntegration extends EditRecord
         $configFields = match ($this->integrationType) {
             OrganizationIntegrationSettings::TYPE_ACTION1 => OrganizationIntegrationSettings::action1ConfigToFormFields($entry['config']),
             OrganizationIntegrationSettings::TYPE_GOOGLE_WORKSPACE => OrganizationIntegrationSettings::googleWorkspaceConfigToFormFields($entry['config']),
+            OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY => OrganizationIntegrationSettings::activeDirectoryConfigToFormFields($entry['config']),
             default => OrganizationIntegrationSettings::entraConfigToFormFields($entry['config']),
         };
 
@@ -170,6 +209,16 @@ class EditOrganizationIntegration extends EditRecord
             );
 
             $this->savedAction1IntegrationId = $this->integrationId;
+
+            return [];
+        }
+
+        if ($this->integrationType === OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY) {
+            app(OrganizationIntegrationRepository::class)->updateActiveDirectoryFromForm(
+                $this->record,
+                $this->integrationId,
+                $data,
+            );
 
             return [];
         }
@@ -205,7 +254,7 @@ class EditOrganizationIntegration extends EditRecord
             return;
         }
 
-        if ($this->integrationType === OrganizationIntegrationSettings::TYPE_GOOGLE_WORKSPACE) {
+        if (in_array($this->integrationType, [OrganizationIntegrationSettings::TYPE_GOOGLE_WORKSPACE, OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY], true)) {
             return;
         }
 

@@ -159,6 +159,10 @@ class OrganizationIntegration extends TenantModel
 
     public static function resolveScopeKey(string $type, array $config): string
     {
+        if ($type === IntegrationType::ACTIVE_DIRECTORY) {
+            return mb_strtolower(trim((string) ($config['domain_fqdn'] ?? '')));
+        }
+
         if ($type === IntegrationType::ACTION1) {
             $groupId = trim((string) ($config['action1_group_id'] ?? ''));
 

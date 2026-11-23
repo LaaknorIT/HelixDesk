@@ -10,6 +10,8 @@ final class IntegrationType
 
     public const ACTION1 = 'action1';
 
+    public const ACTIVE_DIRECTORY = 'active_directory';
+
     /**
      * @return list<string>
      */
@@ -19,6 +21,7 @@ final class IntegrationType
             self::MICROSOFT_ENTRA,
             self::GOOGLE_WORKSPACE,
             self::ACTION1,
+            self::ACTIVE_DIRECTORY,
         ];
     }
 
@@ -39,6 +42,7 @@ final class IntegrationType
             self::MICROSOFT_ENTRA => __('Microsoft Entra ID'),
             self::GOOGLE_WORKSPACE => __('Google Workspace'),
             self::ACTION1 => __('Action1'),
+            self::ACTIVE_DIRECTORY => __('Active Directory (on-premises)'),
             default => $type,
         };
     }

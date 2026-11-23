@@ -232,6 +232,12 @@ class ListOrganizationSettings extends Page implements HasTable
             return $parts === [] ? __('Credentials not set') : implode(' · ', $parts);
         }
 
+        if ($type === OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY) {
+            $domain = trim((string) ($config['domain_fqdn'] ?? ''));
+
+            return $domain !== '' ? __('Domain: :domain', ['domain' => Str::limit($domain, 36)]) : __('Domain not set');
+        }
+
         if ($type === OrganizationIntegrationSettings::TYPE_ACTION1) {
             $orgId = trim((string) ($config['action1_organization_id'] ?? ''));
             $groupId = trim((string) ($config['action1_group_id'] ?? ''));

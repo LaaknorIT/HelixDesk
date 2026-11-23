@@ -26,14 +26,14 @@ return [
     'asset_reconciliation_enabled' => env('HELIXDESK_ASSET_RECONCILIATION', false),
 
     'source_of_truth' => [
-        'name' => ['action1', 'microsoft_entra'],
+        'name' => ['action1', 'microsoft_entra', 'active_directory'],
         'serial_number' => ['action1', 'microsoft_entra'],
-        'primary_hostname' => ['action1', 'microsoft_entra'],
-        'operating_system' => ['action1', 'microsoft_entra'],
+        'primary_hostname' => ['action1', 'microsoft_entra', 'active_directory'],
+        'operating_system' => ['action1', 'microsoft_entra', 'active_directory'],
         'owner_user_id' => ['microsoft_entra', 'action1'],
         'lifecycle_status' => ['helixdesk', 'action1', 'microsoft_entra'],
         'asset_identifier' => ['helixdesk'],
-        'asset_type_id' => ['helixdesk', 'action1', 'microsoft_entra'],
+        'asset_type_id' => ['helixdesk', 'action1', 'microsoft_entra', 'active_directory'],
     ],
 
     'identity' => [

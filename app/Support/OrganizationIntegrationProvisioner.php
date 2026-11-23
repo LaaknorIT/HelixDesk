@@ -30,6 +30,10 @@ final class OrganizationIntegrationProvisioner
                 $organization,
                 $formData,
             ),
+            OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY => $repository->createActiveDirectoryFromForm(
+                $organization,
+                $formData,
+            ),
             default => throw new InvalidArgumentException("Unsupported integration type [{$integrationType}]."),
         };
 
