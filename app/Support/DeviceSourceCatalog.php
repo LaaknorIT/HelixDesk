@@ -12,7 +12,7 @@ use App\Models\OrganizationIntegration;
 final class DeviceSourceCatalog
 {
     /**
-     * @return array<string, array{key: string, label: string, roles: list<DeviceSourceRole>, scope: string, integration_type: string}>
+     * @return array<string, array{key: string, label: string, roles: list<DeviceSourceRole>, scope: string, integration_type: string, discovered_label: ?string}>
      */
     public static function all(): array
     {
@@ -26,6 +26,7 @@ final class DeviceSourceCatalog
                     'roles' => $source['roles'],
                     'scope' => $source['scope'],
                     'integration_type' => $type,
+                    'discovered_label' => $source['discovered_label'] ?? null,
                 ];
             }
         }
@@ -34,7 +35,7 @@ final class DeviceSourceCatalog
     }
 
     /**
-     * @return array{key: string, label: string, roles: list<DeviceSourceRole>, scope: string, integration_type: string}|null
+     * @return array{key: string, label: string, roles: list<DeviceSourceRole>, scope: string, integration_type: string, discovered_label: ?string}|null
      */
     public static function find(string $key): ?array
     {
@@ -44,6 +45,14 @@ final class DeviceSourceCatalog
     public static function label(string $key): string
     {
         return self::find($key)['label'] ?? $key;
+    }
+
+    /**
+     * What a source calls a device it has seen but does not manage (for example "Not onboarded" for Defender).
+     */
+    public static function discoveredLabel(string $key): string
+    {
+        return self::find($key)['discovered_label'] ?? __('Seen, not managed');
     }
 
     /**

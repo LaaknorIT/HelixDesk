@@ -44,6 +44,14 @@ final class MicrosoftEntraIntegrationCatalog
                 ],
                 'setup_notes' => 'Requires Intune / Microsoft Endpoint Manager in the tenant. Use read-only scope first; expand only if workflows need writes.',
             ],
+            'devices' => [
+                'label' => 'Devices (Entra ID)',
+                'description' => 'Read device objects in Entra ID (joined, hybrid joined and registered) for the device coverage report, and link hybrid joined PCs to Active Directory computers.',
+                'application_permissions' => [
+                    'Device.Read.All',
+                ],
+                'setup_notes' => 'Device.Read.All is enough; Directory.Read.All also covers it. HelixDesk only reads devices and never changes them.',
+            ],
             'security_work_items' => [
                 'label' => 'Security incidents',
                 'description' => 'Ingest Microsoft 365 Defender / unified security incidents for correlation with service desk work.',
@@ -90,6 +98,9 @@ final class MicrosoftEntraIntegrationCatalog
                     'DeviceManagementManagedDevices.Read.All',
                     'DeviceManagementManagedDevices.ReadWrite.All',
                 ],
+            ],
+            'devices' => [
+                'Device.Read.All' => ['Device.Read.All', 'Device.ReadWrite.All', 'Directory.Read.All', 'Directory.ReadWrite.All'],
             ],
             'security_work_items' => [
                 'SecurityIncident.Read.All' => [
@@ -147,7 +158,7 @@ final class MicrosoftEntraIntegrationCatalog
      */
     public static function directorySyncScopeKeys(): array
     {
-        return ['users', 'departments', 'computers', 'security_work_items', 'defender_devices'];
+        return ['users', 'departments', 'computers', 'devices', 'security_work_items', 'defender_devices'];
     }
 
     /**
@@ -177,7 +188,7 @@ final class MicrosoftEntraIntegrationCatalog
     }
 
     /**
-     * @param  array<string, bool>  $scopesEnabled  keys: users, departments, computers, security_work_items, defender_devices, mail
+     * @param  array<string, bool>  $scopesEnabled  keys: users, departments, computers, devices, security_work_items, defender_devices, mail
      */
     public static function collectApplicationPermissions(array $scopesEnabled): array
     {
@@ -260,6 +271,7 @@ final class MicrosoftEntraIntegrationCatalog
             'users' => (bool) $get('entra_scope_users'),
             'departments' => (bool) $get('entra_scope_departments'),
             'computers' => (bool) $get('entra_scope_computers'),
+            'devices' => (bool) $get('entra_scope_devices'),
             'security_work_items' => (bool) $get('entra_scope_security_work_items'),
             'defender_devices' => (bool) $get('entra_scope_defender_devices'),
             'mail' => (bool) $get('entra_scope_mail'),

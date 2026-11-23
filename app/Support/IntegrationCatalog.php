@@ -44,7 +44,7 @@ final class IntegrationCatalog
      *     requirements: list<string>,
      *     capabilities: array<string, string>,
      *     docs_url: ?string,
-     *     device_sources: array<string, array{label: string, roles: list<DeviceSourceRole>, scope: string}>,
+     *     device_sources: array<string, array{label: string, roles: list<DeviceSourceRole>, scope: string, discovered_label?: string}>,
      * }>
      */
     public static function definitions(): array
@@ -68,12 +68,19 @@ final class IntegrationCatalog
                     'users' => __($entraScopes['users']['label']),
                     'departments' => __($entraScopes['departments']['label']),
                     'computers' => __($entraScopes['computers']['label']),
+                    'devices' => __($entraScopes['devices']['label']),
                     'security_work_items' => __('Microsoft Defender').': '.__($entraScopes['security_work_items']['label']),
                     'defender_devices' => __('Microsoft Defender').': '.__('Devices'),
                     'mail' => __($entraScopes['mail']['label']),
                 ],
                 'docs_url' => 'https://learn.microsoft.com/entra/identity-platform/quickstart-register-app',
                 'device_sources' => [
+                    DeviceSourceKey::MICROSOFT_ENTRA_DEVICE => [
+                        'label' => __('Entra ID'),
+                        'roles' => [DeviceSourceRole::Directory],
+                        'scope' => 'devices',
+                        'discovered_label' => __('Registered only'),
+                    ],
                     DeviceSourceKey::MICROSOFT_INTUNE => [
                         'label' => __('Intune'),
                         'roles' => [DeviceSourceRole::DeviceManagement],
@@ -83,6 +90,7 @@ final class IntegrationCatalog
                         'label' => __('Microsoft Defender'),
                         'roles' => [DeviceSourceRole::EndpointSecurity],
                         'scope' => 'defender_devices',
+                        'discovered_label' => __('Not onboarded'),
                     ],
                 ],
             ],

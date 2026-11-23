@@ -183,8 +183,16 @@ Future sources plug into the same registry: Tactical RMM, NinjaOne, Datto RMM ([
 - `MicrosoftDefenderHttpClient` gets a second token from the same app registration with scope `https://api.securitycenter.microsoft.com/.default` and pages through `GET https://api.security.microsoft.com/api/machines`. The Defender token carries its own `roles` claim, so its permissions are stored as `granted_defender_permissions` in the health metadata, apart from the Graph permissions, and the health inspector checks `defender_devices` against them.
 - A missing `Machine.Read.All` skips only this scope and shows *Missing API permission*. A Defender token or API error (for example Defender for Endpoint not licensed) is a scope warning; the rest of the Entra sync carries on, and nothing is marked gone after an interrupted listing.
 - **Linking without creating:** Defender reports no serial number, so it never creates assets and never changes asset fields. An onboarded device links to an asset through `aadDeviceId` (the Intune/Entra device ID) or, like AD, the one asset in the organization with the same computer name. The Defender machine ID is stored as the hard identifier `defender_machine_id`.
-- **Discovered devices** (`onboardingStatus` other than `Onboarded`) are stored with `discovered_only` in the record metadata and get the status *Discovered, not onboarded*. They are never linked by name. In the coverage report the Defender cell shows *Not onboarded*, which counts as missing for *Any source → endpoint security*. This flag is generic: any source can mark a device it has seen but does not manage.
+- **Discovered devices** (`onboardingStatus` other than `Onboarded`) are stored with `discovered_only` in the record metadata and get the status *Not onboarded* (each source can name this state with `discovered_label`; the default is *Seen, not managed*). They are never linked by name. In the coverage report the Defender cell shows *Not onboarded*, which counts as missing for *Any source → endpoint security*. This flag is generic: any source can mark a device it has seen but does not manage.
 - Defender's compact platform names (`Windows11`, `WindowsServer2022`) are spaced out (`Windows 11`, `Windows Server 2022`) so device class and the rules' OS filters treat them like the other sources.
+
+### 3.2 Entra ID devices (implemented, phase 4b)
+
+- New scope `devices` on the `microsoft_entra` integration (`Device.Read.All`; `Directory.Read.All` also covers it). It reads `GET /devices` and stores each object as the source `microsoft_entra_device` with role `directory`, so *Directory → device management* also finds **Entra joined PCs that are missing in Intune**, the typical missing-license case, without AD.
+- Activity is `approximateLastSignInDateTime`; `accountEnabled = false` is *disabled*.
+- Like Defender, Entra ID devices never create assets and never change asset fields. They link through the Entra device ID (`deviceId` = Intune `azureADDeviceId`), through the on-premises SID, or, for joined devices, through a unique computer name.
+- **Registered-only devices** (`trustType = Workplace`, usually personal phones and PCs) are stored as *discovered only*, shown as *Registered only*, and never expected in device management.
+- **SID bridge:** `onPremisesSecurityIdentifier` is stored as `ad_object_sid` on the asset. The reconciliation service treats `ad_object_sid` like `entra_azure_ad_device_id` as a cross-provider bridge, so an AD computer links to the Intune asset of the same hybrid joined PC even if the names differ. This completes the AD ↔ Entra ID ↔ Intune chain from §4.2.
 
 ---
 
@@ -344,7 +352,7 @@ Phase 2 ships the rules *Directory → device management*, *Remote management �
 | ----- | ------- | ---------- |
 | **1. Source records** | `asset_source_records`, `DeviceSourceRole`, `device_sources` in the integration catalog, source records and activity time from Intune and Action1, marking records gone after a complete sync, sources on the asset page | — |
 | **2. Coverage report v1** | Generic matrix (columns from registered sources), role-based built-in rules, CSV, health warning | Phase 1 |
-| **3. Active Directory** | `active_directory` type, collector key, push API, PowerShell collector. LDAPS mode, the Entra `devices` scope and the SID bridge follow separately | Phase 1 |
+| **3. Active Directory** | `active_directory` type, collector key, push API, PowerShell collector. The Entra `devices` scope and the SID bridge are done (§3.2); LDAPS mode follows separately | Phase 1 |
 | **4. Defender for Endpoint** | `defender_devices` scope on the Entra integration (same credentials), Defender grouping in the UI, discovered devices. Implemented as in §3.1 | Phase 1 |
 | **5. Follow-up** | Rule editor, exceptions, trends, tickets per rule, MSP overview, dashboard widget, license hint | Phase 2 |
 

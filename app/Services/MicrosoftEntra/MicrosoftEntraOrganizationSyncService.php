@@ -86,6 +86,10 @@ final class MicrosoftEntraOrganizationSyncService
                 $this->syncManagedDevices($client, $target, $organization);
             }
 
+            if (($scopes['devices'] ?? false)) {
+                $this->syncDirectoryDevices($client, $target, $organization);
+            }
+
             if (($scopes['security_work_items'] ?? false)) {
                 $this->syncSecurityIncidents($client, $target, $organization);
             }
@@ -430,6 +434,87 @@ final class MicrosoftEntraOrganizationSyncService
             $target->tenantId,
             $target->integrationId,
             DeviceSourceKey::MICROSOFT_INTUNE,
+            $syncStartedAt,
+        );
+    }
+
+    /**
+     * Reads Entra ID device objects as the device source "microsoft_entra_device" (role directory). They never create
+     * assets or change asset fields. They link to an asset through the Entra device ID (reported by Intune too) or,
+     * for hybrid joined PCs, the on-premises SID (the AD computer's objectSid), which chains AD, Entra ID and Intune.
+     * Devices that are only registered (personal devices, trust type "Workplace") are kept as discovered only, so
+     * they are listed but not expected in device management.
+     */
+    private function syncDirectoryDevices(MicrosoftGraphHttpClient $client, EntraSyncTarget $target, Organization $organization): void
+    {
+        $syncStartedAt = now();
+
+        foreach ($client->paginateCollection('devices', [
+            '$select' => 'id,deviceId,displayName,operatingSystem,operatingSystemVersion,trustType,accountEnabled,approximateLastSignInDateTime,onPremisesSyncEnabled,onPremisesSecurityIdentifier,isManaged,isCompliant,registrationDateTime,profileType',
+            '$top' => 999,
+        ]) as $device) {
+            $objectId = trim((string) ($device['id'] ?? ''));
+            if ($objectId === '') {
+                continue;
+            }
+
+            $deviceId = trim((string) ($device['deviceId'] ?? ''));
+            $sid = trim((string) ($device['onPremisesSecurityIdentifier'] ?? ''));
+            $name = trim((string) ($device['displayName'] ?? ''));
+            $trustType = (string) ($device['trustType'] ?? '');
+            $joined = in_array(strtolower($trustType), ['azuread', 'serverad'], true);
+
+            $identifiers = [[
+                'type' => AssetExternalIdentifierType::EntraDeviceId,
+                'value' => $objectId,
+            ]];
+            if ($deviceId !== '') {
+                $identifiers[] = ['type' => AssetExternalIdentifierType::EntraAzureAdDeviceId, 'value' => $deviceId];
+            }
+            if ($sid !== '') {
+                $identifiers[] = ['type' => AssetExternalIdentifierType::AdObjectSid, 'value' => $sid];
+            }
+            if ($joined && AssetIdentityNormalizer::normalizeHostname($name) !== null) {
+                $identifiers[] = ['type' => AssetExternalIdentifierType::Hostname, 'value' => $name];
+            }
+
+            $this->assetReconciliationService->reconcile(new AssetProviderSnapshot(
+                tenantId: $target->tenantId,
+                organizationId: (int) $organization->getKey(),
+                organizationIntegrationId: $target->integrationId,
+                provider: IntegrationType::MICROSOFT_ENTRA,
+                identifiers: $identifiers,
+                attributes: [],
+                sourceRecord: new DeviceSourceRecordData(
+                    source: DeviceSourceKey::MICROSOFT_ENTRA_DEVICE,
+                    providerRecordId: $objectId,
+                    displayName: $name !== '' ? $name : null,
+                    hostname: $name !== '' ? $name : null,
+                    operatingSystem: trim((string) ($device['operatingSystem'] ?? '')) ?: null,
+                    enabled: is_bool($device['accountEnabled'] ?? null) ? $device['accountEnabled'] : null,
+                    lastActivityAt: DeviceSourceRecordData::parseActivityTime($device['approximateLastSignInDateTime'] ?? null),
+                    metadata: array_filter([
+                        'trust_type' => $trustType !== '' ? $trustType : null,
+                        'device_id' => $deviceId !== '' ? $deviceId : null,
+                        'on_premises_sid' => $sid !== '' ? $sid : null,
+                        'on_premises_sync_enabled' => $device['onPremisesSyncEnabled'] ?? null,
+                        'is_managed' => $device['isManaged'] ?? null,
+                        'is_compliant' => $device['isCompliant'] ?? null,
+                        'os_version' => $device['operatingSystemVersion'] ?? null,
+                        'registered_at' => $device['registrationDateTime'] ?? null,
+                        'profile_type' => $device['profileType'] ?? null,
+                    ], fn (mixed $value): bool => $value !== null && $value !== ''),
+                    discoveredOnly: ! $joined,
+                ),
+                createAssetIfUnmatched: false,
+                matchByUniqueHostname: $joined,
+            ));
+        }
+
+        $this->deviceSourceRecordService->markMissingAsGone(
+            $target->tenantId,
+            $target->integrationId,
+            DeviceSourceKey::MICROSOFT_ENTRA_DEVICE,
             $syncStartedAt,
         );
     }
