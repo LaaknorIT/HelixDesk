@@ -8,7 +8,10 @@
 
     Install once (as an administrator), with the collector key from the integration page in HelixDesk:
 
-        .\HelixDesk-ADCollector.ps1 -Install -CollectorKey 'hdc_...'
+        .\HelixDesk-ADCollector.ps1 -Install -HelixDeskUrl 'https://...' -IntegrationId '...' -CollectorKey 'hdc_...'
+
+    The integration page shows this command with the right values filled in. The URL and integration ID in the
+    command take precedence over the ones in this file, so a copy downloaded for another integration still works.
 
     This stores the key encrypted for this machine (DPAPI, LocalMachine) and creates a scheduled task that runs the
     collector as SYSTEM. SYSTEM uses the computer account, which can read computer objects in its own domain.
@@ -26,7 +29,8 @@
 param(
     [string]$HelixDeskUrl = '__HELIXDESK_URL__',
     [string]$IntegrationId = '__INTEGRATION_ID__',
-    [string]$KeyFile = (Join-Path $env:ProgramData 'HelixDesk\ad-collector.key'),
+    # One key file and one script copy per integration, so collectors for several customers can share a machine.
+    [string]$KeyFile = (Join-Path $env:ProgramData "HelixDesk\ad-collector-$IntegrationId.key"),
     [switch]$Install,
     [string]$CollectorKey,
     [string]$RunAsUser,
@@ -35,6 +39,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($IntegrationId -notmatch '^[0-9a-fA-F-]{36}$') { throw 'Pass the integration ID from HelixDesk with -IntegrationId, or download the collector from the integration page.' }
 $CollectorVersion = '__COLLECTOR_VERSION__'
 $TaskName = "HelixDesk AD collector ($IntegrationId)"
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
@@ -66,13 +71,46 @@ function Get-CollectorKey {
 function Invoke-HelixDesk([string]$Method, [string]$Path, $Body) {
     $uri = '{0}/api/v1/collectors/active-directory/{1}/{2}' -f $HelixDeskUrl.TrimEnd('/'), $IntegrationId, $Path
     $headers = @{ Authorization = "Bearer $script:Key"; Accept = 'application/json' }
-    $params = @{ Method = $Method; Uri = $uri; Headers = $headers; UseBasicParsing = $true; TimeoutSec = 120 }
+    # No redirects: Windows PowerShell drops the Authorization header when it follows one, which ends in a 401.
+    $params = @{ Method = $Method; Uri = $uri; Headers = $headers; UseBasicParsing = $true; TimeoutSec = 120; MaximumRedirection = 0 }
     if ($null -ne $Body) {
         $params.Body = [Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 6 -Compress))
         $params.ContentType = 'application/json; charset=utf-8'
     }
-    $response = Invoke-RestMethod @params
+    try {
+        $response = Invoke-RestMethod @params
+    } catch {
+        throw (Get-HelixDeskErrorMessage $_ $uri)
+    }
     return $response.data
+}
+
+function Get-HelixDeskErrorMessage($ErrorRecord, [string]$Uri) {
+    $response = $ErrorRecord.Exception.Response
+    if ($null -eq $response) {
+        $message = "HelixDesk could not be reached at ${Uri}: $($ErrorRecord.Exception.Message)"
+        if ($message -match 'redirect') { $message += ' HelixDesk answers on another address: run the collector with -HelixDeskUrl set to that address (and set APP_URL to it in HelixDesk).' }
+        return $message
+    }
+
+    $status = [int]$response.StatusCode
+    $serverMessage = $null
+    if ($ErrorRecord.ErrorDetails -and $ErrorRecord.ErrorDetails.Message) {
+        try { $serverMessage = ($ErrorRecord.ErrorDetails.Message | ConvertFrom-Json).message } catch { $serverMessage = $ErrorRecord.ErrorDetails.Message }
+    }
+
+    if ($status -ge 300 -and $status -lt 400) {
+        $location = $null
+        try { $location = $response.Headers.Location } catch { }
+        if (-not $location) { try { $location = $response.Headers['Location'] } catch { } }
+        return "HelixDesk redirected $Uri to $location. Run the collector with -HelixDeskUrl set to the address HelixDesk really answers on (and set APP_URL to it in HelixDesk)."
+    }
+    if ($status -eq 401) {
+        $detail = if ($serverMessage) { $serverMessage } else { 'Unauthorized.' }
+        return "HelixDesk refused the collector key for integration $IntegrationId (401: $detail) Check that the key and -IntegrationId come from the same integration page in HelixDesk; copy the install command from there again, or create a new key."
+    }
+    $detail = if ($serverMessage) { $serverMessage } else { $ErrorRecord.Exception.Message }
+    return "HelixDesk answered $status for ${Uri}: $detail"
 }
 
 function ConvertTo-IsoTime($Value) {
@@ -160,10 +198,11 @@ if ($Install) {
     $script:Key = $CollectorKey
     $config = Invoke-HelixDesk 'GET' 'config' $null
 
-    $scriptPath = Join-Path (Split-Path $KeyFile -Parent) 'HelixDesk-ADCollector.ps1'
+    $scriptPath = Join-Path (Split-Path $KeyFile -Parent) "HelixDesk-ADCollector-$IntegrationId.ps1"
     if ($PSCommandPath -ne $scriptPath) { Copy-Item -Path $PSCommandPath -Destination $scriptPath -Force }
 
-    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -ExecutionPolicy Bypass -File "{0}"' -f $scriptPath)
+    $taskArguments = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -HelixDeskUrl "{1}" -IntegrationId "{2}" -KeyFile "{3}"' -f $scriptPath, $HelixDeskUrl, $IntegrationId, $KeyFile
+    $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $taskArguments
     $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2) -RepetitionInterval (New-TimeSpan -Hours ([int]$config.sync_interval_hours))
     $principal = if ($RunAsUser) {
         New-ScheduledTaskPrincipal -UserId $RunAsUser -LogonType Password

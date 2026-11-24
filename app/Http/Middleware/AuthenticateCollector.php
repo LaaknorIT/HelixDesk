@@ -26,8 +26,18 @@ class AuthenticateCollector
             ->where('type', $integrationType)
             ->first();
 
-        if ($integration === null || ! $this->keys->matches($integration, $request->bearerToken())) {
-            return response()->json(['message' => 'Invalid integration or collector key.'], Response::HTTP_UNAUTHORIZED);
+        // The messages say which part is wrong: integration IDs are random UUIDs, so naming a missing one gives
+        // nothing away, and it tells an administrator whether the script or the key is the problem.
+        if ($integration === null) {
+            return response()->json(['message' => 'No integration with this ID. Download the collector again from the integration page.'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if ($request->bearerToken() === null) {
+            return response()->json(['message' => 'No collector key was received. A proxy or redirect may have removed the Authorization header.'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (! $this->keys->matches($integration, $request->bearerToken())) {
+            return response()->json(['message' => 'The collector key does not match this integration. Use the key created on this integration\'s page, or create a new one.'], Response::HTTP_UNAUTHORIZED);
         }
 
         if (! $integration->enabled) {

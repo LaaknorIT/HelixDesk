@@ -120,7 +120,43 @@ class ActiveDirectoryCollectorTest extends TestCase
         $this->assertFalse(app(CollectorKeyService::class)->matches($this->integration->fresh(), $this->key));
         // The modal's read-only fields hold the key and a ready-to-paste install command.
         $this->assertSame($newKey, $component->get('mountedActions.0.data.key'));
-        $this->assertStringContainsString("-Install -CollectorKey '{$newKey}'", (string) $component->get('mountedActions.0.data.install_command'));
+        $command = (string) $component->get('mountedActions.0.data.install_command');
+        $this->assertStringContainsString("-HelixDeskUrl '".rtrim((string) config('app.url'), '/')."'", $command);
+        $this->assertStringContainsString("-IntegrationId '{$this->integration->id}'", $command);
+        $this->assertStringContainsString("-CollectorKey '{$newKey}'", $command);
+
+        // The key from the modal works against the collector API, as the install command uses it.
+        $this->getJson($this->url('config'), ['Authorization' => 'Bearer '.$newKey])->assertOk();
+    }
+
+    public function test_a_key_from_another_integration_is_refused_with_a_clear_message(): void
+    {
+        $otherOrganization = Organization::factory()->create(['tenant_id' => $this->tenant->id]);
+        $other = app(OrganizationIntegrationRepository::class)->createActiveDirectoryFromForm($otherOrganization, [
+            'ad_domain_fqdn' => 'other.example.com',
+            'ad_search_bases' => '',
+            'ad_excluded_ous' => '',
+            'ad_active_threshold_days' => 30,
+            'ad_create_assets' => 'active_only',
+            'ad_sync_interval_hours' => 4,
+            'ad_enabled' => true,
+        ]);
+        $otherKey = app(CollectorKeyService::class)->issue($other);
+
+        // The script for this integration with the key for the other one: the mistake behind a 401 at install.
+        $this->getJson($this->url('config'), ['Authorization' => 'Bearer '.$otherKey])
+            ->assertUnauthorized()
+            ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'does not match this integration'));
+
+        $this->getJson($this->url('config'))
+            ->assertUnauthorized()
+            ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'No collector key was received'));
+
+        $this->getJson('/api/v1/collectors/active-directory/00000000-0000-0000-0000-000000000000/config', $this->auth())
+            ->assertUnauthorized()
+            ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'No integration with this ID'));
+
+        $this->getJson('/api/v1/collectors/active-directory/'.$other->id.'/config', ['Authorization' => 'Bearer '.$otherKey])->assertOk();
     }
 
     public function test_collector_endpoints_need_the_right_key_and_an_enabled_integration(): void
@@ -273,6 +309,12 @@ class ActiveDirectoryCollectorTest extends TestCase
         $this->assertStringContainsString(ActiveDirectoryCollectorScript::VERSION, $script);
         $this->assertStringNotContainsString('__INTEGRATION_ID__', $script);
         $this->assertStringNotContainsString($this->key, $script);
+        // A copied script per integration and a key file per integration, so two collectors on one machine do not
+        // overwrite each other, and the scheduled task passes its integration explicitly.
+        $this->assertStringContainsString('ad-collector-$IntegrationId.key', $script);
+        $this->assertStringContainsString('HelixDesk-ADCollector-$IntegrationId.ps1', $script);
+        $this->assertStringContainsString('-IntegrationId "{2}"', $script);
+        $this->assertStringContainsString('MaximumRedirection = 0', $script);
     }
 
     public function test_edit_page_shows_the_ad_form_and_the_collector_actions(): void

@@ -116,14 +116,18 @@ All calls send `Authorization: Bearer <collector key>` and are rate limited (120
 
 `resources/collectors/active-directory/HelixDesk-ADCollector.ps1`, downloaded from the integration page with the HelixDesk URL and integration ID filled in (never the key).
 
+When a key is created, the integration page shows the install command with the URL, the integration ID and the key filled in. Use that command: the URL and ID in it take precedence over the ones in the file, so it works even with a copy of the collector downloaded for another integration.
+
 ```powershell
-.\HelixDesk-ADCollector.ps1 -Install -CollectorKey 'hdc_...'          # once, as administrator
+.\HelixDesk-ADCollector.ps1 -Install -HelixDeskUrl 'https://helpdesk.example.com' -IntegrationId '<id>' -CollectorKey 'hdc_...'   # once, as administrator
 .\HelixDesk-ADCollector.ps1 -WhatIf                                   # read AD, print a summary, send nothing
 .\HelixDesk-ADCollector.ps1 -Install -CollectorKey 'hdc_...' -RunAsUser 'CORP\gmsa-helixdesk$'
 .\HelixDesk-ADCollector.ps1 -Uninstall
 ```
 
-- `-Install` stores the key encrypted with DPAPI (LocalMachine scope) in `%ProgramData%\HelixDesk`, readable only by administrators, SYSTEM and the task account, and registers a scheduled task at the interval set in HelixDesk.
+- `-Install` stores the key encrypted with DPAPI (LocalMachine scope) in `%ProgramData%\HelixDesk\ad-collector-<integration id>.key`, readable only by administrators, SYSTEM and the task account, copies the script to `%ProgramData%\HelixDesk\HelixDesk-ADCollector-<integration id>.ps1` and registers a scheduled task at the interval set in HelixDesk. Files are per integration, so collectors for several customers can run on one machine.
+- The collector does not follow redirects, because Windows PowerShell drops the `Authorization` header when it does, which ends in a 401. If HelixDesk redirects (for example http to https, or another host name), the collector says where to, and `APP_URL` should be set to that address.
+- A 401 says which part is wrong: no integration with that ID, no key received (a proxy removed the header), or a key that belongs to another integration.
 - By default the task runs as SYSTEM, which reads AD as the computer account. `-RunAsUser` runs it as a gMSA instead.
 - It uses `System.DirectoryServices` (no RSAT module), reads with paging, and reports errors to HelixDesk through the heartbeat.
 
