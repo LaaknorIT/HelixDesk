@@ -6,6 +6,7 @@ use App\Enums\AssetExternalIdentifierType;
 use App\Enums\DeviceClass;
 use App\Enums\DeviceSourceRole;
 use App\Filament\Agent\Resources\Organizations\OrganizationResource;
+use App\Filament\Agent\Resources\Organizations\Pages\EditOrganizationIntegration;
 use App\Models\Asset;
 use App\Models\AssetSourceRecord;
 use App\Models\AssetType;
@@ -26,6 +27,8 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
+use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 class ActiveDirectoryCollectorTest extends TestCase
@@ -85,6 +88,39 @@ class ActiveDirectoryCollectorTest extends TestCase
         $this->assertStringStartsWith('hdc_', $this->key);
         $this->assertSame(hash('sha256', $this->key), $credentials['collector_key_hash']);
         $this->assertStringNotContainsString($this->key, json_encode($credentials));
+    }
+
+    public function test_issuing_a_key_is_logged_with_the_integration_id(): void
+    {
+        // activity_log.subject_id is a bigint and integrations have UUID keys, so the integration must not be the
+        // subject: MySQL/MariaDB and PostgreSQL reject the insert (SQLite does not, which hid the bug).
+        $activity = Activity::query()->where('event', 'collector_key_issued')->latest('id')->firstOrFail();
+
+        $this->assertNull($activity->subject_id);
+        $this->assertSame((string) $this->integration->id, $activity->getProperty('integration_id'));
+        $this->assertStringNotContainsString($this->key, (string) json_encode($activity->properties));
+    }
+
+    public function test_replacing_the_key_shows_the_new_key_once_in_a_modal(): void
+    {
+        $this->actingAsTenantAdmin();
+
+        $component = Livewire::test(EditOrganizationIntegration::class, [
+            'record' => $this->organization->id,
+            'integration' => (string) $this->integration->getKey(),
+        ])
+            ->callAction('collector_key')
+            ->assertHasNoActionErrors()
+            ->assertActionMounted('showCollectorKey');
+
+        $newKey = (string) $component->get('mountedActions.0.arguments.key');
+        $this->assertStringStartsWith('hdc_', $newKey);
+        $this->assertNotSame($this->key, $newKey);
+        $this->assertTrue(app(CollectorKeyService::class)->matches($this->integration->fresh(), $newKey));
+        $this->assertFalse(app(CollectorKeyService::class)->matches($this->integration->fresh(), $this->key));
+        // The modal's read-only fields hold the key and a ready-to-paste install command.
+        $this->assertSame($newKey, $component->get('mountedActions.0.data.key'));
+        $this->assertStringContainsString("-Install -CollectorKey '{$newKey}'", (string) $component->get('mountedActions.0.data.install_command'));
     }
 
     public function test_collector_endpoints_need_the_right_key_and_an_enabled_integration(): void
@@ -241,12 +277,7 @@ class ActiveDirectoryCollectorTest extends TestCase
 
     public function test_edit_page_shows_the_ad_form_and_the_collector_actions(): void
     {
-        $admin = User::factory()->create(['tenant_id' => $this->tenant->id, 'type' => 'agent']);
-        setPermissionsTeamId($this->tenant->id);
-        $admin->assignRole('Tenant Admin');
-        $this->actingAs($admin);
-        Filament::setCurrentPanel('agent');
-        Filament::setTenant($this->tenant, isQuiet: true);
+        $this->actingAsTenantAdmin();
 
         $this->get(OrganizationResource::getUrl('settings.integrations.edit', [
             'record' => $this->organization->id,
@@ -258,6 +289,16 @@ class ActiveDirectoryCollectorTest extends TestCase
             ->assertSee('Download collector')
             ->assertDontSee('App registration');
 
+    }
+
+    private function actingAsTenantAdmin(): void
+    {
+        $admin = User::factory()->create(['tenant_id' => $this->tenant->id, 'type' => 'agent']);
+        setPermissionsTeamId($this->tenant->id);
+        $admin->assignRole('Tenant Admin');
+        $this->actingAs($admin);
+        Filament::setCurrentPanel('agent');
+        Filament::setTenant($this->tenant, isQuiet: true);
     }
 
     private function url(string $path): string

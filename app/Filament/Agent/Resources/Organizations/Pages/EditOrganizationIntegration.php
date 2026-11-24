@@ -21,6 +21,7 @@ use App\Support\IntegrationHealth\IntegrationHealthPresenter;
 use App\Support\IntegrationHealth\IntegrationHealthReport;
 use App\Support\OrganizationIntegrationSettings;
 use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\Section;
@@ -40,9 +41,9 @@ class EditOrganizationIntegration extends EditRecord
 
     public string $integrationType = OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA;
 
-    public function mount(int|string $record): void
+    public function mount(int|string $record, ?string $integration = null): void
     {
-        $integration = request()->route('integration');
+        $integration ??= request()->route('integration');
         abort_unless(is_string($integration) && $integration !== '', 404);
         $this->integrationId = $integration;
 
@@ -127,12 +128,8 @@ class EditOrganizationIntegration extends EditRecord
 
                     $key = app(CollectorKeyService::class)->issue($integration);
 
-                    Notification::make()
-                        ->title(__('Collector key created'))
-                        ->body(__('Copy it now, it is shown only once: :key', ['key' => $key]))
-                        ->success()
-                        ->persistent()
-                        ->send();
+                    // Only the hash is stored, so this modal is the one chance to copy the key.
+                    $this->replaceMountedAction('showCollectorKey', ['key' => $key]);
                 }),
             Action::make('download_collector')
                 ->label(__('Download collector'))
@@ -145,6 +142,34 @@ class EditOrganizationIntegration extends EditRecord
                     ['Content-Type' => 'text/plain; charset=UTF-8'],
                 )),
         ];
+    }
+
+    public function showCollectorKeyAction(): Action
+    {
+        return Action::make('showCollectorKey')
+            ->modalHeading(__('Collector key created'))
+            ->modalDescription(__('Copy the key now. It is shown only once and cannot be read back later.'))
+            ->modalIcon(Heroicon::OutlinedKey)
+            ->fillForm(fn (array $arguments): array => [
+                'key' => (string) ($arguments['key'] ?? ''),
+                'install_command' => '.\\'.ActiveDirectoryCollectorScript::FILE_NAME." -Install -CollectorKey '".($arguments['key'] ?? '')."'",
+            ])
+            ->schema([
+                TextInput::make('key')
+                    ->label(__('Collector key'))
+                    ->readOnly()
+                    ->copyable(copyMessage: __('Copied'))
+                    ->extraInputAttributes(['class' => 'font-mono']),
+                TextInput::make('install_command')
+                    ->label(__('Install command'))
+                    ->helperText(__('Run it as an administrator in PowerShell on a domain-joined machine, in the folder with the downloaded collector.'))
+                    ->readOnly()
+                    ->copyable(copyMessage: __('Copied'))
+                    ->extraInputAttributes(['class' => 'font-mono']),
+            ])
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('Done'))
+            ->closeModalByClickingAway(false);
     }
 
     private function integrationModel(): ?OrganizationIntegration
