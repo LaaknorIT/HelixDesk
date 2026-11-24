@@ -11,8 +11,9 @@ final class AssetProviderSnapshot
      * @param  array<string, mixed>  $attributes
      * @param  array<string, mixed>  $satellite
      * @param  bool  $createAssetIfUnmatched  false leaves an unmatched device as an unlinked source record only
-     * @param  bool  $matchByUniqueHostname  for sources without serial numbers (Active Directory): link to the one
-     *                                       asset in the organization with the same short hostname, if exactly one
+     * @param  bool  $matchByUniqueHostname  when no device ID or serial number matches: link to the one asset in the
+     *                                       organization (or below) with the same short hostname that is not
+     *                                       provably another device, if exactly one
      */
     public function __construct(
         public int $tenantId,

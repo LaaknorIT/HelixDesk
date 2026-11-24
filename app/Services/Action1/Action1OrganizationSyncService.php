@@ -300,6 +300,9 @@ final class Action1OrganizationSyncService
                     'azure_ad_device_id' => $azureAdDeviceId !== '' ? $azureAdDeviceId : null,
                 ], fn (mixed $value): bool => $value !== null && $value !== ''),
             ),
+            // An asset that Active Directory created has no serial number, so the name links the two. Not at the
+            // root level, where the same name can belong to devices of different customers.
+            matchByUniqueHostname: $target->organizationId !== null,
         );
     }
 

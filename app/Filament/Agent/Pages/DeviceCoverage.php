@@ -4,6 +4,7 @@ namespace App\Filament\Agent\Pages;
 
 use App\Enums\DeviceClass;
 use App\Filament\Agent\Resources\Assets\AssetResource;
+use App\Services\AssetMergeService;
 use App\Services\DeviceCoverageService;
 use App\Support\DeviceCoverage\CoverageRules;
 use App\Support\DeviceCoverage\DeviceCoverageExport;
@@ -13,6 +14,7 @@ use App\Support\OrganizationIntegrationOptions;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\Grid;
@@ -59,6 +61,8 @@ class DeviceCoverage extends Page implements HasTable
 
     private ?DeviceCoverageReport $report = null;
 
+    private ?int $duplicateCount = null;
+
     public static function getNavigationLabel(): string
     {
         return __('Device coverage');
@@ -103,7 +107,52 @@ class DeviceCoverage extends Page implements HasTable
                 ->icon(Heroicon::OutlinedArrowDownTray)
                 ->color('gray')
                 ->action(fn (): StreamedResponse => $this->exportCsv()),
+            Action::make('mergeDuplicates')
+                ->label(__('Merge duplicates'))
+                ->icon(Heroicon::OutlinedArrowsPointingIn)
+                ->color('gray')
+                ->visible(fn (): bool => $this->duplicateCount() > 0
+                    && (Auth::user()?->hasPermissionTo('asset.update') ?? false)
+                    && (Auth::user()?->hasPermissionTo('asset.delete') ?? false))
+                ->requiresConfirmation()
+                ->modalHeading(__('Merge duplicate devices'))
+                ->modalDescription(fn (): string => trans_choice(
+                    '{1} 1 device was created twice by different integrations (same name in the same organization, no conflicting serial number or device ID). It will be merged into one asset, keeping everything linked to it.|[2,*] :count devices were created twice by different integrations (same name in the same organization, no conflicting serial number or device ID). Each will be merged into one asset, keeping everything linked to them.',
+                    $this->duplicateCount(),
+                ))
+                ->modalSubmitActionLabel(__('Merge'))
+                ->action(function (): void {
+                    $tenant = Filament::getTenant();
+                    if ($tenant === null) {
+                        return;
+                    }
+
+                    $merged = collect(app(AssetMergeService::class)->mergeDuplicates((int) $tenant->getKey()))
+                        ->sum(fn (array $result): int => count($result['merged']));
+
+                    $this->report = null;
+                    $this->duplicateCount = null;
+
+                    Notification::make()
+                        ->title(trans_choice('{0} No assets were merged|{1} 1 duplicate asset merged|[2,*] :count duplicate assets merged', $merged))
+                        ->success()
+                        ->send();
+                }),
         ];
+    }
+
+    private function duplicateCount(): int
+    {
+        if ($this->duplicateCount !== null) {
+            return $this->duplicateCount;
+        }
+
+        $tenant = Filament::getTenant();
+
+        return $this->duplicateCount = $tenant === null ? 0 : array_sum(array_map(
+            fn (array $group): int => count($group) - 1,
+            app(AssetMergeService::class)->findDuplicateGroups((int) $tenant->getKey()),
+        ));
     }
 
     public function table(Table $table): Table

@@ -290,6 +290,7 @@ final class DeviceCoverageService
         }
 
         $deviceClass = null;
+        $serverOperatingSystem = null;
         $operatingSystem = $group['asset']?->operating_system;
         $name = $group['asset']?->name;
 
@@ -305,12 +306,22 @@ final class DeviceCoverageService
                 $lastActivity[$record->source] = $record->last_activity_at->toIso8601String();
             }
 
-            if (($deviceClass === null || $deviceClass === DeviceClass::Other) && $record->device_class !== null) {
+            // A server operating system is unambiguous, while some sources report a server only as "Windows"
+            // (Intune for servers managed through Defender), which reads as a workstation. Server wins.
+            if ($record->device_class !== null && $this->classRank($record->device_class) > $this->classRank($deviceClass)) {
                 $deviceClass = $record->device_class;
+                if ($deviceClass === DeviceClass::Server && $record->operating_system !== null) {
+                    $serverOperatingSystem = $record->operating_system;
+                }
             }
 
             $operatingSystem ??= $record->operating_system;
             $name ??= $record->display_name ?? $record->hostname;
+        }
+
+        if ($deviceClass === DeviceClass::Server && $serverOperatingSystem !== null
+            && ! str_contains(mb_strtolower((string) $operatingSystem), 'server')) {
+            $operatingSystem = $serverOperatingSystem;
         }
 
         return [
@@ -326,6 +337,16 @@ final class DeviceCoverageService
             'last_activity' => $lastActivity,
             'findings' => [],
         ];
+    }
+
+    private function classRank(?DeviceClass $deviceClass): int
+    {
+        return match ($deviceClass) {
+            DeviceClass::Server => 3,
+            DeviceClass::Workstation, DeviceClass::Mobile => 2,
+            DeviceClass::Other => 1,
+            null => 0,
+        };
     }
 
     /**
