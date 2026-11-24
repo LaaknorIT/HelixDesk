@@ -525,7 +525,9 @@ final class MicrosoftEntraOrganizationSyncService
      * Reads devices from Microsoft Defender for Endpoint with the integration's own app registration. They are stored
      * as the separate device source "microsoft_defender", so the coverage report shows them apart from Intune.
      * Defender reports no serial number, so it links to an existing asset through the Entra device ID or a unique
-     * computer name and never creates assets. Problems with this scope are warnings; the rest of the sync goes on.
+     * computer name and never creates assets. A device Defender has only discovered (not onboarded) is kept only when
+     * its name matches a device HelixDesk already knows; see DefenderDiscoveredDevices. Problems with this scope are
+     * warnings; the rest of the sync goes on.
      */
     private function syncDefenderDevices(EntraSyncTarget $target, Organization $organization): void
     {
@@ -552,9 +554,18 @@ final class MicrosoftEntraOrganizationSyncService
         }
 
         $syncStartedAt = now();
+        $knownHostnames = null;
 
         try {
             foreach ($client->paginateCollection('machines') as $machine) {
+                if (! $this->defenderMachineIsOnboarded($machine)) {
+                    // Skipped devices are not reported, so a record stored by an earlier sync is marked gone below.
+                    $knownHostnames ??= DefenderDiscoveredDevices::knownHostnames($target->tenantId);
+                    if (! DefenderDiscoveredDevices::isKnown($machine['computerDnsName'] ?? null, $knownHostnames)) {
+                        continue;
+                    }
+                }
+
                 $this->reconcileDefenderMachine($target, $organization, $machine);
             }
         } catch (Throwable $exception) {
@@ -586,7 +597,7 @@ final class MicrosoftEntraOrganizationSyncService
 
         $dnsName = trim((string) ($machine['computerDnsName'] ?? ''));
         $aadDeviceId = trim((string) ($machine['aadDeviceId'] ?? ''));
-        $onboarded = strcasecmp((string) ($machine['onboardingStatus'] ?? 'Onboarded'), 'Onboarded') === 0;
+        $onboarded = $this->defenderMachineIsOnboarded($machine);
         $operatingSystem = $this->defenderOperatingSystem($machine);
 
         $identifiers = [[
@@ -647,6 +658,14 @@ final class MicrosoftEntraOrganizationSyncService
             createAssetIfUnmatched: false,
             matchByUniqueHostname: $onboarded,
         ));
+    }
+
+    /**
+     * @param  array<string, mixed>  $machine
+     */
+    private function defenderMachineIsOnboarded(array $machine): bool
+    {
+        return strcasecmp((string) ($machine['onboardingStatus'] ?? 'Onboarded'), 'Onboarded') === 0;
     }
 
     /**

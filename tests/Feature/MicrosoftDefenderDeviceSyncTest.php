@@ -73,6 +73,8 @@ class MicrosoftDefenderDeviceSyncTest extends TestCase
             'is_primary' => true,
         ]);
         $server = $this->asset($tenant, $organization, 'SRV-FILE01', 'srv-file01.corp.example');
+        // Known from another source, but not onboarded in Defender.
+        $this->asset($tenant, $organization, 'LAPTOP-02', 'laptop-02.corp.example');
 
         $machines = [
             [
@@ -126,7 +128,7 @@ class MicrosoftDefenderDeviceSyncTest extends TestCase
         $this->assertFalse(AssetSourceRecord::query()->withoutGlobalScopes()->active()->whereKey($discovered->id)->exists());
         $this->assertTrue(AssetSourceRecord::query()->withoutGlobalScopes()->active()->whereKey($records['mde-laptop-01']->id)->exists());
 
-        $this->assertSame(2, Asset::query()->withoutGlobalScopes()->count(), 'Defender never creates assets');
+        $this->assertSame(3, Asset::query()->withoutGlobalScopes()->count(), 'Defender never creates assets');
         $this->assertSame('LAPTOP-01', $intuneAsset->fresh()->name, 'Defender does not change asset fields');
         $this->assertTrue(AssetExternalIdentifier::query()->withoutGlobalScopes()
             ->where('identifier_type', AssetExternalIdentifierType::DefenderMachineId)
@@ -140,6 +142,111 @@ class MicrosoftDefenderDeviceSyncTest extends TestCase
 
         $this->assertNotNull($discovered->fresh()->gone_at);
         $this->assertNull($records['mde-laptop-01']->fresh()->gone_at);
+    }
+
+    public function test_sync_skips_devices_that_are_not_onboarded_and_not_known(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $organization = Organization::factory()->create(['tenant_id' => $tenant->id]);
+        $integration = $this->entraIntegration($tenant, $organization);
+        $this->asset($tenant, $organization, 'PC-KNOWN', 'pc-known');
+
+        $this->fakeApis([
+            [
+                'id' => 'mde-guid-name',
+                'computerDnsName' => '70cbe4e2-7b7a-435d-a600-0df57facde41',
+                'osPlatform' => 'Windows10',
+                'onboardingStatus' => 'CanBeOnboarded',
+            ],
+            [
+                'id' => 'mde-no-name',
+                'osPlatform' => 'Other',
+                'onboardingStatus' => 'Unsupported',
+            ],
+            [
+                'id' => 'mde-unknown-host',
+                'computerDnsName' => 'printer-3f',
+                'onboardingStatus' => 'InsufficientInfo',
+            ],
+            [
+                'id' => 'mde-known-host',
+                'computerDnsName' => 'PC-KNOWN.corp.example',
+                'osPlatform' => 'Windows11',
+                'onboardingStatus' => 'CanBeOnboarded',
+            ],
+            [
+                'id' => 'mde-onboarded-unknown',
+                'computerDnsName' => 'laptop-new',
+                'osPlatform' => 'Windows11',
+                'onboardingStatus' => 'Onboarded',
+            ],
+        ]);
+
+        // A record from before this rule is marked gone by the next sync.
+        $stale = AssetSourceRecord::query()->withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'organization_id' => $organization->id,
+            'organization_integration_id' => $integration->id,
+            'source' => DeviceSourceKey::MICROSOFT_DEFENDER,
+            'provider_record_id' => 'mde-guid-name',
+            'display_name' => '70cbe4e2-7b7a-435d-a600-0df57facde41',
+            'hostname' => '70cbe4e2-7b7a-435d-a600-0df57facde41',
+            'last_reported_at' => now()->subDay(),
+            'metadata_json' => [AssetSourceRecord::METADATA_DISCOVERED_ONLY => true],
+        ]);
+
+        app(MicrosoftEntraOrganizationSyncService::class)->sync($this->target($tenant, $organization, $integration));
+
+        $active = AssetSourceRecord::query()->withoutGlobalScopes()
+            ->where('source', DeviceSourceKey::MICROSOFT_DEFENDER)
+            ->whereNull('gone_at')
+            ->pluck('provider_record_id')
+            ->sort()
+            ->values()
+            ->all();
+
+        $this->assertSame(['mde-known-host', 'mde-onboarded-unknown'], $active);
+        $this->assertNotNull($stale->fresh()->gone_at);
+        $this->assertSame(1, Asset::query()->withoutGlobalScopes()->count(), 'Defender never creates assets');
+    }
+
+    public function test_prune_command_deletes_unknown_discovered_defender_devices_after_a_dry_run(): void
+    {
+        $tenant = Tenant::factory()->create();
+        $organization = Organization::factory()->create(['tenant_id' => $tenant->id]);
+        $integration = $this->entraIntegration($tenant, $organization);
+        $this->asset($tenant, $organization, 'PC-KNOWN', 'pc-known');
+
+        $record = fn (string $id, ?string $name, bool $discovered) => AssetSourceRecord::query()->withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->id,
+            'organization_id' => $organization->id,
+            'organization_integration_id' => $integration->id,
+            'source' => DeviceSourceKey::MICROSOFT_DEFENDER,
+            'provider_record_id' => $id,
+            'display_name' => $name,
+            'hostname' => $name,
+            'last_reported_at' => now(),
+            'metadata_json' => $discovered ? [AssetSourceRecord::METADATA_DISCOVERED_ONLY => true] : null,
+        ]);
+
+        $guid = $record('mde-guid', 'a7797ecc-38c9-4255-a4a1-d09ed285ef2f', true);
+        $nameless = $record('mde-nameless', null, true);
+        $known = $record('mde-known', 'pc-known', true);
+        $onboarded = $record('mde-onboarded', 'laptop-new', false);
+
+        $this->artisan('helixdesk:prune-defender-discovered-devices', ['--dry-run' => true])
+            ->expectsOutputToContain('Found 2 Defender device(s)')
+            ->assertSuccessful();
+        $this->assertSame(4, AssetSourceRecord::query()->withoutGlobalScopes()->count());
+
+        $this->artisan('helixdesk:prune-defender-discovered-devices', ['--tenant' => $tenant->id])
+            ->expectsOutputToContain('Deleted 2 Defender device(s)')
+            ->assertSuccessful();
+
+        $this->assertNull($guid->fresh());
+        $this->assertNull($nameless->fresh());
+        $this->assertNotNull($known->fresh());
+        $this->assertNotNull($onboarded->fresh());
     }
 
     public function test_coverage_report_flags_devices_that_defender_does_not_protect(): void
