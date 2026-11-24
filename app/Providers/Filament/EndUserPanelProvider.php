@@ -8,6 +8,7 @@ use App\Models\Tenant;
 use App\Providers\Filament\Concerns\ConfiguresHelixdeskPanel;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Support\Enums\Width;
 
 class EndUserPanelProvider extends PanelProvider
 {
@@ -25,6 +26,8 @@ class EndUserPanelProvider extends PanelProvider
             ], isPersistent: true)
             ->tenantMenu(false)
             ->tenantSwitcher(false)
+            // End users mostly read and write ticket text, which gets hard to read on a full-width line.
+            ->maxContentWidth(Width::ScreenTwoExtraLarge)
             ->discoverResources(in: app_path('Filament/EndUser/Resources'), for: 'App\\Filament\\EndUser\\Resources')
             ->discoverPages(in: app_path('Filament/EndUser/Pages'), for: 'App\\Filament\\EndUser\\Pages')
             ->pages([
