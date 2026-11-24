@@ -10,10 +10,12 @@ use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationAction1Settin
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationActiveDirectorySettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationEntraSettingsSchema;
 use App\Filament\Agent\Resources\Organizations\Schemas\OrganizationGoogleWorkspaceSettingsSchema;
+use App\Models\Asset;
 use App\Models\Organization;
 use App\Models\OrganizationIntegration;
 use App\Repositories\OrganizationIntegrationRepository;
 use App\Services\ActiveDirectory\CollectorKeyService;
+use App\Services\ActiveDirectory\StaleActiveDirectoryAssetCleanup;
 use App\Support\ActiveDirectoryCollectorScript;
 use App\Support\IntegrationHealth\IntegrationConnectionChecker;
 use App\Support\IntegrationHealth\IntegrationHealthInspector;
@@ -28,6 +30,8 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 
 class EditOrganizationIntegration extends EditRecord
 {
@@ -40,6 +44,11 @@ class EditOrganizationIntegration extends EditRecord
     public string $integrationId;
 
     public string $integrationType = OrganizationIntegrationSettings::TYPE_MICROSOFT_ENTRA;
+
+    /**
+     * @var Collection<int, Asset>|null
+     */
+    private ?Collection $staleComputerAssets = null;
 
     public function mount(int|string $record, ?string $integration = null): void
     {
@@ -141,7 +150,57 @@ class EditOrganizationIntegration extends EditRecord
                     ActiveDirectoryCollectorScript::FILE_NAME,
                     ['Content-Type' => 'text/plain; charset=UTF-8'],
                 )),
+            Action::make('retire_stale_computers')
+                ->label(__('Retire stale computers'))
+                ->icon(Heroicon::OutlinedArchiveBox)
+                ->color('gray')
+                ->visible(fn (): bool => $this->integrationType === OrganizationIntegrationSettings::TYPE_ACTIVE_DIRECTORY
+                    && (Auth::user()?->hasPermissionTo('asset.update') ?? false)
+                    && $this->staleComputerAssets()->isNotEmpty())
+                ->requiresConfirmation()
+                ->modalHeading(__('Retire stale computers'))
+                ->modalDescription(function (): string {
+                    $assets = $this->staleComputerAssets();
+                    $names = $assets->take(15)->pluck('name')->implode(', ');
+                    if ($assets->count() > 15) {
+                        $names .= ', …';
+                    }
+
+                    return trans_choice(
+                        '{1} 1 asset is known only from Active Directory, and AD now reports it as disabled, not seen for a long time or deleted: :names. It will be marked as retired. You can change the status back on the asset.|[2,*] :count assets are known only from Active Directory, and AD now reports them as disabled, not seen for a long time or deleted: :names. They will be marked as retired. You can change the status back on each asset.',
+                        $assets->count(),
+                        ['names' => $names],
+                    );
+                })
+                ->modalSubmitActionLabel(__('Retire'))
+                ->action(function (): void {
+                    $integration = $this->integrationModel();
+                    if ($integration === null) {
+                        return;
+                    }
+
+                    $retired = app(StaleActiveDirectoryAssetCleanup::class)->retire($integration);
+                    $this->staleComputerAssets = null;
+
+                    Notification::make()
+                        ->title(trans_choice('{0} No assets were retired.|{1} 1 asset was retired.|[2,*] :count assets were retired.', $retired))
+                        ->success()
+                        ->send();
+                }),
         ];
+    }
+
+    /**
+     * @return Collection<int, Asset>
+     */
+    private function staleComputerAssets(): Collection
+    {
+        $integration = $this->integrationModel();
+        if ($integration === null) {
+            return collect();
+        }
+
+        return $this->staleComputerAssets ??= app(StaleActiveDirectoryAssetCleanup::class)->candidates($integration);
     }
 
     public function showCollectorKeyAction(): Action

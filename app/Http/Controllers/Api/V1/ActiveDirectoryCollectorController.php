@@ -91,10 +91,12 @@ class ActiveDirectoryCollectorController extends Controller
         ]);
 
         $stored = $this->inventory->ingestBatch($model, $collectorRun, (int) $validated['sequence'], $validated['objects']);
+        $collectorRun->refresh();
 
         return response()->json(['data' => [
             'stored' => $stored,
-            'received_total' => $collectorRun->fresh()->received_count,
+            'received_total' => $collectorRun->received_count,
+            'skipped_total' => $collectorRun->skipped_count,
         ]]);
     }
 
@@ -112,6 +114,7 @@ class ActiveDirectoryCollectorController extends Controller
         return response()->json(['data' => [
             'status' => $collectorRun->status,
             'received_total' => $collectorRun->received_count,
+            'skipped_total' => $collectorRun->skipped_count,
         ]]);
     }
 

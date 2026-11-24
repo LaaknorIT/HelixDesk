@@ -72,11 +72,21 @@ class OrganizationActiveDirectorySettingsSchema
                                 ->maxValue(365)
                                 ->required()
                                 ->helperText(__('Uses the newest of last logon and machine password change. At least :days days, because Active Directory only updates the last logon time every 9 to 14 days.', ['days' => OrganizationIntegrationSettings::ACTIVE_DIRECTORY_MIN_ACTIVE_DAYS])),
+                            TextInput::make('ad_skip_inactive_after_days')
+                                ->label(__('Skip computers not seen for (days)'))
+                                ->numeric()
+                                ->minValue(0)
+                                ->maxValue(OrganizationIntegrationSettings::ACTIVE_DIRECTORY_MAX_SKIP_INACTIVE_DAYS)
+                                ->required()
+                                ->helperText(__('Old computer objects nobody removed from AD are left out of HelixDesk entirely: no asset and no row in Device coverage. Computers already imported are removed from Device coverage on the next run. Use 0 to import every computer.')),
+                            Toggle::make('ad_skip_disabled')
+                                ->label(__('Skip disabled computers'))
+                                ->helperText(__('Disabled computer accounts are left out of HelixDesk. Domain controllers are always imported.')),
                             Radio::make('ad_create_assets')
                                 ->label(__('Create assets for'))
                                 ->options([
                                     'active_only' => __('Active computers only (recommended)'),
-                                    'all' => __('All computers, including stale and disabled ones'),
+                                    'all' => __('All computers that are not skipped'),
                                     'never' => __('None: only show them in Device coverage'),
                                 ])
                                 ->required()
