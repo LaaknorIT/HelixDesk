@@ -13,6 +13,7 @@ use App\Models\AssetIdentityAmbiguity;
 use App\Models\AssetSourceRecord;
 use App\Models\AssetType;
 use App\Support\AssetIdentifierHelper;
+use App\Support\AssetIdentityConflicts;
 use App\Support\AssetIdentityNormalizer;
 use App\Support\IntegrationType;
 use App\Support\OrganizationLineage;
@@ -55,7 +56,15 @@ final class AssetReconciliationService
         }
 
         if ($matchedAsset === null && $snapshot->matchByUniqueHostname) {
-            $matchedAsset = $this->findAssetByUniqueHostname($snapshot);
+            $hostnameCandidates = $this->hostnameCandidates($snapshot);
+
+            if ($hostnameCandidates->count() > 1) {
+                // The device already exists, but which asset it is cannot be told apart by name. Creating another
+                // asset would only add a third copy, so the record stays unlinked until the duplicates are merged.
+                return new AssetReconciliationResult(asset: null);
+            }
+
+            $matchedAsset = $hostnameCandidates->first();
         }
 
         if ($matchedAsset !== null) {
@@ -155,10 +164,14 @@ final class AssetReconciliationService
 
     /**
      * Sources such as Active Directory report no serial number or MAC address, so the serial-based soft match can
-     * never link them. A computer name is unique within a domain, so one asset in the organization with the same
-     * short hostname is taken as the same device. Two or more candidates link nothing.
+     * never link them, and an asset that Active Directory created has no serial number for Intune or the RMM to match.
+     * A computer name is unique within a domain, so one asset in the organization with the same short hostname is
+     * taken as the same device. Candidates that are provably another device (a different serial number, or another
+     * device ID from the same provider) are left out. Two or more remaining candidates link nothing.
+     *
+     * @return Collection<int, Asset>
      */
-    private function findAssetByUniqueHostname(AssetProviderSnapshot $snapshot): ?Asset
+    private function hostnameCandidates(AssetProviderSnapshot $snapshot): Collection
     {
         $hostname = AssetIdentityNormalizer::normalizeHostname(
             $snapshot->identifierValue(AssetExternalIdentifierType::Hostname)
@@ -166,18 +179,18 @@ final class AssetReconciliationService
         );
 
         if ($hostname === null) {
-            return null;
+            return collect();
         }
 
-        $candidates = $this->sameOrBelowAssetQuery($snapshot)
+        return $this->sameOrBelowAssetQuery($snapshot)
             ->where(fn ($query) => $query
                 ->whereRaw('LOWER(primary_hostname) = ?', [$hostname])
                 ->orWhereRaw('LOWER(primary_hostname) LIKE ?', [$hostname.'.%'])
                 ->orWhereRaw('LOWER(name) = ?', [$hostname]))
-            ->limit(2)
-            ->get();
-
-        return $candidates->count() === 1 ? $candidates->first() : null;
+            ->limit(25)
+            ->get()
+            ->reject(fn (Asset $asset): bool => AssetIdentityConflicts::snapshotConflictsWithAsset($snapshot, $asset))
+            ->values();
     }
 
     /**

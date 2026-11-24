@@ -913,5 +913,20 @@
     "Done": "Ferdig",
     "Copy the key now. It is shown only once and cannot be read back later.": "Kopier nøkkelen nå. Den vises bare én gang og kan ikke hentes frem igjen senere.",
     "Install command": "Installasjonskommando",
-    "Run it as an administrator in PowerShell on a domain-joined machine, in the folder with the downloaded collector.": "Kjør den som administrator i PowerShell på en domenetilknyttet maskin, i mappen der du lagret den nedlastede collectoren."
+    "Run it as an administrator in PowerShell on a domain-joined machine, in the folder with the downloaded collector.": "Kjør den som administrator i PowerShell på en domenetilknyttet maskin, i mappen der du lagret den nedlastede collectoren.",
+    "An asset cannot be merged into itself.": "En ressurs kan ikke slås sammen med seg selv.",
+    "The assets belong to different tenants.": "Ressursene tilhører ulike leietakere.",
+    "The assets belong to different customers.": "Ressursene tilhører ulike kunder.",
+    "The assets have different serial numbers or device IDs from the same source, so they are different devices.": "Ressursene har ulike serienumre eller enhets-ID-er fra samme kilde, så de er ulike enheter.",
+    "Merge duplicate": "Slå sammen duplikat",
+    "Everything linked to the duplicate (integrations, work items, software, documents) moves to this asset, and the duplicate is deleted.": "Alt som er koblet til duplikatet (integrasjoner, saker, programvare, dokumenter) flyttes til denne ressursen, og duplikatet slettes.",
+    "Duplicate asset": "Duplikat",
+    "Assets with the same name are listed first. Type to search for others.": "Ressurser med samme navn vises først. Skriv for å søke etter andre.",
+    "The assets were not merged": "Ressursene ble ikke slått sammen",
+    "Assets merged": "Ressursene er slått sammen",
+    ":name was merged into this asset.": ":name ble slått sammen med denne ressursen.",
+    "Merge duplicates": "Slå sammen duplikater",
+    "Merge duplicate devices": "Slå sammen dupliserte enheter",
+    "{1} 1 device was created twice by different integrations (same name in the same organization, no conflicting serial number or device ID). It will be merged into one asset, keeping everything linked to it.|[2,*] :count devices were created twice by different integrations (same name in the same organization, no conflicting serial number or device ID). Each will be merged into one asset, keeping everything linked to them.": "{1} 1 enhet ble opprettet to ganger av ulike integrasjoner (samme navn i samme organisasjon, uten motstridende serienummer eller enhets-ID). Den slås sammen til én ressurs, og alt som er koblet til den beholdes.|[2,*] :count enheter ble opprettet to ganger av ulike integrasjoner (samme navn i samme organisasjon, uten motstridende serienummer eller enhets-ID). Hver slås sammen til én ressurs, og alt som er koblet til dem beholdes.",
+    "{0} No assets were merged|{1} 1 duplicate asset merged|[2,*] :count duplicate assets merged": "{0} Ingen ressurser ble slått sammen|{1} 1 duplikat slått sammen|[2,*] :count duplikater slått sammen"
 }

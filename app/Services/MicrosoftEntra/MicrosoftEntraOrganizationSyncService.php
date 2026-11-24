@@ -425,6 +425,8 @@ final class MicrosoftEntraOrganizationSyncService
                         'azure_ad_device_id' => $azureAdDeviceId !== '' ? $azureAdDeviceId : null,
                     ], fn (mixed $value): bool => $value !== null && $value !== ''),
                 ),
+                // An asset that Active Directory created has no serial number, so the name links the two.
+                matchByUniqueHostname: true,
             );
 
             $this->assetReconciliationService->reconcile($snapshot);
