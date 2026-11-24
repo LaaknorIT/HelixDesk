@@ -3,3 +3,28 @@
 @source '../../../app/Filament/**/*';
 @source '../../../resources/views/filament/**/*';
 @source '../../../resources/views/livewire/**/*';
+
+/*
+ * Wide screens: wrap step bars and tab rows onto more lines instead of making them scroll sideways.
+ */
+@layer components {
+    .fi-sc-wizard .fi-sc-wizard-header {
+        @apply md:grid-flow-row md:grid-cols-[repeat(auto-fit,minmax(14rem,1fr))] md:overflow-x-visible;
+
+        & .fi-sc-wizard-header-step {
+            @apply min-w-0;
+
+            & .fi-sc-wizard-header-step-btn {
+                @apply w-full min-w-0 pe-8;
+            }
+
+            & .fi-sc-wizard-header-step-text {
+                @apply min-w-0 md:w-auto md:max-w-none;
+            }
+        }
+    }
+
+    .fi-tabs:not(.fi-vertical) {
+        @apply flex-wrap gap-y-1;
+    }
+}

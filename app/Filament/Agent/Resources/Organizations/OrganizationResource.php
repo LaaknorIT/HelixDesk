@@ -19,6 +19,7 @@ use App\Filament\Concerns\TranslatesResourceLabels;
 use App\Models\Organization;
 use BackedEnum;
 use Filament\Navigation\NavigationItem;
+use Filament\Pages\Enums\SubNavigationPosition;
 use Filament\Resources\Pages\Page;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -46,6 +47,11 @@ class OrganizationResource extends Resource
     protected static string|UnitEnum|null $navigationGroup = 'Customers';
 
     protected static ?string $navigationLabel = 'Customers';
+
+    /**
+     * Two entries (Details, Settings) fit as tabs above the page, which leaves the full width to the content.
+     */
+    protected static ?SubNavigationPosition $subNavigationPosition = SubNavigationPosition::Top;
 
     public static function getNavigationLabel(): string
     {

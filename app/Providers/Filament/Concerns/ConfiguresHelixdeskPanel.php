@@ -13,6 +13,7 @@ use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\Support\Colors\Color;
+use Filament\Support\Enums\Width;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -22,7 +23,10 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 /**
  * What every HelixDesk panel shares: sign-in, profile with language choice, brand colour, theme,
- * local avatars and the middleware stack.
+ * content width, local avatars and the middleware stack.
+ *
+ * Content uses the full width of the screen so wide monitors are not left with empty margins and
+ * horizontally scrolling tables or step bars. Panels with mostly running text may narrow it again.
  */
 trait ConfiguresHelixdeskPanel
 {
@@ -36,6 +40,7 @@ trait ConfiguresHelixdeskPanel
                 'primary' => Color::Indigo,
             ])
             ->viteTheme('resources/css/filament/theme.css')
+            ->maxContentWidth(Width::Full)
             ->defaultAvatarProvider(LocalAvatarProvider::class)
             ->middleware([
                 EncryptCookies::class,
