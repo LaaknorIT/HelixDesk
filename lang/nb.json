@@ -844,7 +844,6 @@
     "Create collector key": "Opprett collector-nøkkel",
     "The current key stops working right away. Update the collector with the new key.": "Den nåværende nøkkelen slutter å virke med en gang. Oppdater collectoren med den nye nøkkelen.",
     "Collector key created": "Collector-nøkkel opprettet",
-    "Copy it now, it is shown only once: :key": "Kopier den nå, den vises bare én gang: :key",
     "Download collector": "Last ned collector",
     "Domain not set": "Domene ikke satt",
     "Active Directory (on-premises)": "Active Directory (lokalt)",
@@ -908,5 +907,11 @@
     "Read device objects in Entra ID (joined, hybrid joined and registered) for the device coverage report, and link hybrid joined PCs to Active Directory computers.": "Les enhetsobjekter i Entra ID (innmeldt, hybrid innmeldt og registrert) for rapporten over enhetsdekning, og koble hybrid innmeldte PC-er til maskiner i Active Directory.",
     "Entra ID": "Entra ID",
     "Registered only": "Kun registrert",
-    "Seen, not managed": "Sett, ikke administrert"
+    "Seen, not managed": "Sett, ikke administrert",
+    "Collector key": "Collector-nøkkel",
+    "Copied": "Kopiert",
+    "Done": "Ferdig",
+    "Copy the key now. It is shown only once and cannot be read back later.": "Kopier nøkkelen nå. Den vises bare én gang og kan ikke hentes frem igjen senere.",
+    "Install command": "Installasjonskommando",
+    "Run it as an administrator in PowerShell on a domain-joined machine, in the folder with the downloaded collector.": "Kjør den som administrator i PowerShell på en domenetilknyttet maskin, i mappen der du lagret den nedlastede collectoren."
 }

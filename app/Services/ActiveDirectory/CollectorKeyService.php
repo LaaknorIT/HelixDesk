@@ -3,6 +3,7 @@
 namespace App\Services\ActiveDirectory;
 
 use App\Models\OrganizationIntegration;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -17,18 +18,27 @@ final class CollectorKeyService
     {
         $key = self::PREFIX.Str::random(48);
 
-        $integration->credentials = [
-            ...$integration->mergedCredentials(),
-            'collector_key_hash' => hash('sha256', $key),
-            'collector_key_hint' => substr($key, -4),
-            'collector_key_created_at' => now()->toIso8601String(),
-        ];
-        $integration->save();
+        DB::transaction(function () use ($integration, $key): void {
+            $integration->credentials = [
+                ...$integration->mergedCredentials(),
+                'collector_key_hash' => hash('sha256', $key),
+                'collector_key_hint' => substr($key, -4),
+                'collector_key_created_at' => now()->toIso8601String(),
+            ];
+            $integration->save();
 
-        activity()
-            ->performedOn($integration)
-            ->event('collector_key_issued')
-            ->log('Collector key issued');
+            // Integrations have UUID keys, while activity_log.subject_id is a bigint column, so the integration
+            // cannot be the log subject (PostgreSQL rejects the insert). Its ID goes in the properties instead.
+            activity()
+                ->withProperties([
+                    'integration_id' => (string) $integration->getKey(),
+                    'organization_id' => $integration->organization_id,
+                    'tenant_id' => $integration->tenant_id,
+                    'key_hint' => substr($key, -4),
+                ])
+                ->event('collector_key_issued')
+                ->log('Collector key issued');
+        });
 
         return $key;
     }
