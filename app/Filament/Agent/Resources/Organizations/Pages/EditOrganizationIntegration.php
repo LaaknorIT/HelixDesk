@@ -152,7 +152,9 @@ class EditOrganizationIntegration extends EditRecord
             ->modalIcon(Heroicon::OutlinedKey)
             ->fillForm(fn (array $arguments): array => [
                 'key' => (string) ($arguments['key'] ?? ''),
-                'install_command' => '.\\'.ActiveDirectoryCollectorScript::FILE_NAME." -Install -CollectorKey '".($arguments['key'] ?? '')."'",
+                'install_command' => ($integration = $this->integrationModel()) !== null
+                    ? ActiveDirectoryCollectorScript::installCommand($integration, (string) ($arguments['key'] ?? ''))
+                    : '',
             ])
             ->schema([
                 TextInput::make('key')
@@ -162,7 +164,10 @@ class EditOrganizationIntegration extends EditRecord
                     ->extraInputAttributes(['class' => 'font-mono']),
                 TextInput::make('install_command')
                     ->label(__('Install command'))
-                    ->helperText(__('Run it as an administrator in PowerShell on a domain-joined machine, in the folder with the downloaded collector.'))
+                    ->helperText(fn (): string => __('Run it as an administrator in PowerShell on a domain-joined machine, in the folder with the downloaded collector.')
+                        .(self::appUrlDiffersFromBrowser()
+                            ? ' '.__('Note: the collector connects to :url (APP_URL), not the address in your browser. If that address does not reach HelixDesk, change -HelixDeskUrl.', ['url' => ActiveDirectoryCollectorScript::helixDeskUrl()])
+                            : ''))
                     ->readOnly()
                     ->copyable(copyMessage: __('Copied'))
                     ->extraInputAttributes(['class' => 'font-mono']),
@@ -170,6 +175,13 @@ class EditOrganizationIntegration extends EditRecord
             ->modalSubmitAction(false)
             ->modalCancelActionLabel(__('Done'))
             ->closeModalByClickingAway(false);
+    }
+
+    private static function appUrlDiffersFromBrowser(): bool
+    {
+        $configuredHost = parse_url(ActiveDirectoryCollectorScript::helixDeskUrl(), PHP_URL_HOST);
+
+        return is_string($configuredHost) && strcasecmp($configuredHost, request()->getHost()) !== 0;
     }
 
     private function integrationModel(): ?OrganizationIntegration
