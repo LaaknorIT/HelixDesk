@@ -184,6 +184,8 @@ class ActiveDirectoryCollectorTest extends TestCase
 
     public function test_a_complete_run_links_creates_and_marks_gone(): void
     {
+        // Import every computer here, so the stale one shows how stale computers are handled when kept.
+        $this->integration->update(['config' => [...$this->integration->config, 'skip_inactive_after_days' => 0]]);
         $intuneAsset = $this->asset('PC-0142');
 
         $runId = $this->postJson($this->url('runs'), ['collector_version' => '1.0.0', 'host' => 'SRV-MGMT'], $this->auth())
@@ -236,6 +238,137 @@ class ActiveDirectoryCollectorTest extends TestCase
 
         $this->assertNotNull($records['PC-OLD']->fresh()->gone_at);
         $this->assertNull($records['PC-0142']->fresh()->gone_at);
+    }
+
+    public function test_inactive_and_disabled_computers_are_skipped_but_the_run_still_completes(): void
+    {
+        $this->assertSame(90, $this->integration->fresh()->config['skip_inactive_after_days']);
+        $this->assertTrue($this->integration->fresh()->config['skip_disabled']);
+
+        $runId = $this->postJson($this->url('runs'), [], $this->auth())->json('data.run_id');
+        $this->postJson($this->url("runs/{$runId}/objects"), ['sequence' => 0, 'objects' => [
+            $this->object('44444444-0000-0000-0000-000000000001', 'PC-ACTIVE', lastLogon: now()->subDays(2)),
+            // Like ANETTEL-BB2010: Windows 7, last logon two years ago.
+            $this->object('44444444-0000-0000-0000-000000000002', 'PC-WIN7', lastLogon: Carbon::parse('2022-10-21 10:13:34'), os: 'Windows 7 Ultimate'),
+            $this->object('44444444-0000-0000-0000-000000000003', 'PC-DISABLED', lastLogon: now()->subDays(2), enabled: false),
+            // Between the active limit (30) and the skip limit (90): kept, but not made an asset.
+            $this->object('44444444-0000-0000-0000-000000000004', 'PC-IDLE', lastLogon: now()->subDays(60)),
+            // An old domain controller is never skipped.
+            $this->object('44444444-0000-0000-0000-000000000005', 'DC-OLD', lastLogon: now()->subDays(400), os: 'Windows Server 2012 R2', dc: true),
+            // Joined last week and never logged on: counted from when it was created.
+            [...$this->object('44444444-0000-0000-0000-000000000006', 'PC-NEW', lastLogon: now()), 'last_logon_timestamp' => null, 'pwd_last_set' => null, 'when_created' => now()->subWeek()->toIso8601String()],
+        ]], $this->auth())
+            ->assertOk()
+            ->assertJsonPath('data.stored', 4)
+            ->assertJsonPath('data.received_total', 6)
+            ->assertJsonPath('data.skipped_total', 2);
+
+        $this->postJson($this->url("runs/{$runId}/complete"), ['object_count' => 6], $this->auth())
+            ->assertOk()
+            ->assertJsonPath('data.status', CollectorRun::STATUS_COMPLETED);
+
+        $names = AssetSourceRecord::query()->withoutGlobalScopes()->whereNull('gone_at')->pluck('display_name')->sort()->values()->all();
+        $this->assertSame(['DC-OLD', 'PC-ACTIVE', 'PC-IDLE', 'PC-NEW'], $names);
+        // Kept computers still only become assets when active (seen within 30 days).
+        $this->assertSame(['PC-ACTIVE'], Asset::query()->withoutGlobalScopes()->orderBy('name')->pluck('name')->all());
+
+        $report = app(DeviceCoverageService::class)->build($this->tenant->id);
+        $this->assertNotContains('PC-WIN7', collect($report->rows)->pluck('name')->all());
+    }
+
+    public function test_already_imported_stale_computers_leave_coverage_and_ad_only_assets_can_be_retired(): void
+    {
+        $intuneAsset = $this->asset('PC-SHARED');
+        AssetSourceRecord::query()->create([
+            'tenant_id' => $this->tenant->id,
+            'organization_id' => $this->organization->id,
+            'asset_id' => $intuneAsset->id,
+            'organization_integration_id' => OrganizationIntegration::factory()->create([
+                'tenant_id' => $this->tenant->id,
+                'organization_id' => $this->organization->id,
+                'type' => IntegrationType::MICROSOFT_ENTRA,
+            ])->id,
+            'source' => DeviceSourceKey::MICROSOFT_INTUNE,
+            'provider_record_id' => 'intune-shared',
+            'display_name' => 'PC-SHARED',
+            'last_activity_at' => now()->subDays(200),
+            'last_reported_at' => now(),
+        ]);
+
+        // Imported before stale computers were skipped.
+        $this->integration->update(['config' => [...$this->integration->config, 'skip_inactive_after_days' => 0, 'create_assets' => 'all']]);
+        $runId = $this->postJson($this->url('runs'), [], $this->auth())->json('data.run_id');
+        $this->postJson($this->url("runs/{$runId}/objects"), ['sequence' => 0, 'objects' => [
+            $this->object('55555555-0000-0000-0000-000000000001', 'PC-WIN7', lastLogon: now()->subYears(2), os: 'Windows 7 Ultimate'),
+            $this->object('55555555-0000-0000-0000-000000000002', 'PC-SHARED', lastLogon: now()->subDays(200)),
+            $this->object('55555555-0000-0000-0000-000000000003', 'PC-ACTIVE', lastLogon: now()->subDays(1)),
+        ]], $this->auth());
+        $this->postJson($this->url("runs/{$runId}/complete"), ['object_count' => 3], $this->auth());
+        $this->assertSame(3, Asset::query()->withoutGlobalScopes()->count());
+
+        // Back to the defaults: the next run drops the stale computer from Device coverage.
+        $this->integration->update(['config' => [...$this->integration->config, 'skip_inactive_after_days' => 90, 'create_assets' => 'active_only']]);
+        $this->travel(4)->hours();
+        $runId = $this->postJson($this->url('runs'), [], $this->auth())->json('data.run_id');
+        $this->postJson($this->url("runs/{$runId}/objects"), ['sequence' => 0, 'objects' => [
+            $this->object('55555555-0000-0000-0000-000000000001', 'PC-WIN7', lastLogon: now()->subYears(2), os: 'Windows 7 Ultimate'),
+            $this->object('55555555-0000-0000-0000-000000000002', 'PC-SHARED', lastLogon: now()->subDays(200)),
+            $this->object('55555555-0000-0000-0000-000000000003', 'PC-ACTIVE', lastLogon: now()->subDays(1)),
+        ]], $this->auth());
+        $this->postJson($this->url("runs/{$runId}/complete"), ['object_count' => 3], $this->auth())
+            ->assertJsonPath('data.status', CollectorRun::STATUS_COMPLETED);
+
+        $win7Record = AssetSourceRecord::query()->withoutGlobalScopes()->where('provider_record_id', '55555555-0000-0000-0000-000000000001')->sole();
+        $this->assertNotNull($win7Record->gone_at);
+
+        // Only the asset nobody but AD knows about is retired; the dry run changes nothing.
+        $this->artisan('helixdesk:retire-stale-ad-assets', ['--dry-run' => true])
+            ->expectsOutputToContain('"PC-WIN7"')
+            ->expectsOutputToContain('Found 1 stale Active Directory asset(s)')
+            ->assertSuccessful();
+        $this->assertSame('in_use', Asset::query()->withoutGlobalScopes()->findOrFail($win7Record->asset_id)->lifecycle_status);
+
+        $this->artisan('helixdesk:retire-stale-ad-assets')->expectsOutputToContain('Retired 1 stale')->assertSuccessful();
+
+        $statuses = Asset::query()->withoutGlobalScopes()->pluck('lifecycle_status', 'name');
+        $this->assertSame('retired', $statuses['PC-WIN7']);
+        $this->assertNotSame('retired', $statuses['PC-SHARED']);
+        $this->assertNotSame('retired', $statuses['PC-ACTIVE']);
+        $this->assertTrue(Activity::query()->where('event', 'retired')->where('properties->trigger', 'active_directory_cleanup')->exists());
+    }
+
+    public function test_edit_page_offers_to_retire_stale_computers(): void
+    {
+        $this->integration->update(['config' => [...$this->integration->config, 'create_assets' => 'all', 'skip_disabled' => false]]);
+        $runId = $this->postJson($this->url('runs'), [], $this->auth())->json('data.run_id');
+        $this->postJson($this->url("runs/{$runId}/objects"), ['sequence' => 0, 'objects' => [
+            $this->object('66666666-0000-0000-0000-000000000001', 'PC-OFF', lastLogon: now()->subDays(2), enabled: false),
+        ]], $this->auth());
+        $this->integration->update(['config' => [...$this->integration->config, 'skip_disabled' => true]]);
+
+        $this->actingAsTenantAdmin();
+
+        Livewire::test(EditOrganizationIntegration::class, [
+            'record' => $this->organization->id,
+            'integration' => (string) $this->integration->getKey(),
+        ])
+            ->assertActionVisible('retire_stale_computers')
+            ->callAction('retire_stale_computers')
+            ->assertHasNoActionErrors()
+            ->assertNotified();
+
+        $this->assertSame('retired', Asset::query()->withoutGlobalScopes()->sole()->lifecycle_status);
+    }
+
+    public function test_skip_limit_must_be_zero_or_at_least_the_active_limit(): void
+    {
+        $this->expectException(ValidationException::class);
+        app(OrganizationIntegrationRepository::class)->createActiveDirectoryFromForm($this->organization, [
+            'ad_domain_fqdn' => 'other.example.com',
+            'ad_active_threshold_days' => 60,
+            'ad_skip_inactive_after_days' => 45,
+            'ad_create_assets' => 'active_only',
+        ]);
     }
 
     public function test_an_incomplete_run_marks_nothing_gone_and_is_reported(): void

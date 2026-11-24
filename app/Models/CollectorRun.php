@@ -27,6 +27,7 @@ class CollectorRun extends TenantModel
         'organization_integration_id',
         'status',
         'received_count',
+        'skipped_count',
         'expected_count',
         'batch_sequences',
         'collector_version',
@@ -40,6 +41,7 @@ class CollectorRun extends TenantModel
     {
         return [
             'received_count' => 'integer',
+            'skipped_count' => 'integer',
             'expected_count' => 'integer',
             'batch_sequences' => 'array',
             'started_at' => 'datetime',

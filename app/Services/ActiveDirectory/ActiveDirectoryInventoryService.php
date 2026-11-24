@@ -21,10 +21,17 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * Turns computer objects pushed by the Active Directory collector into source records and (for active computers,
- * by default) assets.
+ * by default) assets. Disabled computers and computers that have not been seen for a long time are skipped, so old
+ * objects nobody cleaned out of AD never show up in HelixDesk.
  */
 final class ActiveDirectoryInventoryService
 {
+    public const DEFAULT_SKIP_INACTIVE_AFTER_DAYS = 90;
+
+    public const SKIP_REASON_DISABLED = 'disabled';
+
+    public const SKIP_REASON_INACTIVE = 'inactive';
+
     public function __construct(
         private readonly TenantContext $tenantContext,
         private readonly AssetReconciliationService $assetReconciliationService,
@@ -69,10 +76,20 @@ final class ActiveDirectoryInventoryService
                 ->firstOrCreate(['tenant_id' => $integration->tenant_id, 'name' => 'Computer'])
                 ->getKey();
 
+            $config = $integration->mergedConfig();
             $stored = 0;
+            $skipped = 0;
             foreach ($objects as $object) {
                 $snapshot = $this->snapshot($integration, $assetTypeId, $object);
                 if ($snapshot === null) {
+                    continue;
+                }
+
+                if (self::skipReason($config, $snapshot->sourceRecord?->enabled, $snapshot->sourceRecord?->lastActivityAt, $object) !== null) {
+                    // Counted as received so the run still completes; the record is then marked gone like a
+                    // computer deleted from AD.
+                    $skipped++;
+
                     continue;
                 }
 
@@ -84,10 +101,56 @@ final class ActiveDirectoryInventoryService
         }
 
         $run->batch_sequences = [...$sequences, $sequence];
-        $run->received_count += $stored;
+        $run->received_count += $stored + $skipped;
+        $run->skipped_count += $skipped;
         $run->save();
 
         return $stored;
+    }
+
+    /**
+     * Days without activity after which a computer is skipped, or 0 to keep every computer.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    public static function skipInactiveAfterDays(array $config): int
+    {
+        return max(0, (int) ($config['skip_inactive_after_days'] ?? self::DEFAULT_SKIP_INACTIVE_AFTER_DAYS));
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    public static function skipsDisabled(array $config): bool
+    {
+        return (bool) ($config['skip_disabled'] ?? true);
+    }
+
+    /**
+     * Why a computer is left out of HelixDesk, or null to import it. Domain controllers are always imported. A
+     * computer that has never logged on counts from when it was created, so a newly joined PC is not skipped.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $object  the collector object (for is_domain_controller and when_created)
+     */
+    public static function skipReason(array $config, ?bool $enabled, ?Carbon $lastActivity, array $object = []): ?string
+    {
+        if ((bool) ($object['is_domain_controller'] ?? false)) {
+            return null;
+        }
+
+        if ($enabled === false && self::skipsDisabled($config)) {
+            return self::SKIP_REASON_DISABLED;
+        }
+
+        $days = self::skipInactiveAfterDays($config);
+        if ($days === 0) {
+            return null;
+        }
+
+        $seen = $lastActivity ?? DeviceSourceRecordData::parseActivityTime($object['when_created'] ?? null);
+
+        return $seen === null || $seen->lessThan(now()->subDays($days)) ? self::SKIP_REASON_INACTIVE : null;
     }
 
     /**

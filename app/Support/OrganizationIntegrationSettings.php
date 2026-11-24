@@ -7,6 +7,7 @@ use App\Models\AssetSourceRecord;
 use App\Models\Organization;
 use App\Models\OrganizationIntegration;
 use App\Repositories\OrganizationIntegrationRepository;
+use App\Services\ActiveDirectory\ActiveDirectoryInventoryService;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
@@ -22,6 +23,8 @@ final class OrganizationIntegrationSettings
 
     /** Active Directory replicates lastLogonTimestamp only every 9–14 days, so shorter windows give false "stale". */
     public const ACTIVE_DIRECTORY_MIN_ACTIVE_DAYS = 21;
+
+    public const ACTIVE_DIRECTORY_MAX_SKIP_INACTIVE_DAYS = 3650;
 
     /**
      * @return list<string>
@@ -601,6 +604,8 @@ final class OrganizationIntegrationSettings
             'ad_excluded_ous' => '',
             'ad_active_threshold_days' => AssetSourceRecord::DEFAULT_ACTIVE_THRESHOLD_DAYS,
             'ad_create_assets' => 'active_only',
+            'ad_skip_inactive_after_days' => ActiveDirectoryInventoryService::DEFAULT_SKIP_INACTIVE_AFTER_DAYS,
+            'ad_skip_disabled' => true,
             'ad_sync_interval_hours' => 4,
             'ad_enabled' => true,
         ];
@@ -618,6 +623,8 @@ final class OrganizationIntegrationSettings
             'ad_excluded_ous' => implode("\n", (array) ($config['excluded_ous'] ?? [])),
             'ad_active_threshold_days' => (int) ($config['active_threshold_days'] ?? AssetSourceRecord::DEFAULT_ACTIVE_THRESHOLD_DAYS),
             'ad_create_assets' => (string) ($config['create_assets'] ?? 'active_only'),
+            'ad_skip_inactive_after_days' => ActiveDirectoryInventoryService::skipInactiveAfterDays($config),
+            'ad_skip_disabled' => ActiveDirectoryInventoryService::skipsDisabled($config),
             'ad_sync_interval_hours' => (int) ($config['sync_interval_hours'] ?? 4),
             'ad_enabled' => (bool) ($config['enabled'] ?? false),
         ];
@@ -644,6 +651,14 @@ final class OrganizationIntegrationSettings
             $errors['ad_create_assets'] = __('Choose when computers become assets.');
         }
 
+        $skipAfter = (int) ($data['ad_skip_inactive_after_days'] ?? ActiveDirectoryInventoryService::DEFAULT_SKIP_INACTIVE_AFTER_DAYS);
+        if ($skipAfter !== 0 && ($skipAfter < $threshold || $skipAfter > self::ACTIVE_DIRECTORY_MAX_SKIP_INACTIVE_DAYS)) {
+            $errors['ad_skip_inactive_after_days'] = __('Use 0 to keep every computer, or a number of days between the active limit (:min) and :max.', [
+                'min' => max($threshold, self::ACTIVE_DIRECTORY_MIN_ACTIVE_DAYS),
+                'max' => self::ACTIVE_DIRECTORY_MAX_SKIP_INACTIVE_DAYS,
+            ]);
+        }
+
         if ($errors !== []) {
             throw ValidationException::withMessages($errors);
         }
@@ -668,6 +683,8 @@ final class OrganizationIntegrationSettings
             'excluded_ous' => $lines($data['ad_excluded_ous'] ?? ''),
             'active_threshold_days' => max(self::ACTIVE_DIRECTORY_MIN_ACTIVE_DAYS, (int) ($data['ad_active_threshold_days'] ?? AssetSourceRecord::DEFAULT_ACTIVE_THRESHOLD_DAYS)),
             'create_assets' => (string) ($data['ad_create_assets'] ?? 'active_only'),
+            'skip_inactive_after_days' => max(0, (int) ($data['ad_skip_inactive_after_days'] ?? ActiveDirectoryInventoryService::DEFAULT_SKIP_INACTIVE_AFTER_DAYS)),
+            'skip_disabled' => (bool) ($data['ad_skip_disabled'] ?? true),
             'sync_interval_hours' => max(1, (int) ($data['ad_sync_interval_hours'] ?? 4)),
             'scopes' => ['computers' => true],
             'mode' => 'collector',
